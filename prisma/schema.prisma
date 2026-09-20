@@ -1,0 +1,405 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Lurevia — Schéma Prisma
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum AuthIdentifier {
+  EMAIL
+  PHONE
+}
+
+enum PaymentMethod {
+  MOBILE_MONEY
+  CARD
+  CASH
+}
+
+enum MobileMoneyProvider {
+  MVOLA
+  ORANGE_MONEY
+  AIRTEL_MONEY
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum TransactionStatus {
+  SUCCESS
+  PENDING
+  FAILED
+}
+
+enum FeedbackCategory {
+  DELIVERY
+  PAYMENT
+  SUPPORT
+  WEBSITE
+  OTHER
+}
+
+enum NotificationType {
+  REVIEW_PENDING
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  PROMO
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILISATEURS & AUTHENTIFICATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id                String         @id @default(cuid())
+  fullName          String
+  email             String?        @unique
+  phone             String?        @unique
+  passwordHash      String
+  primaryIdentifier AuthIdentifier @default(EMAIL)
+  avatarUrl         String?
+  role              Role           @default(CUSTOMER)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  lastLoginAt       DateTime?
+
+  addresses         Address[]
+  cartItems         CartItem[]
+  favorites         FavoriteItem[]
+  orders            Order[]
+  reviews           ProductReview[]
+  serviceFeedbacks  ServiceFeedback[]
+  notifications     Notification[]
+  refreshTokens     RefreshToken[]
+
+  @@map("users")
+}
+
+// Jetons de rafraîchissement stockés hashés — permet la révocation et la
+// rotation, contrairement à un simple JWT stateless.
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  createdByIp String?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  fullName  String
+  phone     String
+  email     String
+  address   String
+  city      String
+  region    String
+  notes     String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CATALOGUE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String
+  imageUrl    String
+  bannerUrl   String
+  iconName    String   @default("ShoppingBag")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products ProductCategory[]
+
+  @@map("categories")
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  sku             String   @unique
+  description     String?
+  longDescription String?
+  price           Int
+  originalPrice   Int?
+  stock           Int      @default(0)
+  isNew           Boolean  @default(false)
+  tags            String[] @default([])
+  ratingCache     Float    @default(0)
+  reviewCountCache Int     @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  images     ProductImage[]
+  colors     ProductColor[]
+  sizes      ProductSize[]
+  categories ProductCategory[]
+  cartItems  CartItem[]
+  favorites  FavoriteItem[]
+  orderItems OrderItem[]
+  reviews    ProductReview[]
+
+  @@index([price])
+  @@index([createdAt])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int     @default(0)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model ProductColor {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String
+  hex       String
+
+  @@index([productId])
+  @@map("product_colors")
+}
+
+// Le "size" est volontairement une chaîne libre plutôt qu'un enum : le
+// catalogue mélange des tailles vestimentaires (S, M, L), des pointures
+// (38, 39...), des dimensions ("180 × 250 cm"), des poids ("500 g") et des
+// volumes ("100 ml") selon la nature du produit (artisanat, bijoux, beauté...).
+model ProductSize {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  value     String  @db.VarChar(60)
+
+  @@unique([productId, value])
+  @@map("product_sizes")
+}
+
+// Table de jointure explicite (plutôt qu'une relation implicite Prisma)
+// pour permettre de futures métadonnées (ex: mise en avant) sans migration lourde.
+model ProductCategory {
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+  @@map("product_categories")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PANIER & FAVORIS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("cart_items")
+}
+
+model FavoriteItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("favorite_items")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMANDES & PAIEMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Order {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod
+
+  // Copie figée de l'adresse au moment de la commande (ne doit jamais changer
+  // rétroactivement si l'utilisateur modifie son carnet d'adresses).
+  shippingFullName String
+  shippingPhone    String
+  shippingEmail    String
+  shippingAddress  String
+  shippingCity     String
+  shippingRegion   String
+  shippingNotes    String?
+
+  subtotal     Int
+  shippingCost Int
+  total        Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items        OrderItem[]
+  transactions Transaction[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("orders")
+}
+
+// Ligne de commande : on fige le titre et le prix au moment de l'achat pour
+// que l'historique reste exact même si le produit change ensuite de prix.
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  titleSnapshot String
+  imageSnapshot String?
+  priceSnapshot Int
+  quantity      Int
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Transaction {
+  id        String            @id @default(cuid())
+  orderId   String
+  order     Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount    Int
+  method    PaymentMethod
+  status    TransactionStatus
+  createdAt DateTime          @default(now())
+
+  @@index([orderId])
+  @@map("transactions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AVIS PRODUITS & FEEDBACK DE SERVICE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ProductReview {
+  id                 String   @id @default(cuid())
+  productId          String
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating             Int
+  title              String?
+  comment            String
+  isVerifiedPurchase Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@map("product_reviews")
+}
+
+model ServiceFeedback {
+  id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  overallRating  Int
+  criteria       Json?
+  category       FeedbackCategory
+  comment        String
+  teamResponse   String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([userId])
+  @@map("service_feedbacks")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  title       String
+  message     String
+  actionUrl   String
+  imageUrl    String?
+  // Référence métier optionnelle utilisée pour éviter les doublons
+  // (ex: "order:<id>:shipped" ou "review:<orderId>:<productId>").
+  referenceKey String
+  read        Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  @@unique([userId, referenceKey])
+  @@index([userId])
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEWSLETTER
+// ─────────────────────────────────────────────────────────────────────────────
+
+model NewsletterSubscriber {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  subscribedAt DateTime @default(now())
+
+  @@map("newsletter_subscribers")
+}

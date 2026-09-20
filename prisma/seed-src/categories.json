@@ -1,0 +1,50 @@
+[
+  {
+    "id": "artisanat",
+    "name": "Artisanat malgache",
+    "slug": "artisanat-malgache",
+    "description": "Découvrez des pièces uniques faites main par des artisans passionnés, valorisant les matières naturelles locales et durables de Madagascar.",
+    "imageUrl": "/images/categories/category_1.png",
+    "bannerUrl": "/images/hero/banner_artisanat.jpg"
+  },
+  {
+    "id": "mode",
+    "name": "Mode & accessoires",
+    "slug": "mode-accessoires",
+    "description": "Découvrez notre sélection exclusive de vêtements, sacs cabas en raphia, chapeaux et accessoires pour un style unique, moderne et authentique.",
+    "imageUrl": "/images/hero/hero_3.png",
+    "bannerUrl": "/images/hero/banner_mode.jpg"
+  },
+  {
+    "id": "bijoux",
+    "name": "Bijoux artisanaux",
+    "slug": "bijoux-artisanaux",
+    "description": "Des parures élégantes, colliers en corne et laiton forgés à la main par nos maîtres bijoutiers locaux.",
+    "imageUrl": "/images/categories/category_3.png",
+    "bannerUrl": "/images/hero/banner_bijoux.jpg"
+  },
+  {
+    "id": "maison",
+    "name": "Maison & décoration",
+    "slug": "maison-decoration",
+    "description": "Sublimez votre intérieur avec des poteries, vanneries, paniers en jonc naturel et objets de décoration authentiques de la Grande Île.",
+    "imageUrl": "/images/categories/category_4.png",
+    "bannerUrl": "/images/hero/banner_maison.jpg"
+  },
+  {
+    "id": "beaute",
+    "name": "Beauté & bien-être",
+    "slug": "beaute-bien-etre",
+    "description": "Prenez soin de vous grâce à des huiles essentielles pures, des soins naturels et des produits de bien-être issus de la biodiversité malgache.",
+    "imageUrl": "/images/categories/category_5.png",
+    "bannerUrl": "/images/hero/banner_beaute.jpg"
+  },
+  {
+    "id": "gadgets",
+    "name": "Gadgets & quotidien",
+    "slug": "gadgets-quotidien",
+    "description": "Une sélection d'objets pratiques, cadeaux originaux et accessoires utiles pour simplifier et égayer votre quotidien.",
+    "imageUrl": "/images/categories/category_6.png",
+    "bannerUrl": "/images/hero/banner_gadgets.jpg"
+  }
+]
