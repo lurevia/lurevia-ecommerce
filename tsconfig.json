@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
+    "module": "node16",
     "lib": ["ES2022"],
-    "moduleResolution": "node10",
-    "rootDir": "./",
+    "moduleResolution": "node16",
+    "types": ["node"],
+    "rootDir": "src",
     "outDir": "./dist",
     "paths": {
       "@/*": ["./src/*"]
@@ -26,5 +27,10 @@
     "incremental": true
   },
   "include": ["src/**/*.ts", "prisma/**/*.ts"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests"],
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
+  }
 }
