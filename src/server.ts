@@ -12,13 +12,26 @@ const start = async (): Promise<void> => {
     logger.info(`🚀 API Lurevia démarrée sur le port ${env.PORT} (${env.NODE_ENV})`);
   });
 
+  const keepAliveInterval = setInterval(async () => {
+    try {
+      await prisma.$executeRawUnsafe("SELECT 1;");
+      logger.debug("[DB Keep-Alive] Base de données pingée avec succès.");
+    } catch (error) {
+      logger.warn({ err: error }, "[DB Keep-Alive] Impossible de joindre la base de données.");
+    }
+  }, 10 * 60 * 1000);
+
   const shutdown = async (signal: string) => {
     logger.info(`Signal ${signal} reçu, arrêt en cours...`);
+
+    clearInterval(keepAliveInterval);
+
     server.close(async () => {
       await prisma.$disconnect();
       logger.info("Arrêt propre terminé");
       process.exit(0);
     });
+
     setTimeout(() => {
       logger.error("Arrêt forcé après timeout");
       process.exit(1);
