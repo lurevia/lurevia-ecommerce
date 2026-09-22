@@ -18,5 +18,10 @@ export const changePasswordSchema = z.object({
     .regex(/[0-9]/),
 });
 
+export const requestDeletionSchema = z.object({
+  reason: z.string().trim().max(1000).optional(),
+});
+
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type RequestDeletionInput = z.infer<typeof requestDeletionSchema>;

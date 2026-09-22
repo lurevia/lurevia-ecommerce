@@ -2,8 +2,9 @@ import { usersRepository } from "./users.repository";
 import { authRepository } from "../auth/auth.repository";
 import { toPublicUser } from "../auth/auth.mapper";
 import { verifyPassword, hashPassword } from "../../utils/password";
-import { BadRequestError, NotFoundError, UnauthorizedError } from "../../errors/AppError";
-import type { ChangePasswordInput, UpdateProfileInput } from "./users.validators";
+import { adminNotificationsService } from "../admin/adminNotifications.service";
+import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from "../../errors/AppError";
+import type { ChangePasswordInput, RequestDeletionInput, UpdateProfileInput } from "./users.validators";
 
 export const usersService = {
   async updateProfile(userId: string, input: UpdateProfileInput) {
@@ -33,5 +34,31 @@ export const usersService = {
     // Révoque toutes les sessions actives : un changement de mot de passe
     // doit invalider les éventuels tokens déjà émis (ex: appareil volé).
     await authRepository.revokeAllUserTokens(userId);
+  },
+
+  /**
+   * Un client ne peut pas supprimer son compte lui-même : la demande passe
+   * par une validation manuelle admin (voir module admin), pour éviter les
+   * suppressions accidentelles ou frauduleuses (ex: compte piraté).
+   */
+  async requestDeletion(userId: string, input: RequestDeletionInput) {
+    const user = await usersRepository.findById(userId);
+    if (!user) throw new NotFoundError("Utilisateur");
+
+    const existing = await usersRepository.findPendingDeletionRequest(userId);
+    if (existing) throw new ConflictError("Une demande de suppression est déjà en attente de traitement.");
+
+    const request = await usersRepository.createDeletionRequest(userId, input.reason);
+
+    await adminNotificationsService.notify({
+      type: "DELETION_REQUEST",
+      title: "Demande de suppression de compte",
+      message: `${user.fullName} souhaite supprimer son compte${input.reason ? ` — ${input.reason.slice(0, 80)}` : ""}`,
+      entityType: "deletionRequest",
+      entityId: request.id,
+      actorUserId: userId,
+    });
+
+    return { id: request.id, status: "pending" as const, createdAt: request.createdAt.toISOString() };
   },
 };

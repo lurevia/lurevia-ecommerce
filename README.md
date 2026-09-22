@@ -61,8 +61,11 @@ npm install
 cp .env.example .env
 # → éditez .env : DATABASE_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET au minimum
 
-# Première initialisation de la base (crée le dossier prisma/migrations)
-npx prisma migrate dev --name init
+# Appliquer les migrations versionnées (développement)
+npm run prisma:migrate:dev
+
+# En production/Render, appliquer uniquement les migrations existantes
+npm run prisma:migrate
 
 # Peuple la base avec le catalogue de démonstration
 npm run seed
@@ -105,6 +108,7 @@ Voir `.env.example` pour la liste complète et les valeurs par défaut. Les plus
 | `DEFAULT_SHIPPING_COST`    | Frais de livraison par défaut, en Ariary                                   |
 | `FREE_SHIPPING_THRESHOLD`  | Montant au-delà duquel la livraison est gratuite                           |
 | `REVIEW_DELAY_DAYS`        | Délai avant qu'un client puisse laisser un avis après achat                |
+| `ADMIN_RATE_LIMIT_MAX`     | Limite dédiée aux opérations d'administration (plus permissive que l'auth) |
 
 Le serveur **refuse de démarrer** si une variable requise est absente ou invalide (validation stricte via Zod dans `src/config/env.ts`) — c'est volontaire : mieux vaut échouer immédiatement au démarrage qu'en pleine production.
 
@@ -142,13 +146,15 @@ src/
     *.service.ts             Logique métier
     *.controller.ts           Adaptation requête/réponse HTTP
     *.routes.ts                 Déclaration des routes Express
-  routes/index.ts        Assemblage de toutes les routes
+  routes/index.ts        Assemblage de toutes les routes client et admin
   app.ts                  Pipeline de middlewares Express
   server.ts               Point d'entrée, démarrage, arrêt propre
 tests/                  Tests unitaires et d'intégration (Vitest)
 ```
 
-Architecture en couches **Route → Controller → Service → Repository → Prisma**, cohérente sur l'ensemble des modules.
+Architecture en couches **Route → Controller → Service → Repository → Prisma**, cohérente sur l'ensemble des modules. Les deux anciens backends sont remplacés par cette seule application et ce seul singleton Prisma.
+
+La matrice complète des accès est disponible dans [docs/access-matrix.md](docs/access-matrix.md).
 
 ---
 

@@ -67,6 +67,20 @@ enum NotificationType {
   ACCOUNT_VERIFICATION
 }
 
+enum AdminNotificationType {
+  NEW_ORDER
+  NEW_REVIEW
+  NEW_FEEDBACK
+  DELETION_REQUEST
+  LOW_STOCK
+}
+
+enum DeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // UTILISATEURS & AUTHENTIFICATION
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,6 +112,7 @@ model User {
   notifications     Notification[]
   refreshTokens     RefreshToken[]
   verificationRequests VerificationRequest[]
+  deletionRequests  AccountDeletionRequest[]
 
   @@map("users")
 }
@@ -397,6 +412,37 @@ model Notification {
   @@unique([userId, referenceKey])
   @@index([userId])
   @@map("notifications")
+}
+
+model AdminNotification {
+  id          String                @id @default(cuid())
+  type        AdminNotificationType
+  title       String
+  message     String
+  entityType  String
+  entityId    String
+  actorUserId String?
+  read        Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+
+  @@index([read, createdAt])
+  @@index([entityType, entityId])
+  @@map("admin_notifications")
+}
+
+model AccountDeletionRequest {
+  id          String               @id @default(cuid())
+  userId      String
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason      String?
+  status      DeletionRequestStatus @default(PENDING)
+  adminNote   String?
+  createdAt   DateTime             @default(now())
+  processedAt DateTime?
+
+  @@index([status])
+  @@index([userId])
+  @@map("account_deletion_requests")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

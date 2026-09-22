@@ -28,3 +28,11 @@ export const authRateLimiter = rateLimit({
     },
   },
 });
+
+export const adminRateLimiter = rateLimit({
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: env.ADMIN_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: "TOO_MANY_REQUESTS", message: "Trop de requêtes admin, réessayez plus tard." } },
+});

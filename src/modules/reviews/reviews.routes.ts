@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { reviewsController } from "./reviews.controller";
-import { attachUserIfPresent, requireAuth } from "../../middlewares/auth.middleware";
+import { attachUserIfPresent, requireAuth, requireVerified } from "../../middlewares/auth.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import {
   createReviewSchema,
@@ -37,6 +37,7 @@ productReviewsRouter.get(
 productReviewsRouter.post(
   "/",
   requireAuth,
+  requireVerified,
   validate({ params: productIdParamsSchema, body: createReviewSchema }),
   reviewsController.create
 );
@@ -47,7 +48,13 @@ export const reviewsRouter = Router();
 reviewsRouter.use(requireAuth);
 reviewsRouter.patch(
   "/:id",
+  requireVerified,
   validate({ params: reviewIdParamsSchema, body: updateReviewSchema }),
   reviewsController.update
 );
-reviewsRouter.delete("/:id", validate({ params: reviewIdParamsSchema }), reviewsController.remove);
+reviewsRouter.delete(
+  "/:id",
+  requireVerified,
+  validate({ params: reviewIdParamsSchema }),
+  reviewsController.remove
+);

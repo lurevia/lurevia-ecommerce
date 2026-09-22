@@ -12,4 +12,9 @@ export const usersController = {
     await usersService.changePassword(req.user!.id, req.body);
     res.status(204).send();
   }),
+
+  requestDeletion: asyncHandler(async (req: Request, res: Response) => {
+    const request = await usersService.requestDeletion(req.user!.id, req.body);
+    res.status(201).json({ data: { request } });
+  }),
 };

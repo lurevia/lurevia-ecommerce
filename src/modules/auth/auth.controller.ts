@@ -37,4 +37,19 @@ export const authController = {
     const user = await authService.getCurrentUser(req.user!.id);
     res.status(200).json({ data: { user } });
   }),
+
+  requestVerification: asyncHandler(async (req: Request, res: Response) => {
+    const result = await authService.requestVerification(req.user!.id);
+    res.status(201).json({ data: result });
+  }),
+
+  confirmVerification: asyncHandler(async (req: Request, res: Response) => {
+    const result = await authService.confirmVerification(req.user!.id, req.body.code);
+    res.status(200).json({ data: result });
+  }),
+
+  verificationStatus: asyncHandler(async (req: Request, res: Response) => {
+    const status = await authService.getVerificationStatus(req.user!.id);
+    res.status(200).json({ data: status });
+  }),
 };

@@ -28,5 +28,10 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Mot de passe requis").max(128),
 });
 
+export const verificationCodeSchema = z.object({
+  code: z.string().regex(/^\d{6}$/, "Le code doit contenir 6 chiffres"),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type VerificationCodeInput = z.infer<typeof verificationCodeSchema>;

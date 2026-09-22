@@ -1,47 +1,128 @@
-import type { Request, Response, NextFunction } from "express";
-import { adminVerificationService } from "./admin.service";
-
-type VerificationStatus = "PENDING" | "APPROVED" | "REJECTED" | "USED" | "EXPIRED";
+import type { Request, Response } from "express";
+import { asyncHandler } from "../../utils/asyncHandler";
+import { adminService, adminVerificationService } from "./admin.service";
 
 export const adminController = {
-  async listVerifications(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const status = (req.query.status as VerificationStatus) ?? "PENDING";
-      const requests = await adminVerificationService.listRequests(status);
-      res.json({ requests });
-    } catch (err) {
-      next(err);
-    }
-  },
+  stats: asyncHandler(async (_req: Request, res: Response) => {
+    const stats = await adminService.stats();
+    res.status(200).json({ data: { stats } });
+  }),
 
-  async approveVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const adminId = req.user!.id;
+  listOrders: asyncHandler(async (req: Request, res: Response) => {
+    const result = await adminService.listOrders(req.query as never);
+    res.status(200).json({ data: result });
+  }),
 
-      const updated = await adminVerificationService.approveRequest(id, adminId);
+  getOrder: asyncHandler(async (req: Request, res: Response) => {
+    const order = await adminService.getOrder(req.params.id);
+    res.status(200).json({ data: { order } });
+  }),
 
-      res.json({
+  listUsers: asyncHandler(async (req: Request, res: Response) => {
+    const result = await adminService.listUsers(req.query as never);
+    res.status(200).json({ data: result });
+  }),
+
+  getUser: asyncHandler(async (req: Request, res: Response) => {
+    const user = await adminService.getUser(req.params.id);
+    res.status(200).json({ data: { user } });
+  }),
+
+  updateUserRole: asyncHandler(async (req: Request, res: Response) => {
+    const user = await adminService.updateUserRole(req.params.id, req.body.role);
+    res.status(200).json({ data: { user } });
+  }),
+
+  removeUser: asyncHandler(async (req: Request, res: Response) => {
+    await adminService.removeUser(req.params.id, req.user!.id);
+    res.status(204).send();
+  }),
+
+  listReviews: asyncHandler(async (req: Request, res: Response) => {
+    const result = await adminService.listReviews(req.query as never);
+    res.status(200).json({ data: result });
+  }),
+
+  removeReview: asyncHandler(async (req: Request, res: Response) => {
+    await adminService.removeReview(req.params.id);
+    res.status(204).send();
+  }),
+
+  listFeedback: asyncHandler(async (req: Request, res: Response) => {
+    const result = await adminService.listFeedback(req.query as never);
+    res.status(200).json({ data: result });
+  }),
+
+  respondToFeedback: asyncHandler(async (req: Request, res: Response) => {
+    const feedback = await adminService.respondToFeedback(req.params.id, req.body.teamResponse);
+    res.status(200).json({ data: { feedback } });
+  }),
+
+  removeFeedback: asyncHandler(async (req: Request, res: Response) => {
+    await adminService.removeFeedback(req.params.id);
+    res.status(204).send();
+  }),
+
+  listDeletionRequests: asyncHandler(async (req: Request, res: Response) => {
+    const result = await adminService.listDeletionRequests(req.query as never);
+    res.status(200).json({ data: result });
+  }),
+
+  approveDeletionRequest: asyncHandler(async (req: Request, res: Response) => {
+    const request = await adminService.approveDeletionRequest(req.params.id, req.body);
+    res.status(200).json({ data: { request } });
+  }),
+
+  rejectDeletionRequest: asyncHandler(async (req: Request, res: Response) => {
+    const request = await adminService.rejectDeletionRequest(req.params.id, req.body);
+    res.status(200).json({ data: { request } });
+  }),
+
+  listNotifications: asyncHandler(async (req: Request, res: Response) => {
+    const { page, limit, unreadOnly } = req.query as unknown as {
+      page?: number;
+      limit?: number;
+      unreadOnly?: boolean;
+    };
+    const result = await adminService.listNotifications(page, limit, unreadOnly);
+    res.status(200).json({ data: result });
+  }),
+
+  unreadNotificationsCount: asyncHandler(async (_req: Request, res: Response) => {
+    const count = await adminService.countUnreadNotifications();
+    res.status(200).json({ data: { count } });
+  }),
+
+  markNotificationRead: asyncHandler(async (req: Request, res: Response) => {
+    await adminService.markNotificationRead(req.params.id);
+    res.status(204).send();
+  }),
+
+  markAllNotificationsRead: asyncHandler(async (_req: Request, res: Response) => {
+    await adminService.markAllNotificationsRead();
+    res.status(204).send();
+  }),
+
+  listVerifications: asyncHandler(async (req: Request, res: Response) => {
+    const status = (req.query.status as "PENDING" | "APPROVED" | "REJECTED" | "USED" | "EXPIRED") ?? "PENDING";
+    const requests = await adminVerificationService.listRequests(status);
+    res.status(200).json({ data: { requests } });
+  }),
+
+  approveVerification: asyncHandler(async (req: Request, res: Response) => {
+    const request = await adminVerificationService.approveRequest(req.params.id, req.user!.id);
+    res.status(200).json({
+      data: {
         success: true,
-        code: updated.code,
-        expiresAt: updated.expiresAt,
-        user: updated.user,
-      });
-    } catch (err) {
-      next(err);
-    }
-  },
+        code: request.code,
+        expiresAt: request.expiresAt,
+        user: request.user,
+      },
+    });
+  }),
 
-  async rejectVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const { reason } = req.body;
-
-      await adminVerificationService.rejectRequest(id, reason);
-
-      res.json({ success: true });
-    } catch (err) {
-      next(err);
-    }
-  },
+  rejectVerification: asyncHandler(async (req: Request, res: Response) => {
+    await adminVerificationService.rejectRequest(req.params.id, req.body.reason);
+    res.status(204).send();
+  }),
 };

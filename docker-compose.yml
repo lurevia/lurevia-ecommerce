@@ -41,18 +41,14 @@ services:
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX: 300
       AUTH_RATE_LIMIT_MAX: 10
+      ADMIN_RATE_LIMIT_MAX: 600
       LOG_LEVEL: info
       DEFAULT_SHIPPING_COST: 8000
       FREE_SHIPPING_THRESHOLD: 250000
       REVIEW_DELAY_DAYS: 5
     ports:
       - "4000:4000"
-    # `migrate deploy` applique l'historique de migrations s'il existe déjà
-    # (flux normal une fois `prisma migrate dev` lancé au moins une fois en
-    # local et les migrations commitées) ; à défaut (tout premier démarrage
-    # sans dossier prisma/migrations), on retombe sur `db push` pour créer
-    # le schéma directement — pratique pour une première mise en route rapide.
-    command: sh -c "npx prisma migrate deploy || npx prisma db push --accept-data-loss && node dist/server.js"
+    command: sh -c "npx prisma migrate deploy && node dist/server.js"
 
 volumes:
   lurevia_postgres_data:
