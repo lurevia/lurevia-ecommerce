@@ -109,8 +109,17 @@ Voir `.env.example` pour la liste complète et les valeurs par défaut. Les plus
 | `FREE_SHIPPING_THRESHOLD`  | Montant au-delà duquel la livraison est gratuite                           |
 | `REVIEW_DELAY_DAYS`        | Délai avant qu'un client puisse laisser un avis après achat                |
 | `ADMIN_RATE_LIMIT_MAX`     | Limite dédiée aux opérations d'administration (plus permissive que l'auth) |
+| `SMTP_HOST`                | Hôte du serveur SMTP utilisé pour les codes de vérification                 |
+| `SMTP_PORT`                | Port SMTP (587 ou 465 selon votre fournisseur)                              |
+| `SMTP_USER`                | Identifiant SMTP                                                              |
+| `SMTP_PASSWORD`            | Mot de passe SMTP (à conserver uniquement dans les secrets de déploiement)   |
+| `SMTP_FROM`                | Adresse d'expédition validée par le fournisseur SMTP                         |
 
 Le serveur **refuse de démarrer** si une variable requise est absente ou invalide (validation stricte via Zod dans `src/config/env.ts`) — c'est volontaire : mieux vaut échouer immédiatement au démarrage qu'en pleine production.
+
+Les demandes de vérification approuvées par un administrateur déclenchent l'envoi
+du code par SMTP. Le code n'est jamais renvoyé dans la réponse HTTP admin ; si
+l'envoi échoue, la demande reste en attente et l'API renvoie une erreur explicite.
 
 ---
 

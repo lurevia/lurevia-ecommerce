@@ -37,6 +37,12 @@ const envSchema = z.object({
   FREE_SHIPPING_THRESHOLD: z.coerce.number().int().nonnegative().default(250000),
 
   REVIEW_DELAY_DAYS: z.coerce.number().int().nonnegative().default(5),
+
+  SMTP_HOST: z.string().min(1, "SMTP_HOST est requis"),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535, "SMTP_PORT invalide"),
+  SMTP_USER: z.string().min(1, "SMTP_USER est requis"),
+  SMTP_PASSWORD: z.string().min(1, "SMTP_PASSWORD est requis"),
+  SMTP_FROM: z.string().email("SMTP_FROM doit être une adresse e-mail valide"),
 });
 
 const parsed = envSchema.safeParse(process.env);

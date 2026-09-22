@@ -49,6 +49,14 @@ export const verificationStatusQuerySchema = z.object({
 export const verificationRejectSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
 });
+export const profileChangeStatusQuerySchema = z.object({ status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional() });
+export const adminMessageSchema = z.object({
+  userId: z.string().cuid().optional(),
+  allUsers: z.boolean().optional(),
+  subject: z.string().trim().min(1).max(200),
+  body: z.string().trim().min(1).max(10000),
+}).refine((v) => Boolean(v.userId) !== Boolean(v.allUsers), { message: "Choisissez un utilisateur ou tous les utilisateurs." });
+export const reviewProfileChangeSchema = z.object({ approved: z.boolean(), adminNote: z.string().trim().max(1000).optional() });
 
 export type ListOrdersQuery = z.infer<typeof listOrdersQuerySchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;

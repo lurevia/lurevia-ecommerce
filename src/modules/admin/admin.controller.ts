@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { adminService, adminVerificationService } from "./admin.service";
+import { adminFoundationService } from "./adminFoundation";
 
 export const adminController = {
   stats: asyncHandler(async (_req: Request, res: Response) => {
@@ -114,7 +115,6 @@ export const adminController = {
     res.status(200).json({
       data: {
         success: true,
-        code: request.code,
         expiresAt: request.expiresAt,
         user: request.user,
       },
@@ -124,5 +124,17 @@ export const adminController = {
   rejectVerification: asyncHandler(async (req: Request, res: Response) => {
     await adminVerificationService.rejectRequest(req.params.id, req.body.reason);
     res.status(204).send();
+  }),
+  listProfileChanges: asyncHandler(async (req: Request, res: Response) => {
+    const requests = await adminFoundationService.listProfileChangeRequests(req.query.status as any);
+    res.status(200).json({ data: { requests } });
+  }),
+  reviewProfileChange: asyncHandler(async (req: Request, res: Response) => {
+    const request = await adminFoundationService.reviewProfileChangeRequest(req.params.id, req.user!.id, req.body.approved, req.body.adminNote);
+    res.status(200).json({ data: { request } });
+  }),
+  sendMessage: asyncHandler(async (req: Request, res: Response) => {
+    const result = await adminFoundationService.sendMessage(req.user!.id, req.body);
+    res.status(201).json({ data: result });
   }),
 };

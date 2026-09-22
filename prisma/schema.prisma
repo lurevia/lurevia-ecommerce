@@ -73,12 +73,23 @@ enum AdminNotificationType {
   NEW_FEEDBACK
   DELETION_REQUEST
   LOW_STOCK
+  PROFILE_CHANGE_REQUEST
 }
 
 enum DeletionRequestStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum ProfileChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MessageType {
+  ADMIN_MESSAGE
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,6 +124,10 @@ model User {
   refreshTokens     RefreshToken[]
   verificationRequests VerificationRequest[]
   deletionRequests  AccountDeletionRequest[]
+  profileChangeRequests ProfileChangeRequest[]
+  messagesReceived UserMessage[] @relation("MessageRecipient")
+  messagesSent UserMessage[] @relation("MessageSender")
+  auditLogs AuditLog[] @relation("AuditActor")
 
   @@map("users")
 }
@@ -412,6 +427,56 @@ model Notification {
   @@unique([userId, referenceKey])
   @@index([userId])
   @@map("notifications")
+}
+
+model ProfileChangeRequest {
+  id                String @id @default(cuid())
+  userId            String
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestedFullName String?
+  requestedEmail    String?
+  requestedPhone    String?
+  status            ProfileChangeRequestStatus @default(PENDING)
+  adminNote         String?
+  reviewedBy        String?
+  createdAt         DateTime @default(now())
+  reviewedAt        DateTime?
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("profile_change_requests")
+}
+
+model UserMessage {
+  id          String @id @default(cuid())
+  recipientId String
+  recipient   User @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  senderId    String?
+  sender      User? @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  type        MessageType @default(ADMIN_MESSAGE)
+  subject     String
+  body        String
+  read        Boolean @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([recipientId, createdAt])
+  @@index([senderId, createdAt])
+  @@map("user_messages")
+}
+
+model AuditLog {
+  id         String @id @default(cuid())
+  actorUserId String?
+  actor      User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
 }
 
 model AdminNotification {

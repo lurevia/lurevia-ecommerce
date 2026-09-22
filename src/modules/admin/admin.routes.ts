@@ -16,6 +16,9 @@ import {
   updateUserRoleSchema,
   verificationRejectSchema,
   verificationStatusQuerySchema,
+  profileChangeStatusQuerySchema,
+  adminMessageSchema,
+  reviewProfileChangeSchema,
 } from "./admin.validators";
 
 const router = Router();
@@ -24,6 +27,9 @@ const router = Router();
 router.use(requireAuth, requireRole("ADMIN"), adminRateLimiter);
 
 router.get("/stats", adminController.stats);
+router.get("/profile-change-requests", validate({ query: profileChangeStatusQuerySchema }), adminController.listProfileChanges);
+router.post("/profile-change-requests/:id/review", validate({ params: idParamsSchema, body: reviewProfileChangeSchema }), adminController.reviewProfileChange);
+router.post("/messages", validate({ body: adminMessageSchema }), adminController.sendMessage);
 
 router.get(
   "/verifications",

@@ -11,11 +11,25 @@ export const usersService = {
     const user = await usersRepository.findById(userId);
     if (!user) throw new NotFoundError("Utilisateur");
 
-    const updated = await usersRepository.update(userId, {
-      fullName: input.fullName,
-      avatarUrl: input.avatarUrl,
-    });
-    return toPublicUser(updated);
+    if (input.avatarUrl !== undefined) await usersRepository.update(userId, { avatarUrl: input.avatarUrl });
+    const current = await usersRepository.findById(userId);
+    if (!current) throw new NotFoundError("Utilisateur");
+    const identity = { requestedFullName: input.fullName, requestedEmail: input.email, requestedPhone: input.phone };
+    if (input.fullName !== undefined || input.email !== undefined || input.phone !== undefined) {
+      const pending = await usersRepository.findPendingProfileChangeRequest(userId);
+      if (pending) throw new ConflictError("Une demande de modification de profil est déjà en attente.");
+      const request = await usersRepository.createProfileChangeRequest(userId, identity);
+      await adminNotificationsService.notify({
+        type: "PROFILE_CHANGE_REQUEST",
+        title: "Demande de modification de profil",
+        message: `${user.fullName} demande une modification de ses informations personnelles.`,
+        entityType: "profileChangeRequest",
+        entityId: request.id,
+        actorUserId: userId,
+      });
+      return toPublicUser(current);
+    }
+    return toPublicUser(current);
   },
 
   async changePassword(userId: string, input: ChangePasswordInput) {

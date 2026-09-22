@@ -6,6 +6,7 @@ import { adminNotificationsService } from "./adminNotifications.service";
 import { toOrderDto, ORDER_STATUS_FROM_API } from "../orders/orders.mapper";
 import { buildPaginatedResult, normalizePagination } from "../../utils/pagination";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../errors/AppError";
+import { emailService } from "../../services/email.service";
 import type {
   ListDeletionRequestsQuery,
   ListOrdersQuery,
@@ -268,10 +269,24 @@ export const adminVerificationService = {
 
     const code = randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    return prisma.verificationRequest.update({
-      where: { id: requestId },
-      data: { status: "APPROVED", code, expiresAt, approvedAt: new Date(), approvedBy: adminId },
-      include: { user: { select: { fullName: true, email: true } } },
+    // L'envoi précède la transaction : en cas d'échec SMTP, la demande reste
+    // PENDING et peut être retentée sans approbation partiellement enregistrée.
+    await emailService.sendVerificationCode({
+      to: request.user.email,
+      fullName: request.user.fullName,
+      code,
+      expiresAt,
+    });
+    return prisma.$transaction(async (tx) => {
+      const current = await tx.verificationRequest.findUnique({ where: { id: requestId } });
+      if (!current || current.status !== "PENDING") {
+        throw new BadRequestError("Cette demande a déjà été traitée.");
+      }
+      return tx.verificationRequest.update({
+        where: { id: requestId },
+        data: { status: "APPROVED", code, expiresAt, approvedAt: new Date(), approvedBy: adminId },
+        include: { user: { select: { fullName: true, email: true } } },
+      });
     });
   },
 
