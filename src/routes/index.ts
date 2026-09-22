@@ -11,6 +11,7 @@ import { productReviewsRouter, reviewsRouter } from "../modules/reviews/reviews.
 import feedbackRoutes from "../modules/feedback/feedback.routes";
 import notificationsRoutes from "../modules/notifications/notifications.routes";
 import newsletterRoutes from "../modules/newsletter/newsletter.routes";
+import adminRoutes from "../modules/admin/admin.routes";
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.use("/favorites", favoritesRoutes);
 router.use("/orders", ordersRoutes);
 router.use("/feedback", feedbackRoutes);
 router.use("/notifications", notificationsRoutes);
+router.use("/admin", adminRoutes);
 router.use("/newsletter", newsletterRoutes);
 
 router.get("/health", (_req, res) => {

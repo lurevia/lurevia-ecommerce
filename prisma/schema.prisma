@@ -79,6 +79,11 @@ model User {
   primaryIdentifier AuthIdentifier @default(EMAIL)
   avatarUrl         String?
   role              Role           @default(CUSTOMER)
+
+  isVerified            Boolean   @default(false)
+  verificationToken     String?   @unique
+  verificationExpiresAt DateTime?
+  
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   lastLoginAt       DateTime?
@@ -91,6 +96,7 @@ model User {
   serviceFeedbacks  ServiceFeedback[]
   notifications     Notification[]
   refreshTokens     RefreshToken[]
+  verificationRequests VerificationRequest[]
 
   @@map("users")
 }
@@ -402,4 +408,36 @@ model NewsletterSubscriber {
   subscribedAt DateTime @default(now())
 
   @@map("newsletter_subscribers")
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VÉRIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  USED
+  EXPIRED
+}
+
+model VerificationRequest {
+  id         String             @id @default(cuid())
+  userId     String
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status     VerificationStatus @default(PENDING)
+  code       String?            // Code à 6 chiffres (généré à l'approbation)
+  expiresAt  DateTime?          // Expire 24h après approbation
+  approvedAt DateTime?
+  approvedBy String?            // ID de l'admin qui a approuvé
+  usedAt     DateTime?          // Quand l'utilisateur a validé
+  reason     String?            // Raison si rejeté
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("verification_requests")
 }
