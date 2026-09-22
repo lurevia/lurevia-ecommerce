@@ -5,6 +5,10 @@ import { hashPassword } from "../src/utils/password";
 
 const prisma = new PrismaClient();
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface SeedCategory {
   id: string;
   name: string;
@@ -33,8 +37,31 @@ interface SeedProduct {
   sizes?: string[];
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Génération de slug simplifiée, cohérente avec src/utils/slug.ts
+ *  mais sans dépendance à Prisma en amont. */
+function slugifyForSeed(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function main() {
   console.log("🌱 Démarrage du seed...");
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 1. CATÉGORIES
+  // ═══════════════════════════════════════════════════════════════════════════
 
   const categories = categoriesData as SeedCategory[];
   const slugToCategoryId = new Map<string, string>();
@@ -59,6 +86,10 @@ async function main() {
     slugToCategoryId.set(cat.slug, created.id);
   }
   console.log(`✅ ${categories.length} catégories importées`);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 2. PRODUITS
+  // ═══════════════════════════════════════════════════════════════════════════
 
   const products = productsData as SeedProduct[];
   let productCount = 0;
@@ -89,16 +120,32 @@ async function main() {
         tags: p.tags ?? [],
         ratingCache: p.rating ?? 0,
         reviewCountCache: p.reviewCount ?? 0,
-        images: { create: p.images.map((url, position) => ({ url, position })) },
-        colors: { create: (p.colors ?? []).map((c) => ({ label: c.label, hex: c.hex })) },
-        sizes: { create: (p.sizes ?? []).map((value) => ({ value })) },
-        categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
+        images: {
+          create: p.images.map((url, position) => ({ url, position })),
+        },
+        colors: {
+          create: (p.colors ?? []).map((c) => ({
+            label: c.label,
+            hex: c.hex,
+          })),
+        },
+        sizes: {
+          create: (p.sizes ?? []).map((value) => ({ value })),
+        },
+        categories: {
+          create: categoryIds.map((categoryId) => ({ categoryId })),
+        },
       },
     });
     productCount += 1;
   }
   console.log(`✅ ${productCount} produits importés`);
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 3. COMPTES DE DÉMONSTRATION
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ─── Admin ───
   const adminPassword = await hashPassword("Admin1234!");
   await prisma.user.upsert({
     where: { email: "admin@lurevia.mg" },
@@ -106,12 +153,15 @@ async function main() {
     create: {
       fullName: "Administrateur Lurevia",
       email: "admin@lurevia.mg",
+      phone: "+261340000000",
       passwordHash: adminPassword,
       primaryIdentifier: "EMAIL",
       role: "ADMIN",
+      isVerified: true,
     },
   });
 
+  // ─── Client démo ───
   const customerPassword = await hashPassword("Client1234!");
   await prisma.user.upsert({
     where: { email: "client@lurevia.mg" },
@@ -119,25 +169,24 @@ async function main() {
     create: {
       fullName: "Client Démo",
       email: "client@lurevia.mg",
+      phone: "+261341111111",
       passwordHash: customerPassword,
       primaryIdentifier: "EMAIL",
       role: "CUSTOMER",
+      isVerified: true,
     },
   });
-  console.log("✅ Comptes de démonstration créés (admin@lurevia.mg / client@lurevia.mg — voir README)");
+
+  console.log(
+    "✅ Comptes de démonstration créés (admin@lurevia.mg / client@lurevia.mg — voir README)"
+  );
 
   console.log("🌱 Seed terminé avec succès");
 }
 
-/** Génération de slug simplifiée, cohérente avec src/utils/slug.ts mais sans dépendance à Prisma en amont. */
-function slugifyForSeed(title: string): string {
-  return title
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// EXÉCUTION
+// ─────────────────────────────────────────────────────────────────────────────
 
 main()
   .catch((err) => {

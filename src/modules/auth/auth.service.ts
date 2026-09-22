@@ -10,6 +10,7 @@ import { ConflictError, UnauthorizedError } from "../../errors/AppError";
 import { toPublicUser } from "./auth.mapper";
 import type { LoginInput, RegisterInput } from "./auth.validators";
 import { logger } from "../../lib/logger";
+import { prisma } from "../../lib/prisma";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES INTERNES
@@ -55,7 +56,8 @@ const issueTokenPair = async (
 export const authService = {
   /**
    * Inscription — email ET téléphone obligatoires.
-   * Le téléphone sert pour la livraison et le paiement Mobile Money.
+   * Crée une notification persistée pour inviter l'utilisateur à vérifier
+   * son compte (nécessaire pour passer commande).
    */
   async register(input: RegisterInput, createdByIp?: string) {
     // Unicité email
@@ -80,6 +82,28 @@ export const authService = {
       primaryIdentifier: "EMAIL",
       lastLoginAt: new Date(),
     });
+
+    // 🎯 Notification persistée : invite à vérifier le compte
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: user.id,
+          type: "ACCOUNT_VERIFICATION",
+          title: "Vérifiez votre compte",
+          message:
+            "Pour passer commande, demandez la vérification de votre compte depuis votre espace personnel.",
+          actionUrl: "/compte",
+          referenceKey: `verification:${user.id}`,
+          read: false,
+        },
+      });
+    } catch (err) {
+      // La création de la notification ne doit pas bloquer l'inscription
+      logger.warn(
+        { err, userId: user.id },
+        "Impossible de créer la notification de vérification"
+      );
+    }
 
     const tokens = await issueTokenPair(user.id, user.role, createdByIp);
     logger.info({ userId: user.id }, "Nouvel utilisateur inscrit");
@@ -118,8 +142,6 @@ export const authService = {
 
   /**
    * Rotation de refresh token avec détection de rejeu.
-   * Si un token déjà révoqué est présenté à nouveau → révocation totale
-   * de la famille (sécurité en cas de vol).
    */
   async refresh(rawRefreshToken: string, createdByIp?: string) {
     const tokenHash = hashToken(rawRefreshToken);
@@ -183,5 +205,129 @@ export const authService = {
       throw new UnauthorizedError("Utilisateur introuvable.");
     }
     return toPublicUser(user);
+  },
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 🎯 VÉRIFICATION DE COMPTE (workflow admin)
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * L'utilisateur demande la vérification de son compte.
+   * Crée une VerificationRequest en statut PENDING (ou réutilise celle en cours).
+   */
+  async requestVerification(userId: string) {
+    const user = await authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new UnauthorizedError("Utilisateur introuvable.");
+    }
+
+    if (user.isVerified) {
+      throw new ConflictError("Votre compte est déjà vérifié.");
+    }
+
+    // Y a-t-il déjà une demande en attente ?
+    const pending = await prisma.verificationRequest.findFirst({
+      where: { userId, status: "PENDING" },
+    });
+
+    if (pending) {
+      return { alreadyPending: true, requestId: pending.id };
+    }
+
+    const request = await prisma.verificationRequest.create({
+      data: {
+        userId,
+        status: "PENDING",
+      },
+    });
+
+    logger.info(
+      { userId, requestId: request.id },
+      "Nouvelle demande de vérification de compte"
+    );
+
+    return { alreadyPending: false, requestId: request.id };
+  },
+
+  /**
+   * L'utilisateur confirme son code → vérifie son compte et supprime la
+   * notification associée.
+   */
+  async confirmVerification(userId: string, code: string) {
+    if (!code || code.trim().length === 0) {
+      throw new ConflictError("Code requis.");
+    }
+
+    const request = await prisma.verificationRequest.findFirst({
+      where: {
+        userId,
+        code: code.trim(),
+        status: "APPROVED",
+      },
+    });
+
+    if (!request) {
+      throw new ConflictError("Code invalide.");
+    }
+
+    if (request.expiresAt && request.expiresAt < new Date()) {
+      await prisma.verificationRequest.update({
+        where: { id: request.id },
+        data: { status: "EXPIRED" },
+      });
+      throw new ConflictError("Code expiré. Demandez un nouveau code.");
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          isVerified: true,
+          verificationToken: null,
+          verificationExpiresAt: null,
+        },
+      }),
+      prisma.verificationRequest.update({
+        where: { id: request.id },
+        data: { status: "USED", usedAt: new Date() },
+      }),
+      prisma.notification.deleteMany({
+        where: {
+          userId,
+          type: "ACCOUNT_VERIFICATION",
+        },
+      }),
+    ]);
+
+    logger.info({ userId }, "Compte vérifié avec succès");
+
+    return { success: true };
+  },
+
+  /**
+   * Retourne l'état de la dernière demande de vérification.
+   */
+  async getVerificationStatus(userId: string) {
+    const request = await prisma.verificationRequest.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+    });
+
+    if (!request) {
+      return { status: "NONE" as const };
+    }
+
+    return {
+      status: request.status,
+      requestedAt: request.createdAt,
+      expiresAt: request.expiresAt,
+    };
   },
 };
