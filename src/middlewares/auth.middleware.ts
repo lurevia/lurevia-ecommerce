@@ -129,14 +129,43 @@ export const attachUserIfPresent = async (
  */
 export const requireRole =
   (...roles: Role[]) =>
-  (req: Request, _res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      next(new UnauthorizedError());
-      return;
-    }
-    if (!roles.includes(req.user.role)) {
-      next(new ForbiddenError("Permissions insuffisantes pour cette action"));
-      return;
-    }
-    next();
-  };
+    (req: Request, _res: Response, next: NextFunction): void => {
+      if (!req.user) {
+        next(new UnauthorizedError());
+        return;
+      }
+      if (!roles.includes(req.user.role)) {
+        next(new ForbiddenError("Permissions insuffisantes pour cette action"));
+        return;
+      }
+      next();
+    };
+
+/**
+ * Exige que le compte soit vérifié (email/identité validés par l'admin).
+ * ⚠️ Doit être utilisé APRÈS `requireAuth`.
+ *
+ * Renvoie 403 avec un code explicite, pour que le frontend puisse afficher
+ * un message clair et rediriger l'utilisateur vers son espace de vérification.
+ */
+export const requireVerified = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    next(new UnauthorizedError());
+    return;
+  }
+
+  if (!req.user.isVerified) {
+    next(
+      new ForbiddenError(
+        "Votre compte doit être vérifié avant d'effectuer cette action."
+      )
+    );
+    return;
+  }
+
+  next();
+};

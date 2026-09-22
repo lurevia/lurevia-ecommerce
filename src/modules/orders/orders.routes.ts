@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { ordersController } from "./orders.controller";
-import { requireAuth, requireRole } from "../../middlewares/auth.middleware";
+import {
+  requireAuth,
+  requireRole,
+  requireVerified,
+} from "../../middlewares/auth.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import {
   checkoutSchema,
@@ -13,7 +17,13 @@ const router = Router();
 
 router.use(requireAuth);
 
-router.post("/", validate({ body: checkoutSchema }), ordersController.checkout);
+router.post(
+  "/",
+  requireVerified,
+  validate({ body: checkoutSchema }),
+  ordersController.checkout
+);
+
 router.get("/", validate({ query: listOrdersQuerySchema }), ordersController.list);
 router.get("/:id", validate({ params: orderIdParamsSchema }), ordersController.getById);
 router.post("/:id/cancel", validate({ params: orderIdParamsSchema }), ordersController.cancel);
