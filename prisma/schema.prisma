@@ -64,6 +64,7 @@ enum NotificationType {
   ORDER_SHIPPED
   ORDER_DELIVERED
   PROMO
+  ACCOUNT_VERIFICATION
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
