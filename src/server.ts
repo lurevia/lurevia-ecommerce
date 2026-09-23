@@ -5,11 +5,11 @@ import { prisma } from "./lib/prisma";
 
 const start = async (): Promise<void> => {
   await prisma.$connect();
-  logger.info("Connexion à la base de données établie");
+  logger.info("Database connexion successfull");
 
   const app = createApp();
   const server = app.listen(env.PORT, () => {
-    logger.info(`🚀 API Lurevia démarrée sur le port ${env.PORT} (${env.NODE_ENV})`);
+    logger.info(`Server running in port ${env.PORT} (${env.NODE_ENV})`);
   });
 
   const keepAliveInterval = setInterval(async () => {

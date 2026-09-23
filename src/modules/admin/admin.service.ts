@@ -282,11 +282,29 @@ export const adminVerificationService = {
       if (!current || current.status !== "PENDING") {
         throw new BadRequestError("Cette demande a déjà été traitée.");
       }
-      return tx.verificationRequest.update({
+      const updated = await tx.verificationRequest.update({
         where: { id: requestId },
         data: { status: "APPROVED", code, expiresAt, approvedAt: new Date(), approvedBy: adminId },
         include: { user: { select: { fullName: true, email: true } } },
       });
+
+      // Sans ça, le client ne sait jamais que son code est arrivé —
+      // il ne consulte pas forcément ses emails, la notification dans
+      // l'app est le canal le plus fiable pour le ramener sur la page
+      // de saisie du code.
+      await tx.notification.create({
+        data: {
+          userId: request.userId,
+          type: "ACCOUNT_VERIFICATION",
+          title: "Votre code de vérification est prêt",
+          message: `Un code vous a été envoyé par e-mail à ${request.user.email}. Il expire dans 24h.`,
+          actionUrl: "/compte",
+          referenceKey: `verification-approved:${requestId}`,
+          read: false,
+        },
+      });
+
+      return updated;
     });
   },
 
@@ -294,9 +312,27 @@ export const adminVerificationService = {
     const request = await prisma.verificationRequest.findUnique({ where: { id: requestId } });
     if (!request) throw new NotFoundError("Demande introuvable.");
     if (request.status !== "PENDING") throw new BadRequestError("Cette demande a déjà été traitée.");
-    return prisma.verificationRequest.update({
-      where: { id: requestId },
-      data: { status: "REJECTED", reason: reason ?? "Non spécifiée" },
-    });
+
+    const [updated] = await prisma.$transaction([
+      prisma.verificationRequest.update({
+        where: { id: requestId },
+        data: { status: "REJECTED", reason: reason ?? "Non spécifiée" },
+      }),
+      prisma.notification.create({
+        data: {
+          userId: request.userId,
+          type: "ACCOUNT_VERIFICATION",
+          title: "Demande de vérification refusée",
+          message: reason
+            ? `Votre demande n'a pas été acceptée : ${reason}. Vous pouvez refaire une demande.`
+            : "Votre demande n'a pas été acceptée. Vous pouvez refaire une demande depuis votre espace personnel.",
+          actionUrl: "/compte",
+          referenceKey: `verification-rejected:${requestId}`,
+          read: false,
+        },
+      }),
+    ]);
+
+    return updated;
   },
 };
