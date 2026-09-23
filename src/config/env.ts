@@ -1,11 +1,6 @@
 import "dotenv/config";
 import { z } from "zod";
 
-/**
- * Schéma de validation des variables d'environnement.
- * Le serveur refuse de démarrer si une variable requise est manquante ou
- * invalide — on évite ainsi les surprises en production (ex: JWT secret vide).
- */
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -20,11 +15,14 @@ const envSchema = z.object({
 
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
 
-  COOKIE_DOMAIN: z.string().default("localhost"),
+  COOKIE_DOMAIN: z.string().default(""),
+
   COOKIE_SECURE: z
     .string()
-    .default("false")
-    .transform((v) => v === "true"),
+    .optional()
+    .transform((v) =>
+      v === undefined ? process.env.NODE_ENV === "production" : v === "true"
+    ),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
@@ -35,21 +33,18 @@ const envSchema = z.object({
 
   DEFAULT_SHIPPING_COST: z.coerce.number().int().nonnegative().default(8000),
   FREE_SHIPPING_THRESHOLD: z.coerce.number().int().nonnegative().default(250000),
-
   REVIEW_DELAY_DAYS: z.coerce.number().int().nonnegative().default(5),
 
-  SMTP_HOST: z.string().min(1, "SMTP_HOST est requis"),
-  SMTP_PORT: z.coerce.number().int().min(1).max(65535, "SMTP_PORT invalide"),
-  SMTP_USER: z.string().min(1, "SMTP_USER est requis"),
-  SMTP_PASSWORD: z.string().min(1, "SMTP_PASSWORD est requis"),
-  SMTP_FROM: z.string().email("SMTP_FROM doit être une adresse e-mail valide"),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().email("SMTP_FROM doit être une adresse e-mail valide").optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  // On log dans stderr et on arrête le process : une config invalide ne doit
-  // jamais laisser le serveur démarrer dans un état partiellement fonctionnel.
   console.error("❌ Configuration d'environnement invalide :");
   console.error(parsed.error.flatten().fieldErrors);
   process.exit(1);
