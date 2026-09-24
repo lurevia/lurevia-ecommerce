@@ -300,6 +300,28 @@ domaine `lurevia.github.io` dans les origines JavaScript autorisées et l'URI
 de callback dans les URI de redirection autorisées. Les secrets restent
 uniquement dans Render et ne doivent jamais être placés dans le frontend.
 
+## Initialiser le compte administrateur
+
+Le seed ne contient plus de mot de passe de production par défaut. Sur Render,
+définissez temporairement ces variables avant d'exécuter `prisma db seed` :
+
+```env
+NODE_ENV=production
+INITIAL_ADMIN_EMAIL=admin@example.com
+INITIAL_ADMIN_PHONE=+261340000000
+INITIAL_ADMIN_PASSWORD=un-mot-de-passe-fort-de-12-caracteres-minimum
+```
+
+Le seed crée ou remet le compte au rôle `ADMIN`. Pour réinitialiser le mot de
+passe d'un compte existant, définissez temporairement :
+
+```env
+INITIAL_ADMIN_RESET_PASSWORD=true
+```
+
+Puis supprimez cette variable après l'exécution. La connexion admin utilise
+l'adresse email ou le numéro de téléphone exacts, sans espaces.
+
 Le checkout accepte encore `mobile-money`, mais aucune sortie d'argent vendeur
 ni appel MVola, Orange Money ou Airtel Money n'est activé. Pour activer un
 connecteur, il faudra fournir par variables d'environnement (sans les commiter)

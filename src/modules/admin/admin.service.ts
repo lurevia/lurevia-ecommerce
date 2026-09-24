@@ -131,7 +131,7 @@ export const adminService = {
     return toUserDto(user);
   },
 
-  async updateUserRole(id: string, role: "CUSTOMER" | "ADMIN") {
+  async updateUserRole(id: string, role: "CUSTOMER" | "SELLER" | "ADMIN") {
     const user = await adminRepository.findUserById(id);
     if (!user) throw new NotFoundError("Utilisateur");
     await adminRepository.updateUserRole(id, role);

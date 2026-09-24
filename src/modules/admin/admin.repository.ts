@@ -129,7 +129,7 @@ export const adminRepository = {
       },
     }),
 
-  updateUserRole: (id: string, role: "CUSTOMER" | "ADMIN") =>
+  updateUserRole: (id: string, role: "CUSTOMER" | "SELLER" | "ADMIN") =>
     prisma.user.update({ where: { id }, data: { role } }),
   deleteUser: (id: string) => prisma.user.delete({ where: { id } }),
 

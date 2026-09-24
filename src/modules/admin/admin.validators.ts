@@ -35,7 +35,7 @@ export const listNotificationsQuerySchema = listQuerySchema.extend({
 });
 
 export const updateUserRoleSchema = z.object({
-  role: z.enum(["CUSTOMER", "ADMIN"]),
+  role: z.enum(["CUSTOMER", "SELLER", "ADMIN"]),
 });
 
 export const processDeletionRequestSchema = z.object({
