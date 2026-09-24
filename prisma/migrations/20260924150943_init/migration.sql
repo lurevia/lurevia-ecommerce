@@ -49,12 +49,27 @@ CREATE TYPE "VerificationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'US
 -- CreateEnum
 CREATE TYPE "BidStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED');
 
+-- CreateEnum
+CREATE TYPE "SellerContractType" AS ENUM ('PERCENTAGE', 'MONTHLY_FIXED');
+
+-- CreateEnum
+CREATE TYPE "SellerContractStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "SettlementStatus" AS ENUM ('PENDING_REVIEW', 'READY', 'TRANSFER_PENDING', 'PAID', 'FAILED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "MediaArchiveStatus" AS ENUM ('PENDING', 'SUCCESS', 'FAILED', 'NOT_CONFIGURED');
+
+-- CreateEnum
+CREATE TYPE "TransferStatus" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED');
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "fullName" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "phone" TEXT NOT NULL,
+    "phone" TEXT,
     "avatarUrl" TEXT,
     "age" INTEGER,
     "gender" "Gender",
@@ -72,6 +87,24 @@ CREATE TABLE "users" (
     "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "media_assets" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "ownerId" UUID NOT NULL,
+    "sourceUrl" TEXT NOT NULL,
+    "publicUrl" TEXT NOT NULL,
+    "githubPath" TEXT NOT NULL,
+    "contentType" VARCHAR(100) NOT NULL,
+    "byteSize" INTEGER NOT NULL,
+    "githubSha" VARCHAR(100),
+    "googleArchiveStatus" "MediaArchiveStatus" NOT NULL DEFAULT 'NOT_CONFIGURED',
+    "googleArchiveError" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "media_assets_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -189,6 +222,7 @@ CREATE TABLE "categories" (
 -- CreateTable
 CREATE TABLE "products" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "ownerId" UUID,
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "sku" TEXT NOT NULL,
@@ -210,6 +244,26 @@ CREATE TABLE "products" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "products_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "seller_contracts" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "sellerId" UUID NOT NULL,
+    "version" INTEGER NOT NULL,
+    "type" "SellerContractType" NOT NULL,
+    "value" INTEGER NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'MGA',
+    "status" "SellerContractStatus" NOT NULL DEFAULT 'PENDING',
+    "effectiveFrom" TIMESTAMP(3),
+    "effectiveTo" TIMESTAMP(3),
+    "rejectionReason" TEXT,
+    "reviewedBy" UUID,
+    "reviewedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "seller_contracts_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -309,6 +363,42 @@ CREATE TABLE "orders" (
 );
 
 -- CreateTable
+CREATE TABLE "seller_settlements" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "orderId" UUID NOT NULL,
+    "sellerId" UUID NOT NULL,
+    "contractId" UUID,
+    "contractVersion" INTEGER,
+    "grossAmount" INTEGER NOT NULL,
+    "commissionAmount" INTEGER NOT NULL,
+    "netAmount" INTEGER NOT NULL,
+    "status" "SettlementStatus" NOT NULL DEFAULT 'PENDING_REVIEW',
+    "reviewNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "seller_settlements_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "transfer_ledger" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "settlementId" UUID NOT NULL,
+    "sellerId" UUID NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'MGA',
+    "idempotencyKey" TEXT NOT NULL,
+    "status" "TransferStatus" NOT NULL DEFAULT 'PENDING',
+    "externalReference" TEXT,
+    "failureReason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "completedAt" TIMESTAMP(3),
+
+    CONSTRAINT "transfer_ledger_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "order_items" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "orderId" UUID NOT NULL,
@@ -388,6 +478,8 @@ CREATE TABLE "product_reviews" (
 CREATE TABLE "service_feedbacks" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "userId" UUID NOT NULL,
+    "orderId" UUID,
+    "productId" UUID,
     "overallRating" INTEGER NOT NULL,
     "criteria" JSONB,
     "category" "FeedbackCategory" NOT NULL,
@@ -545,6 +637,12 @@ CREATE INDEX "users_phone_idx" ON "users"("phone");
 CREATE INDEX "users_deletedAt_idx" ON "users"("deletedAt");
 
 -- CreateIndex
+CREATE INDEX "media_assets_ownerId_createdAt_idx" ON "media_assets"("ownerId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "media_assets_googleArchiveStatus_idx" ON "media_assets"("googleArchiveStatus");
+
+-- CreateIndex
 CREATE INDEX "oauth_accounts_userId_idx" ON "oauth_accounts"("userId");
 
 -- CreateIndex
@@ -599,6 +697,15 @@ CREATE INDEX "products_stock_idx" ON "products"("stock");
 CREATE INDEX "products_isActive_idx" ON "products"("isActive");
 
 -- CreateIndex
+CREATE INDEX "products_ownerId_idx" ON "products"("ownerId");
+
+-- CreateIndex
+CREATE INDEX "seller_contracts_sellerId_status_effectiveFrom_idx" ON "seller_contracts"("sellerId", "status", "effectiveFrom");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "seller_contracts_sellerId_version_key" ON "seller_contracts"("sellerId", "version");
+
+-- CreateIndex
 CREATE INDEX "product_images_productId_idx" ON "product_images"("productId");
 
 -- CreateIndex
@@ -641,6 +748,24 @@ CREATE INDEX "orders_status_createdAt_idx" ON "orders"("status", "createdAt" DES
 CREATE INDEX "orders_userId_status_createdAt_idx" ON "orders"("userId", "status", "createdAt" DESC);
 
 -- CreateIndex
+CREATE INDEX "seller_settlements_sellerId_status_createdAt_idx" ON "seller_settlements"("sellerId", "status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "seller_settlements_orderId_idx" ON "seller_settlements"("orderId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "seller_settlements_orderId_sellerId_key" ON "seller_settlements"("orderId", "sellerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "transfer_ledger_idempotencyKey_key" ON "transfer_ledger"("idempotencyKey");
+
+-- CreateIndex
+CREATE INDEX "transfer_ledger_sellerId_status_createdAt_idx" ON "transfer_ledger"("sellerId", "status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "transfer_ledger_settlementId_idx" ON "transfer_ledger"("settlementId");
+
+-- CreateIndex
 CREATE INDEX "order_items_orderId_idx" ON "order_items"("orderId");
 
 -- CreateIndex
@@ -681,6 +806,12 @@ CREATE INDEX "service_feedbacks_userId_idx" ON "service_feedbacks"("userId");
 
 -- CreateIndex
 CREATE INDEX "service_feedbacks_isApproved_createdAt_idx" ON "service_feedbacks"("isApproved", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "service_feedbacks_orderId_idx" ON "service_feedbacks"("orderId");
+
+-- CreateIndex
+CREATE INDEX "service_feedbacks_productId_idx" ON "service_feedbacks"("productId");
 
 -- CreateIndex
 CREATE INDEX "notifications_userId_read_createdAt_idx" ON "notifications"("userId", "read", "createdAt" DESC);
@@ -734,6 +865,9 @@ CREATE INDEX "verification_requests_userId_idx" ON "verification_requests"("user
 CREATE INDEX "verification_requests_status_idx" ON "verification_requests"("status");
 
 -- AddForeignKey
+ALTER TABLE "media_assets" ADD CONSTRAINT "media_assets_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "oauth_accounts" ADD CONSTRAINT "oauth_accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -753,6 +887,12 @@ ALTER TABLE "product_bids" ADD CONSTRAINT "product_bids_productId_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "product_bids" ADD CONSTRAINT "product_bids_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "products" ADD CONSTRAINT "products_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "seller_contracts" ADD CONSTRAINT "seller_contracts_sellerId_fkey" FOREIGN KEY ("sellerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_images" ADD CONSTRAINT "product_images_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -794,6 +934,21 @@ ALTER TABLE "orders" ADD CONSTRAINT "orders_userId_fkey" FOREIGN KEY ("userId") 
 ALTER TABLE "orders" ADD CONSTRAINT "orders_shippingZoneId_fkey" FOREIGN KEY ("shippingZoneId") REFERENCES "shipping_zones"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "seller_settlements" ADD CONSTRAINT "seller_settlements_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "seller_settlements" ADD CONSTRAINT "seller_settlements_sellerId_fkey" FOREIGN KEY ("sellerId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "seller_settlements" ADD CONSTRAINT "seller_settlements_contractId_fkey" FOREIGN KEY ("contractId") REFERENCES "seller_contracts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "transfer_ledger" ADD CONSTRAINT "transfer_ledger_settlementId_fkey" FOREIGN KEY ("settlementId") REFERENCES "seller_settlements"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "transfer_ledger" ADD CONSTRAINT "transfer_ledger_sellerId_fkey" FOREIGN KEY ("sellerId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -813,6 +968,12 @@ ALTER TABLE "product_reviews" ADD CONSTRAINT "product_reviews_orderId_fkey" FORE
 
 -- AddForeignKey
 ALTER TABLE "service_feedbacks" ADD CONSTRAINT "service_feedbacks_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "service_feedbacks" ADD CONSTRAINT "service_feedbacks_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "service_feedbacks" ADD CONSTRAINT "service_feedbacks_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

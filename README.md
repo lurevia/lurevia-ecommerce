@@ -254,6 +254,37 @@ La suite couvre actuellement les utilitaires critiques (pagination, parsing de d
 
 ## 9. Déploiement en production
 
+### Recréer l'historique après une base PostgreSQL neuve
+
+Si la base de production a réellement été supprimée puis recréée vide, le
+dossier `prisma/migrations/20260924174000_initial_schema` contient une
+migration initiale générée depuis le schéma actuel. Depuis un poste qui peut
+atteindre Aiven, vérifiez d'abord la connexion :
+
+```bash
+npx prisma migrate status
+```
+
+Si l'ancienne table `_prisma_migrations` existe encore avec une migration
+échouée, réparez uniquement son état avant de déployer la nouvelle migration :
+
+```bash
+npx prisma migrate resolve --rolled-back 20260924162000_oauth_phone_nullable
+npx prisma migrate deploy
+```
+
+Si la base est vraiment neuve, ne supprimez pas et ne recréez pas les fichiers
+de migration : exécutez simplement :
+
+```bash
+npx prisma migrate deploy
+npx prisma db seed
+```
+
+Ne lancez pas `prisma migrate dev` contre Aiven et ne marquez pas une migration
+comme `--applied` si son SQL n'a pas réellement été exécuté. Si `P1001`
+apparaît, corrigez d'abord l'accès réseau ou l'état du service Aiven.
+
 1. Générez des secrets JWT forts et uniques (`openssl rand -base64 64`).
 2. Positionnez `NODE_ENV=production` et `COOKIE_SECURE=true` (nécessite HTTPS).
 3. Renseignez `CORS_ORIGINS` avec l'URL exacte de votre frontend déployé
