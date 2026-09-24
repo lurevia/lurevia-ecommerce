@@ -226,7 +226,9 @@ La suite couvre actuellement les utilitaires critiques (pagination, parsing de d
 
 1. Générez des secrets JWT forts et uniques (`openssl rand -base64 64`).
 2. Positionnez `NODE_ENV=production` et `COOKIE_SECURE=true` (nécessite HTTPS).
-3. Renseignez `CORS_ORIGINS` avec l'URL exacte de votre frontend déployé.
+3. Renseignez `CORS_ORIGINS` avec l'URL exacte de votre frontend déployé
+   (par exemple `https://lurevia.github.io`). Plusieurs origines sont séparées
+   par des virgules ; ajoutez votre domaine personnalisé si nécessaire.
 4. Committez le dossier `prisma/migrations` généré par `prisma migrate dev` avant le premier déploiement, puis utilisez `prisma migrate deploy` (déjà intégré dans `docker-compose.yml` et le `Dockerfile`) — jamais `migrate dev` en production.
 5. Placez l'API derrière un reverse proxy (Nginx, Caddy) ou une plateforme gérée (Railway, Render, Fly.io) assurant la terminaison TLS.
 6. Surveillez les logs structurés (JSON via Pino) avec votre solution d'observabilité habituelle.

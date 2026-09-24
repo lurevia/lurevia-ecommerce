@@ -13,7 +13,9 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
 
-  CORS_ORIGINS: z.string().default("http://localhost:5173"),
+  CORS_ORIGINS: z
+    .string()
+    .default("http://localhost:5173,https://lurevia.github.io,https://lurevia.github.io/lurevia-admin"),
 
   COOKIE_DOMAIN: z.string().default(""),
 
