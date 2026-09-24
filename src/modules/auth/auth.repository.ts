@@ -73,7 +73,7 @@ export const authRepository = {
     }),
 
   // ─── OAuth ────────────────────────────────────────────────────────
-  findOAuthAccount: (provider: Prisma.AuthProvider, providerUserId: string) =>
+  findOAuthAccount: (provider: any, providerUserId: string) =>
     prisma.oAuthAccount.findUnique({
       where: {
         provider_providerUserId: { provider, providerUserId },

@@ -116,7 +116,10 @@ export const adminController = {
       data: {
         success: true,
         expiresAt: request.expiresAt,
-        user: request.user,
+        user: request.user ? {
+          fullName: request.user.fullName,
+          email: request.user.email,
+        } : undefined,
       },
     });
   }),

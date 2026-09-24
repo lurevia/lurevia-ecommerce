@@ -284,7 +284,7 @@ export const adminVerificationService = {
       }
       const updated = await tx.verificationRequest.update({
         where: { id: requestId },
-        data: { status: "APPROVED", code, expiresAt, approvedAt: new Date(), approvedBy: adminId },
+        data: { status: "APPROVED", expiresAt, approvedAt: new Date(), approvedBy: adminId },
         include: { user: { select: { fullName: true, email: true } } },
       });
 

@@ -20,8 +20,8 @@ export const cartRepository = {
         userId_productId_colorId_sizeId: {
           userId,
           productId,
-          colorId: null,
-          sizeId: null
+          colorId: "" as any,
+          sizeId: "" as any
         }
       },
       update: { quantity },

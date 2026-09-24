@@ -60,6 +60,7 @@ export const ordersRepository = {
 
       const order = await tx.order.create({
         data: {
+          orderNumber: `ORD-${crypto.randomUUID().split('-')[0].toUpperCase()}-${Date.now().toString().slice(-4)}`,
           userId: params.userId,
           status: params.initialStatus,
           paymentMethod: params.paymentMethod,
@@ -84,11 +85,14 @@ export const ordersRepository = {
             })),
           },
           transactions: {
-            create: {
-              amount: params.total,
-              method: params.paymentMethod,
-              status: params.transactionStatus,
-            },
+            create: [
+              {
+                amount: params.total,
+                method: params.paymentMethod,
+                status: params.transactionStatus,
+                idempotencyKey: crypto.randomUUID(),
+              },
+            ],
           },
         },
         include: orderDetailInclude,

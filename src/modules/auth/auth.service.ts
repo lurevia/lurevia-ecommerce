@@ -8,7 +8,7 @@ import {
 } from "../../utils/refreshToken";
 import { ConflictError, UnauthorizedError } from "../../errors/AppError";
 import { toPublicUser } from "./auth.mapper";
-import type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.validators";
+import type { RegisterInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.validators";
 import { logger } from "../../lib/logger";
 import { prisma } from "../../lib/prisma";
 import { emailService } from "../../services/email.service";

@@ -1,7 +1,7 @@
 import { OAuth2Client } from "google-auth-library";
 import axios from "axios";
 import { authRepository } from "./auth.repository";
-import { authService } from "./auth.service";
+import { issueTokenPair } from "./auth.service";
 import { logger } from "../../lib/logger";
 import { prisma } from "../../lib/prisma";
 import { AuthProvider } from "@prisma/client";
@@ -102,7 +102,7 @@ export const oauthService = {
     if (oauthAccount) {
       const user = oauthAccount.user;
       await authRepository.touchLastLogin(user.id);
-      const tokens = await authService.issueTokenPair(user.id, user.role, createdByIp);
+      const tokens = await issueTokenPair(user.id, user.role, createdByIp);
       return { user, tokens };
     }
 
@@ -120,7 +120,7 @@ export const oauthService = {
       });
 
       await authRepository.touchLastLogin(existingUser.id);
-      const tokens = await authService.issueTokenPair(existingUser.id, existingUser.role, createdByIp);
+      const tokens = await issueTokenPair(existingUser.id, existingUser.role, createdByIp);
       return { user: existingUser, tokens };
     }
 
@@ -146,7 +146,7 @@ export const oauthService = {
       },
     });
 
-    const tokens = await authService.issueTokenPair(newUser.id, newUser.role, createdByIp);
+    const tokens = await issueTokenPair(newUser.id, newUser.role, createdByIp);
     return { user: newUser, tokens };
   },
 };

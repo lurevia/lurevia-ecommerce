@@ -90,7 +90,7 @@ export const ordersService = {
         transactionStatus,
       });
 
-      return toOrderDto(order);
+      return toOrderDto(order as any);
     } catch (err) {
 
       if (err instanceof Error && err.message.startsWith("STOCK_INSUFFICIENT:")) {

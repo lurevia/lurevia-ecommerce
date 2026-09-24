@@ -33,7 +33,7 @@ const envSchema = z.object({
 
   DEFAULT_SHIPPING_COST: z.coerce.number().int().nonnegative().default(8000),
   FREE_SHIPPING_THRESHOLD: z.coerce.number().int().nonnegative().default(250000),
-  REVIEW_DELAY_S_DAYS: z.coerce.number().int().nonnegative().default(5),
+  REVIEW_DELAY_DAYS: z.coerce.number().int().nonnegative().default(5),
 
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
