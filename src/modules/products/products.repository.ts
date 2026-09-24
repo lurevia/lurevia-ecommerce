@@ -71,6 +71,11 @@ const buildOrderBy = (sortBy: ListProductsQuery["sortBy"]): Prisma.ProductOrderB
 };
 
 export const productsRepository = {
+  findManyByOwner: (ownerId: string, skip: number, take: number) =>
+    prisma.$transaction([
+      prisma.product.findMany({ where: { ownerId }, orderBy: { createdAt: "desc" }, skip, take, include: productDetailInclude }),
+      prisma.product.count({ where: { ownerId } }),
+    ]),
   async findMany(query: ListProductsQuery) {
     const where = buildWhere(query);
     const orderBy = buildOrderBy(query.sortBy);

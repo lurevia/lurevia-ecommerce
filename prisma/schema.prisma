@@ -177,6 +177,7 @@ model User {
   messagesSent          UserMessage[]     @relation("MessageSender")
   auditLogs             AuditLog[]        @relation("AuditActor")
   bids                  ProductBid[]
+  ownedProducts         Product[]          @relation("ProductOwner")
 
   @@index([email])
   @@index([phone])
@@ -316,6 +317,8 @@ model Category {
 
 model Product {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String?  @db.Uuid
+  owner           User?    @relation("ProductOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   title           String
   slug            String   @unique
   sku             String   @unique
@@ -350,11 +353,13 @@ model Product {
   orderItems OrderItem[]
   reviews    ProductReview[]
   bids       ProductBid[]
+  feedbacks ServiceFeedback[] @relation("FeedbackProduct")
 
   @@index([price])
   @@index([createdAt])
   @@index([stock])
   @@index([isActive])
+  @@index([ownerId])
   @@map("products")
 }
 
@@ -480,6 +485,7 @@ model Order {
   items        OrderItem[]
   transactions Transaction[]
   reviews      ProductReview[]
+  serviceFeedbacks ServiceFeedback[]
 
   @@index([userId])
   @@index([status])
@@ -588,6 +594,10 @@ model ServiceFeedback {
   id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId         String           @db.Uuid
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId        String?          @db.Uuid
+  order          Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  productId      String?          @db.Uuid
+  product        Product?         @relation("FeedbackProduct", fields: [productId], references: [id], onDelete: SetNull)
   overallRating  Int
   criteria       Json?
   category       FeedbackCategory
@@ -603,6 +613,8 @@ model ServiceFeedback {
 
   @@index([userId])
   @@index([isApproved, createdAt])
+  @@index([orderId])
+  @@index([productId])
   @@map("service_feedbacks")
 }
 

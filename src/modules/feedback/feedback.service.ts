@@ -69,12 +69,27 @@ export const feedbackService = {
   },
 
   async create(userId: string, input: CreateFeedbackInput) {
+    let orderId = input.orderId;
+    let productId = input.productId;
+    if (orderId) {
+      const order = await feedbackRepository.findOrderForUser(orderId, userId);
+      if (!order) throw new ForbiddenError("Cette commande ne vous appartient pas.");
+      if (productId && !order.items.some((item) => item.productId === productId)) {
+        throw new ForbiddenError("Le produit n'appartient pas à cette commande.");
+      }
+    }
+    if (productId && !orderId) {
+      const purchase = await feedbackRepository.findPurchasedProduct(productId, userId);
+      if (!purchase) throw new ForbiddenError("Vous ne pouvez pas rattacher ce produit à votre feedback.");
+    }
     const feedback = await feedbackRepository.create({
       user: { connect: { id: userId } },
       overallRating: input.overallRating,
       category: CATEGORY_TO_DB[input.category],
       comment: input.comment,
       criteria: input.criteria,
+      ...(orderId ? { order: { connect: { id: orderId } } } : {}),
+      ...(productId ? { product: { connect: { id: productId } } } : {}),
     });
     return toFeedbackDto(feedback);
   },

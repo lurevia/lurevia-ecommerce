@@ -2,6 +2,10 @@ import { prisma } from "../../lib/prisma";
 import type { Prisma } from "@prisma/client";
 
 export const feedbackRepository = {
+  findOrderForUser: (orderId: string, userId: string) =>
+    prisma.order.findFirst({ where: { id: orderId, userId }, select: { id: true, items: { select: { productId: true } } } }),
+  findPurchasedProduct: (productId: string, userId: string) =>
+    prisma.orderItem.findFirst({ where: { productId, order: { userId } }, select: { productId: true } }),
   findManyPublic: (skip: number, take: number) =>
     prisma.$transaction([
       prisma.serviceFeedback.findMany({

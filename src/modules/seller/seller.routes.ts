@@ -1,0 +1,17 @@
+import { Router } from "express";
+import { requireAuth, requireRole } from "../../middlewares/auth.middleware";
+import { validate } from "../../middlewares/validate.middleware";
+import { sellerController } from "./seller.controller";
+import { createProductSchema, sellerListSchema, sellerProductIdSchema, sellerStatusSchema, updateProductSchema } from "./seller.validators";
+const router = Router();
+router.use(requireAuth, requireRole("SELLER"));
+router.get("/stats", sellerController.stats);
+router.get("/feedback", sellerController.feedback);
+router.get("/products", validate({ query: sellerListSchema }), sellerController.products);
+router.post("/products", validate({ body: createProductSchema }), sellerController.createProduct);
+router.patch("/products/:id", validate({ params: sellerProductIdSchema, body: updateProductSchema }), sellerController.updateProduct);
+router.delete("/products/:id", validate({ params: sellerProductIdSchema }), sellerController.removeProduct);
+router.get("/orders", validate({ query: sellerListSchema }), sellerController.orders);
+router.get("/orders/:id", validate({ params: sellerProductIdSchema }), sellerController.order);
+router.patch("/orders/:id/status", validate({ params: sellerProductIdSchema, body: sellerStatusSchema }), sellerController.status);
+export default router;

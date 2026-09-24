@@ -38,13 +38,14 @@ export const productsService = {
     }));
   },
 
-  async create(input: CreateProductInput) {
+  async create(input: CreateProductInput, ownerId?: string) {
     const existingSku = await productsRepository.findBySku(input.sku);
     if (existingSku) throw new ConflictError("Ce SKU est déjà utilisé.");
 
     const slug = await generateUniqueProductSlug(input.title);
 
     const product = await productsRepository.create({
+      ...(ownerId ? { owner: { connect: { id: ownerId } } } : {}),
       title: input.title,
       slug,
       sku: input.sku,
@@ -64,9 +65,10 @@ export const productsService = {
     return toProductDto(product);
   },
 
-  async update(id: string, input: UpdateProductInput) {
+  async update(id: string, input: UpdateProductInput, ownerId?: string) {
     const existing = await productsRepository.findById(id);
     if (!existing) throw new NotFoundError("Produit");
+    if (ownerId && existing.ownerId !== ownerId) throw new NotFoundError("Produit");
 
     if (input.sku && input.sku !== existing.sku) {
       const skuTaken = await productsRepository.findBySku(input.sku);
@@ -102,9 +104,10 @@ export const productsService = {
     return toProductDto(updated!);
   },
 
-  async remove(id: string) {
+  async remove(id: string, ownerId?: string) {
     const existing = await productsRepository.findById(id);
     if (!existing) throw new NotFoundError("Produit");
+    if (ownerId && existing.ownerId !== ownerId) throw new NotFoundError("Produit");
     await productsRepository.delete(id);
   },
 };

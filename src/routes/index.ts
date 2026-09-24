@@ -15,6 +15,7 @@ import exportRoutes from "../modules/export/export.routes";
 import newsletterRoutes from "../modules/newsletter/newsletter.routes";
 import adminRoutes from "../modules/admin/admin.routes";
 import messagesRoutes from "../modules/messages/messages.routes";
+import sellerRoutes from "../modules/seller/seller.routes";
 
 const router = Router();
 
@@ -35,6 +36,7 @@ router.use("/export", exportRoutes);
 router.use("/admin", adminRoutes);
 router.use("/messages", messagesRoutes);
 router.use("/newsletter", newsletterRoutes);
+router.use("/seller", sellerRoutes);
 
 router.get("/health", (_req, res) => {
   res.status(200).json({ data: { status: "ok", timestamp: new Date().toISOString() } });

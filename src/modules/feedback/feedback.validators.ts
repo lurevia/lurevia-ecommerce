@@ -15,6 +15,8 @@ export const createFeedbackSchema = z.object({
   category: z.enum(["delivery", "payment", "support", "website", "other"]),
   comment: z.string().trim().min(1).max(2000),
   criteria: criteriaSchema,
+  orderId: z.string().min(1).optional(),
+  productId: z.string().min(1).optional(),
 });
 
 export const updateFeedbackSchema = createFeedbackSchema.partial();
