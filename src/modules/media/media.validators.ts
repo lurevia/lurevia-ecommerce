@@ -11,3 +11,7 @@ export const importMediaSchema = z.object({
     }
   }, "Une URL HTTP(S) publique est requise"),
 });
+
+export const uploadMediaSchema = z.object({
+  dataUrl: z.string().min(1).max(35 * 1024 * 1024),
+});

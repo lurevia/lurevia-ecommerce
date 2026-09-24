@@ -10,6 +10,7 @@ import { prisma } from "../../lib/prisma";
 const allowedTypes: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp",
 };
+const dataUrlPattern = /^data:(image\/(?:jpeg|png|gif|webp));base64,([A-Za-z0-9+/]+={0,2})$/;
 
 const isPrivateAddress = (address: string): boolean => {
   const value = address.toLowerCase().replace(/^\[|\]$/g, "");
@@ -51,6 +52,22 @@ const assertImageSignature = (bytes: Buffer, contentType: string): void => {
 };
 
 export const mediaService = {
+  async uploadDataUrl(ownerId: string, dataUrl: string) {
+    const match = dataUrlPattern.exec(dataUrl);
+    if (!match) throw new BadRequestError("Un data URL image valide est requis");
+    const contentType = match[1];
+    const encoded = match[2];
+    if (encoded.length > Math.ceil((env.MEDIA_MAX_BYTES * 4) / 3) + 8) {
+      throw new BadRequestError("La taille de l'image dépasse la limite autorisée");
+    }
+    const bytes = Buffer.from(encoded, "base64");
+    if (!bytes.length || bytes.length > env.MEDIA_MAX_BYTES) {
+      throw new BadRequestError("La taille de l'image dépasse la limite autorisée");
+    }
+    assertImageSignature(bytes, contentType);
+    return this.storeBytes(ownerId, bytes, contentType, "direct-upload");
+  },
+
   async importFromUrl(ownerId: string, sourceUrl: string) {
     const url = await assertPublicUrl(sourceUrl);
     let response;
@@ -62,21 +79,24 @@ export const mediaService = {
       });
     } catch (error) {
       throw new BadRequestError(axios.isAxiosError(error) && error.response?.status === 404
-        ? "L'image source est introuvable"
-        : "Impossible de télécharger l'image source");
+        ? "L'image source est introuvable" : "Impossible de télécharger l'image source");
     }
     const contentType = String(response.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
-    const extension = allowedTypes[contentType];
-    if (!extension) throw new BadRequestError("Le serveur source ne fournit pas un type image autorisé");
+    if (!allowedTypes[contentType]) throw new BadRequestError("Le serveur source ne fournit pas un type image autorisé");
     const bytes = Buffer.from(response.data);
-    if (bytes.length === 0 || bytes.length > env.MEDIA_MAX_BYTES) {
+    if (!bytes.length || bytes.length > env.MEDIA_MAX_BYTES) {
       throw new BadRequestError("La taille de l'image dépasse la limite autorisée");
     }
     assertImageSignature(bytes, contentType);
+    return this.storeBytes(ownerId, bytes, contentType, url.toString());
+  },
+
+  async storeBytes(ownerId: string, bytes: Buffer, contentType: string, sourceUrl: string) {
     if (!env.MEDIA_GITHUB_TOKEN || !env.MEDIA_GITHUB_OWNER || !env.MEDIA_GITHUB_REPOSITORY) {
       throw new ConflictError("Le stockage GitHub des médias n'est pas configuré");
     }
     const folder = env.MEDIA_GITHUB_PATH.replace(/^\/|\/$/g, "");
+    const extension = allowedTypes[contentType];
     const path = `${folder}/${new Date().toISOString().slice(0, 10)}/${randomUUID()}.${extension}`;
     const apiUrl = `https://api.github.com/repos/${encodeURIComponent(env.MEDIA_GITHUB_OWNER)}/${encodeURIComponent(env.MEDIA_GITHUB_REPOSITORY)}/contents/${path.split("/").map(encodeURIComponent).join("/")}`;
     let githubResponse;
@@ -84,7 +104,8 @@ export const mediaService = {
       githubResponse = await axios.put(apiUrl, {
         message: `Import media ${path}`, content: bytes.toString("base64"), branch: env.MEDIA_GITHUB_BRANCH,
       }, { headers: {
-        Authorization: `Bearer ${env.MEDIA_GITHUB_TOKEN}`, Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${env.MEDIA_GITHUB_TOKEN}`,
+        Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       }, timeout: 20000 });
     } catch (error) {
@@ -97,7 +118,7 @@ export const mediaService = {
     const hasPhotosCredentials = Boolean(env.GOOGLE_PHOTOS_ACCESS_TOKEN);
     const asset = await prisma.mediaAsset.create({
       data: {
-        ownerId, sourceUrl: url.toString(), publicUrl, githubPath: path, contentType,
+        ownerId, sourceUrl, publicUrl, githubPath: path, contentType,
         byteSize: bytes.length, githubSha,
         googleArchiveStatus: hasPhotosCredentials ? MediaArchiveStatus.PENDING : MediaArchiveStatus.NOT_CONFIGURED,
         googleArchiveError: hasPhotosCredentials

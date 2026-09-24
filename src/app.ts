@@ -37,7 +37,7 @@ export const createApp = (): Express => {
   );
 
   app.use(compression());
-  app.use(express.json({ limit: "1mb" }));
+  app.use(express.json({ limit: `${Math.ceil((env.MEDIA_MAX_BYTES * 4) / 3 / 1024 / 1024) + 1}mb` }));
   app.use(express.urlencoded({ extended: true, limit: "1mb" }));
   app.use(cookieParser());
   app.use(hpp());
