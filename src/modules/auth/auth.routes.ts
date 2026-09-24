@@ -1,7 +1,14 @@
 import { Router } from "express";
 import { authController } from "./auth.controller";
 import { validate } from "../../middlewares/validate.middleware";
-import { loginSchema, registerSchema, verificationCodeSchema } from "./auth.validators";
+import {
+  loginSchema,
+  registerSchema,
+  verificationCodeSchema,
+  oauthCallbackSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema
+} from "./auth.validators";
 import { requireAuth } from "../../middlewares/auth.middleware";
 import { authRateLimiter } from "../../middlewares/rateLimit.middleware";
 

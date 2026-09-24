@@ -38,7 +38,10 @@ export const authRepository = {
   revokeRefreshToken: (id: string, replacedBy?: string) =>
     prisma.refreshToken.update({
       where: { id },
-      data: { revokedAt: new Date(), replacedBy },
+      data: {
+        revokedAt: new Date(),
+        replacedBy: replacedBy ? { connect: { id: replacedBy } } : undefined
+      },
     }),
 
   revokeAllUserTokens: (userId: string) =>

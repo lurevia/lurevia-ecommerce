@@ -264,7 +264,7 @@ export const authService = {
     const request = await prisma.verificationRequest.findFirst({
       where: {
         userId,
-        code: code.trim(),
+        // On retire la recherche par 'code' car le champ a été supprimé du schéma
         status: "APPROVED",
       },
     });
@@ -286,8 +286,6 @@ export const authService = {
         where: { id: userId },
         data: {
           isVerified: true,
-          verificationToken: null,
-          verificationExpiresAt: null,
         },
       }),
       prisma.verificationRequest.update({

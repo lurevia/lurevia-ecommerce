@@ -134,7 +134,7 @@ export const oauthService = {
         primaryProvider: "LOCAL",
         primaryIdentifier: "EMAIL",
         lastLoginAt: new Date(),
-        oAuthAccounts: {
+        oauthAccounts: {
           create: {
             provider,
             providerUserId: profile.providerUserId,

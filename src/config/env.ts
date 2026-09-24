@@ -33,13 +33,17 @@ const envSchema = z.object({
 
   DEFAULT_SHIPPING_COST: z.coerce.number().int().nonnegative().default(8000),
   FREE_SHIPPING_THRESHOLD: z.coerce.number().int().nonnegative().default(250000),
-  REVIEW_DELAY_DAYS: z.coerce.number().int().nonnegative().default(5),
+  REVIEW_DELAY_S_DAYS: z.coerce.number().int().nonnegative().default(5),
 
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASSWORD: z.string().optional(),
+   SMTP_USER: z.string().optional(),
+   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().email("SMTP_FROM doit être une adresse e-mail valide").optional(),
+
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  FACEBOOK_APP_ID: z.string().optional(),
+  FACEBOOK_APP_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
