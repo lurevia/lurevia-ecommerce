@@ -28,7 +28,7 @@ export const ordersRepository = {
    */
   createOrderTransactional: (params: {
     userId: string;
-    items: { productId: string; quantity: number; priceSnapshot: number; titleSnapshot: string; imageSnapshot: string | null }[];
+    items: { productId: string; quantity: number; priceSnapshot: number; titleSnapshot: string; imageSnapshot: string | null; skuSnapshot: string }[];
     shipping: {
       shippingFullName: string;
       shippingPhone: string;
@@ -80,6 +80,7 @@ export const ordersRepository = {
               priceSnapshot: i.priceSnapshot,
               titleSnapshot: i.titleSnapshot,
               imageSnapshot: i.imageSnapshot,
+              skuSnapshot: i.skuSnapshot,
             })),
           },
           transactions: {

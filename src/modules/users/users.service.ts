@@ -36,7 +36,7 @@ export const usersService = {
     const user = await authRepository.findUserById(userId);
     if (!user) throw new NotFoundError("Utilisateur");
 
-    const valid = await verifyPassword(input.currentPassword, user.passwordHash);
+    const valid = await verifyPassword(input.currentPassword, user.passwordHash || "");
     if (!valid) throw new UnauthorizedError("Mot de passe actuel incorrect.");
 
     if (input.currentPassword === input.newPassword) {

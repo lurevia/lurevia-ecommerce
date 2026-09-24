@@ -40,7 +40,7 @@ export const ordersService = {
       shipping = {
         shippingFullName: address.fullName,
         shippingPhone: address.phone,
-        shippingEmail: address.email,
+        shippingEmail: address.email || "",
         shippingAddress: address.address,
         shippingCity: address.city,
         shippingRegion: address.region,
@@ -59,7 +59,7 @@ export const ordersService = {
     }
 
     // ── Totaux calculés côté serveur — jamais confiés au client ──
-    const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.product.price, 0);
+    const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * (item.product.price ?? 0), 0);
     const shippingCost = subtotal >= env.FREE_SHIPPING_THRESHOLD ? 0 : env.DEFAULT_SHIPPING_COST;
     const total = subtotal + shippingCost;
 
@@ -76,9 +76,10 @@ export const ordersService = {
         items: cartItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
-          priceSnapshot: item.product.price,
+          priceSnapshot: item.product.price ?? 0,
           titleSnapshot: item.product.title,
           imageSnapshot: item.product.images[0]?.url ?? null,
+          skuSnapshot: item.product.sku,
         })),
         shipping,
         paymentMethod,
@@ -91,6 +92,7 @@ export const ordersService = {
 
       return toOrderDto(order);
     } catch (err) {
+
       if (err instanceof Error && err.message.startsWith("STOCK_INSUFFICIENT:")) {
         const productId = err.message.split(":")[1];
         throw new ConflictError("Le stock de certains articles a changé entre-temps.", { productId });

@@ -1,15 +1,17 @@
 import type { Order, OrderItem, OrderStatus, PaymentMethod, Transaction, TransactionStatus } from "@prisma/client";
 
-const PAYMENT_METHOD_TO_API: Record<PaymentMethod, "mobile-money" | "card" | "cash"> = {
+const PAYMENT_METHOD_TO_API: Record<PaymentMethod, "mobile-money" | "card" | "cash" | "bank-transfer"> = {
   MOBILE_MONEY: "mobile-money",
   CARD: "card",
-  CASH: "cash",
+  COD: "cash",
+  BANK_TRANSFERT: "bank-transfer",
 };
 
-export const PAYMENT_METHOD_FROM_API: Record<"mobile-money" | "card" | "cash", PaymentMethod> = {
+export const PAYMENT_METHOD_FROM_API: Record<"mobile-money" | "card" | "cash" | "bank-transfer", PaymentMethod> = {
   "mobile-money": "MOBILE_MONEY",
   card: "CARD",
-  cash: "CASH",
+  cash: "COD",
+  "bank-transfer": "BANK_TRANSFERT",
 };
 
 const ORDER_STATUS_TO_API: Record<OrderStatus, string> = {
@@ -18,6 +20,10 @@ const ORDER_STATUS_TO_API: Record<OrderStatus, string> = {
   SHIPPED: "shipped",
   DELIVERED: "delivered",
   CANCELLED: "cancelled",
+  COD_PENDING: "cod-pending",
+  COD_FAILED: "cod-failed",
+  REFUNDED: "refunded",
+  PAYMENT_FAILED: "payment-failed",
 };
 
 export const ORDER_STATUS_FROM_API: Record<string, OrderStatus> = {
@@ -26,12 +32,19 @@ export const ORDER_STATUS_FROM_API: Record<string, OrderStatus> = {
   shipped: "SHIPPED",
   delivered: "DELIVERED",
   cancelled: "CANCELLED",
+  "cod-pending": "COD_PENDING",
+  "cod-failed": "COD_FAILED",
+  refunded: "REFUNDED",
+  "payment-failed": "PAYMENT_FAILED",
 };
 
 const TRANSACTION_STATUS_TO_API: Record<TransactionStatus, string> = {
   SUCCESS: "success",
   PENDING: "pending",
   FAILED: "failed",
+  INITIATED: "initiated",
+  CANCELLED: "cancelled",
+  REFUNDED: "refunded",
 };
 
 type OrderWithRelations = Order & { items: OrderItem[]; transactions: Transaction[] };

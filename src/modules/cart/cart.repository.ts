@@ -10,17 +10,28 @@ export const cartRepository = {
     }),
 
   findOne: (userId: string, productId: string) =>
-    prisma.cartItem.findUnique({ where: { userId_productId: { userId, productId } } }),
+    prisma.cartItem.findFirst({
+      where: { userId, productId }
+    }),
 
   upsertQuantity: (userId: string, productId: string, quantity: number) =>
     prisma.cartItem.upsert({
-      where: { userId_productId: { userId, productId } },
+      where: {
+        userId_productId_colorId_sizeId: {
+          userId,
+          productId,
+          colorId: null,
+          sizeId: null
+        }
+      },
       update: { quantity },
       create: { userId, productId, quantity },
     }),
 
   delete: (userId: string, productId: string) =>
-    prisma.cartItem.delete({ where: { userId_productId: { userId, productId } } }),
+    prisma.cartItem.deleteMany({
+      where: { userId, productId }
+    }),
 
   clear: (userId: string) => prisma.cartItem.deleteMany({ where: { userId } }),
 };

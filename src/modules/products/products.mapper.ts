@@ -30,7 +30,7 @@ export const toProductDto = (product: ProductWithRelations): ProductDto => ({
   sku: product.sku,
   description: product.description,
   longDescription: product.longDescription,
-  price: product.price,
+  price: product.price ?? 0,
   originalPrice: product.originalPrice,
   stock: product.stock,
   outOfStock: product.stock <= 0,
