@@ -132,6 +132,34 @@ enum BidStatus {
   REJECTED
 }
 
+enum SellerContractType {
+  PERCENTAGE
+  MONTHLY_FIXED
+}
+
+enum SellerContractStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SettlementStatus {
+  PENDING_REVIEW
+  READY
+  TRANSFER_PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum TransferStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // MODÈLES
 // ═════════════════════════════════════════════════════════════════════════════
@@ -178,6 +206,9 @@ model User {
   auditLogs             AuditLog[]        @relation("AuditActor")
   bids                  ProductBid[]
   ownedProducts         Product[]          @relation("ProductOwner")
+  sellerContracts       SellerContract[]
+  settlements           SellerSettlement[]
+  transfers             TransferLedger[]
 
   @@index([email])
   @@index([phone])
@@ -363,6 +394,29 @@ model Product {
   @@map("products")
 }
 
+model SellerContract {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sellerId    String                @db.Uuid
+  seller      User                  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  version     Int
+  type        SellerContractType
+  value       Int
+  currency    String                @default("MGA")
+  status      SellerContractStatus  @default(PENDING)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  rejectionReason String?
+  reviewedBy  String?               @db.Uuid
+  reviewedAt  DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  settlements SellerSettlement[]
+
+  @@unique([sellerId, version])
+  @@index([sellerId, status, effectiveFrom])
+  @@map("seller_contracts")
+}
+
 model ProductImage {
   id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productId String  @db.Uuid
@@ -486,6 +540,7 @@ model Order {
   transactions Transaction[]
   reviews      ProductReview[]
   serviceFeedbacks ServiceFeedback[]
+  settlements SellerSettlement[]
 
   @@index([userId])
   @@index([status])
@@ -493,6 +548,51 @@ model Order {
   @@index([status, createdAt(sort: Desc)])
   @@index([userId, status, createdAt(sort: Desc)])
   @@map("orders")
+}
+
+model SellerSettlement {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId         String          @db.Uuid
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sellerId        String          @db.Uuid
+  seller          User            @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  contractId      String?         @db.Uuid
+  contract        SellerContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  contractVersion Int?
+  grossAmount     Int
+  commissionAmount Int
+  netAmount       Int
+  status          SettlementStatus @default(PENDING_REVIEW)
+  reviewNote      String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  transfers       TransferLedger[]
+
+  @@unique([orderId, sellerId])
+  @@index([sellerId, status, createdAt])
+  @@index([orderId])
+  @@map("seller_settlements")
+}
+
+model TransferLedger {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  settlementId   String         @db.Uuid
+  settlement     SellerSettlement @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  sellerId       String         @db.Uuid
+  seller         User           @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  amount         Int
+  currency       String         @default("MGA")
+  idempotencyKey String         @unique
+  status         TransferStatus @default(PENDING)
+  externalReference String?
+  failureReason  String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  completedAt    DateTime?
+
+  @@index([sellerId, status, createdAt])
+  @@index([settlementId])
+  @@map("transfer_ledger")
 }
 
 model OrderItem {

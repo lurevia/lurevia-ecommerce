@@ -3,6 +3,8 @@ import { adminController } from "./admin.controller";
 import { requireAuth, requireRole } from "../../middlewares/auth.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import { adminRateLimiter } from "../../middlewares/rateLimit.middleware";
+import { financialController } from "../financial/financial.controller";
+import { contractIdSchema, contractListSchema, financialListSchema, reviewContractSchema, transferSchema } from "../financial/financial.validators";
 import {
   idParamsSchema,
   listDeletionRequestsQuerySchema,
@@ -25,6 +27,13 @@ const router = Router();
 
 // Tout l'espace admin exige un compte authentifié avec le rôle ADMIN.
 router.use(requireAuth, requireRole("ADMIN"), adminRateLimiter);
+
+router.get("/financial/stats", financialController.stats);
+router.get("/financial/contracts", validate({ query: contractListSchema }), financialController.contracts);
+router.post("/financial/contracts/:id/review", validate({ params: contractIdSchema, body: reviewContractSchema }), financialController.reviewContract);
+router.get("/financial/settlements", validate({ query: financialListSchema }), financialController.settlements);
+router.get("/financial/transfers", validate({ query: financialListSchema }), financialController.transfers);
+router.post("/financial/settlements/:id/transfer", validate({ params: contractIdSchema, body: transferSchema }), financialController.createTransfer);
 
 router.get("/stats", adminController.stats);
 router.get("/profile-change-requests", validate({ query: profileChangeStatusQuerySchema }), adminController.listProfileChanges);

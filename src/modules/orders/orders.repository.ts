@@ -98,6 +98,46 @@ export const ordersRepository = {
         include: orderDetailInclude,
       });
 
+      // Snapshot financier immuable à la commande. Aucun transfert n'est
+      // déclenché ici : un contrat absent laisse le settlement en revue.
+      const owners = await tx.orderItem.findMany({
+        where: { orderId: order.id },
+        include: { product: { select: { ownerId: true } } },
+      });
+      const bySeller = new Map<string, number>();
+      for (const item of owners) {
+        if (item.product.ownerId) bySeller.set(item.product.ownerId, (bySeller.get(item.product.ownerId) ?? 0) + item.quantity * item.priceSnapshot);
+      }
+      for (const [sellerId, grossAmount] of bySeller) {
+        const contract = await tx.sellerContract.findFirst({
+          where: {
+            sellerId,
+            status: "APPROVED",
+            AND: [
+              { OR: [{ effectiveFrom: null }, { effectiveFrom: { lte: order.createdAt } }] },
+              { OR: [{ effectiveTo: null }, { effectiveTo: { gt: order.createdAt } }] },
+            ],
+          },
+          orderBy: { version: "desc" },
+        });
+        const commissionAmount = contract
+          ? contract.type === "PERCENTAGE" ? Math.round(grossAmount * contract.value / 100) : Math.min(grossAmount, contract.value)
+          : 0;
+        await tx.sellerSettlement.create({
+          data: {
+            orderId: order.id,
+            sellerId,
+            contractId: contract?.id,
+            contractVersion: contract?.version,
+            grossAmount,
+            commissionAmount,
+            netAmount: grossAmount - commissionAmount,
+            status: contract ? "READY" : "PENDING_REVIEW",
+            reviewNote: contract ? null : "Aucun contrat actif au moment de la commande.",
+          },
+        });
+      }
+
       await tx.cartItem.deleteMany({ where: { userId: params.userId } });
 
       return order;

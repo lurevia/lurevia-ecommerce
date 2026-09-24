@@ -257,3 +257,24 @@ Ces choix ont été faits pour rester simples et proportionnés au besoin actuel
 - **Notifications** : les rappels "avis en attente" sont générés à la lecture (`GET /notifications`) plutôt que par une tâche planifiée — largement suffisant au volume actuel, mais une vraie tâche cron serait préférable à grande échelle.
 - **Métrique de popularité** : le tri "populaire" des produits utilise le nombre d'avis comme approximation, faute d'un système de tracking des vues/ventes dédié.
 - **Avis de démonstration** : les avis fictifs du catalogue mock (auteurs non rattachés à de vrais comptes) ne sont pas importés comme lignes `ProductReview` — seule la note moyenne agrégée est reprise, pour ne pas créer de fausses relations utilisateur.
+# Socle financier vendeur
+
+Le socle financier est interne et ne dépend d'aucun PSP. Un vendeur soumet un
+contrat via `POST /seller/contracts` (`PERCENTAGE`, valeur 0–100, ou
+`MONTHLY_FIXED`, valeur en MGA). Un administrateur authentifié peut consulter
+`/admin/financial/contracts`, puis approuver/refuser avec
+`POST /admin/financial/contracts/:id/review`. Les commandes créent un snapshot
+par vendeur (`/admin/financial/settlements`) et les écritures de transfert
+idempotentes sont consultables via `/admin/financial/transfers`; les statistiques
+sont disponibles sur `/admin/financial/stats`.
+
+## Mobile Money (configuration future)
+
+Le checkout accepte encore `mobile-money`, mais aucune sortie d'argent vendeur
+ni appel MVola, Orange Money ou Airtel Money n'est activé. Pour activer un
+connecteur, il faudra fournir par variables d'environnement (sans les commiter)
+les identifiants, URL d'API, numéro marchand, secret de signature et mode
+sandbox de chaque opérateur, ajouter la vérification de signature des webhooks,
+une file de retry et un rapprochement avant de passer un `TransferLedger` à
+`COMPLETED`. Tant que ce travail n'est pas fait, les settlements sans contrat
+restent `PENDING_REVIEW` et aucun transfert automatique n'est effectué.
