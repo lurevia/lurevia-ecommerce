@@ -12,6 +12,9 @@ router.post("/login", authRateLimiter, validate({ body: loginSchema }), authCont
 router.post("/refresh", authRateLimiter, authController.refresh);
 router.post("/logout", authController.logout);
 router.get("/me", requireAuth, authController.me);
+router.post("/oauth/callback", authRateLimiter, validate({ body: oauthCallbackSchema }), authController.oauthCallback);
+router.post("/forgot-password", authRateLimiter, validate({ body: forgotPasswordSchema }), authController.forgotPassword);
+router.post("/reset-password", authRateLimiter, validate({ body: resetPasswordSchema }), authController.resetPassword);
 router.post("/verification/request", requireAuth, authController.requestVerification);
 router.get("/verification/status", requireAuth, authController.verificationStatus);
 router.post(

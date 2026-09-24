@@ -8,9 +8,11 @@ import {
 } from "../../utils/refreshToken";
 import { ConflictError, UnauthorizedError } from "../../errors/AppError";
 import { toPublicUser } from "./auth.mapper";
-import type { LoginInput, RegisterInput } from "./auth.validators";
+import type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.validators";
 import { logger } from "../../lib/logger";
 import { prisma } from "../../lib/prisma";
+import { emailService } from "../../services/email.service";
+import crypto from "crypto";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES INTERNES
@@ -26,9 +28,9 @@ interface TokenPair {
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const issueTokenPair = async (
+export const issueTokenPair = async (
   userId: string,
-  role: "CUSTOMER" | "ADMIN",
+  role: any,
   createdByIp?: string
 ): Promise<TokenPair> => {
   const accessToken = signAccessToken({ sub: userId, role });
@@ -112,23 +114,23 @@ export const authService = {
   },
 
   /**
-   * Connexion — par email uniquement.
+   * Connexion — par email ou téléphone.
    * Message générique pour éviter l'énumération de comptes.
    */
-  async login(input: LoginInput, createdByIp?: string) {
-    const user = await authRepository.findByEmail(input.email);
+  async login(input: any, createdByIp?: string) {
+    const user = await authRepository.findUserByEmailOrPhone(input.identifier);
 
     if (!user) {
-      throw new UnauthorizedError("Email ou mot de passe incorrect.");
+      throw new UnauthorizedError("Identifiants ou mot de passe incorrect.");
     }
 
     const validPassword = await verifyPassword(
       input.password,
-      user.passwordHash
+      user.passwordHash || ""
     );
 
     if (!validPassword) {
-      throw new UnauthorizedError("Email ou mot de passe incorrect.");
+      throw new UnauthorizedError("Identifiants ou mot de passe incorrect.");
     }
 
     await authRepository.touchLastLogin(user.id);
@@ -329,5 +331,72 @@ export const authService = {
       requestedAt: request.createdAt,
       expiresAt: request.expiresAt,
     };
+  },
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 🎯 RÉINITIALISATION DU MOT DE PASSE
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Demande de réinitialisation : génère un token haché en base et envoie l'email.
+   */
+  async requestPasswordReset(input: ForgotPasswordInput, createdByIp?: string) {
+    const user = await authRepository.findByEmail(input.email);
+
+    if (user) {
+      // 1. Générer un token aléatoire et sécurisé
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 heure
+
+      // 2. Stocker le token haché
+      await authRepository.createPasswordResetToken({
+        tokenHash,
+        expiresAt,
+        createdByIp,
+        user: { connect: { id: user.id } },
+      });
+
+      // 3. Envoyer l'email avec le token en clair
+      const resetLink = `https://lurevia.com/reset-password?token=${rawToken}`;
+      await emailService.sendPasswordResetEmail({
+        to: user.email,
+        fullName: user.fullName,
+        resetLink,
+      });
+
+      logger.info({ userId: user.id }, "Demande de réinitialisation de mot de passe");
+    }
+
+    // Retourne toujours le même message pour éviter l'énumération de comptes
+    return {
+      message: "Si cet email est associé à un compte, vous recevrez un lien de réinitialisation.",
+    };
+  },
+
+  /**
+   * Réinitialisation effective : valide le token et met à jour le mot de passe.
+   */
+  async resetPassword(input: ResetPasswordInput) {
+    const tokenHash = hashToken(input.token);
+    const storedToken = await authRepository.findPasswordResetTokenByHash(tokenHash);
+
+    if (!storedToken) {
+      throw new UnauthorizedError("Lien de réinitialisation invalide ou expiré.");
+    }
+
+    if (storedToken.usedAt || storedToken.expiresAt < new Date()) {
+      throw new UnauthorizedError("Lien de réinitialisation invalide ou expiré.");
+    }
+
+    const newPasswordHash = await hashPassword(input.password);
+
+    await prisma.$transaction([
+      authRepository.updateUserPassword(storedToken.userId, newPasswordHash),
+      authRepository.markPasswordResetTokenUsed(storedToken.id),
+    ]);
+
+    logger.info({ userId: storedToken.userId }, "Mot de passe réinitialisé avec succès");
+    return { success: true };
   },
 };

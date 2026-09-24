@@ -1,20 +1,26 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('CUSTOMER', 'ADMIN');
+CREATE TYPE "Role" AS ENUM ('SELLER', 'CUSTOMER', 'ADMIN');
 
 -- CreateEnum
 CREATE TYPE "AuthIdentifier" AS ENUM ('EMAIL', 'PHONE');
 
 -- CreateEnum
-CREATE TYPE "PaymentMethod" AS ENUM ('MOBILE_MONEY', 'CARD', 'CASH');
+CREATE TYPE "AuthProvider" AS ENUM ('LOCAL', 'GOOGLE', 'FACEBOOK');
+
+-- CreateEnum
+CREATE TYPE "ProductPricingMode" AS ENUM ('FIXED', 'ON_REQUEST', 'NEGOTIABLE');
+
+-- CreateEnum
+CREATE TYPE "PaymentMethod" AS ENUM ('MOBILE_MONEY', 'CARD', 'COD', 'BANK_TRANSFERT');
 
 -- CreateEnum
 CREATE TYPE "MobileMoneyProvider" AS ENUM ('MVOLA', 'ORANGE_MONEY', 'AIRTEL_MONEY');
 
 -- CreateEnum
-CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED');
+CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'COD_PENDING', 'COD_FAILED', 'REFUNDED', 'PAYMENT_FAILED');
 
 -- CreateEnum
-CREATE TYPE "TransactionStatus" AS ENUM ('SUCCESS', 'PENDING', 'FAILED');
+CREATE TYPE "TransactionStatus" AS ENUM ('INITIATED', 'PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUNDED');
 
 -- CreateEnum
 CREATE TYPE "FeedbackCategory" AS ENUM ('DELIVERY', 'PAYMENT', 'SUPPORT', 'WEBSITE', 'OTHER');
@@ -32,53 +38,88 @@ CREATE TYPE "DeletionRequestStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
 CREATE TYPE "ProfileChangeRequestStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
 
 -- CreateEnum
-CREATE TYPE "MessageType" AS ENUM ('ADMIN_MESSAGE');
+CREATE TYPE "MessageType" AS ENUM ('ADMIN_MESSAGE', 'ORDER_UPDATE', 'PROMO', 'SYSTEM');
 
 -- CreateEnum
 CREATE TYPE "VerificationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'USED', 'EXPIRED');
 
 -- CreateTable
 CREATE TABLE "users" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "fullName" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
-    "passwordHash" TEXT NOT NULL,
-    "primaryIdentifier" "AuthIdentifier" NOT NULL DEFAULT 'EMAIL',
     "avatarUrl" TEXT,
-    "role" "Role" NOT NULL DEFAULT 'CUSTOMER',
+    "passwordHash" TEXT,
+    "primaryIdentifier" "AuthIdentifier" NOT NULL DEFAULT 'EMAIL',
+    "primaryProvider" "AuthProvider" NOT NULL DEFAULT 'LOCAL',
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "phoneVerified" BOOLEAN NOT NULL DEFAULT false,
     "isVerified" BOOLEAN NOT NULL DEFAULT false,
-    "verificationToken" TEXT,
-    "verificationExpiresAt" TIMESTAMP(3),
+    "role" "Role" NOT NULL DEFAULT 'CUSTOMER',
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "lastLoginAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "lastLoginAt" TIMESTAMP(3),
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
+CREATE TABLE "oauth_accounts" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
+    "provider" "AuthProvider" NOT NULL,
+    "providerUserId" TEXT NOT NULL,
+    "providerEmail" TEXT,
+    "providerName" TEXT,
+    "avatarUrl" TEXT,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "tokenExpiresAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "oauth_accounts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "refresh_tokens" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
     "tokenHash" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "revokedAt" TIMESTAMP(3),
-    "replacedBy" TEXT,
+    "replacedById" UUID,
     "createdByIp" TEXT,
+    "userAgent" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
+CREATE TABLE "password_reset_tokens" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdByIp" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "password_reset_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "addresses" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
     "label" TEXT NOT NULL,
     "fullName" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
+    "email" TEXT,
     "address" TEXT NOT NULL,
     "city" TEXT NOT NULL,
     "region" TEXT NOT NULL,
@@ -91,14 +132,30 @@ CREATE TABLE "addresses" (
 );
 
 -- CreateTable
+CREATE TABLE "shipping_zones" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "name" TEXT NOT NULL,
+    "regions" TEXT[],
+    "basePrice" INTEGER NOT NULL,
+    "pricePerKg" INTEGER,
+    "estimatedDays" INTEGER,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "shipping_zones_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "categories" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "imageUrl" TEXT NOT NULL,
     "bannerUrl" TEXT NOT NULL,
     "iconName" TEXT NOT NULL DEFAULT 'ShoppingBag',
+    "position" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -107,15 +164,20 @@ CREATE TABLE "categories" (
 
 -- CreateTable
 CREATE TABLE "products" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "sku" TEXT NOT NULL,
     "description" TEXT,
     "longDescription" TEXT,
-    "price" INTEGER NOT NULL,
+    "pricingMode" "ProductPricingMode" NOT NULL DEFAULT 'FIXED',
+    "price" INTEGER,
     "originalPrice" INTEGER,
+    "minPrice" INTEGER,
+    "maxPrice" INTEGER,
     "stock" INTEGER NOT NULL DEFAULT 0,
+    "lowStockThreshold" INTEGER NOT NULL DEFAULT 5,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isNew" BOOLEAN NOT NULL DEFAULT false,
     "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "ratingCache" DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -128,8 +190,8 @@ CREATE TABLE "products" (
 
 -- CreateTable
 CREATE TABLE "product_images" (
-    "id" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "productId" UUID NOT NULL,
     "url" TEXT NOT NULL,
     "position" INTEGER NOT NULL DEFAULT 0,
 
@@ -138,8 +200,8 @@ CREATE TABLE "product_images" (
 
 -- CreateTable
 CREATE TABLE "product_colors" (
-    "id" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "productId" UUID NOT NULL,
     "label" TEXT NOT NULL,
     "hex" TEXT NOT NULL,
 
@@ -148,8 +210,8 @@ CREATE TABLE "product_colors" (
 
 -- CreateTable
 CREATE TABLE "product_sizes" (
-    "id" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "productId" UUID NOT NULL,
     "value" VARCHAR(60) NOT NULL,
 
     CONSTRAINT "product_sizes_pkey" PRIMARY KEY ("id")
@@ -157,17 +219,19 @@ CREATE TABLE "product_sizes" (
 
 -- CreateTable
 CREATE TABLE "product_categories" (
-    "productId" TEXT NOT NULL,
-    "categoryId" TEXT NOT NULL,
+    "productId" UUID NOT NULL,
+    "categoryId" UUID NOT NULL,
 
     CONSTRAINT "product_categories_pkey" PRIMARY KEY ("productId","categoryId")
 );
 
 -- CreateTable
 CREATE TABLE "cart_items" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
+    "productId" UUID NOT NULL,
+    "colorId" UUID,
+    "sizeId" UUID,
     "quantity" INTEGER NOT NULL DEFAULT 1,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -177,9 +241,9 @@ CREATE TABLE "cart_items" (
 
 -- CreateTable
 CREATE TABLE "favorite_items" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
+    "productId" UUID NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "favorite_items_pkey" PRIMARY KEY ("id")
@@ -187,10 +251,12 @@ CREATE TABLE "favorite_items" (
 
 -- CreateTable
 CREATE TABLE "orders" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "orderNumber" TEXT NOT NULL,
+    "userId" UUID NOT NULL,
     "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',
     "paymentMethod" "PaymentMethod" NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'MGA',
     "shippingFullName" TEXT NOT NULL,
     "shippingPhone" TEXT NOT NULL,
     "shippingEmail" TEXT NOT NULL,
@@ -198,9 +264,20 @@ CREATE TABLE "orders" (
     "shippingCity" TEXT NOT NULL,
     "shippingRegion" TEXT NOT NULL,
     "shippingNotes" TEXT,
+    "shippingZoneId" UUID,
     "subtotal" INTEGER NOT NULL,
     "shippingCost" INTEGER NOT NULL,
     "total" INTEGER NOT NULL,
+    "codAmountExpected" INTEGER,
+    "codCollectedAt" TIMESTAMP(3),
+    "codCollectedBy" TEXT,
+    "paidAt" TIMESTAMP(3),
+    "shippedAt" TIMESTAMP(3),
+    "deliveredAt" TIMESTAMP(3),
+    "cancelledAt" TIMESTAMP(3),
+    "refundedAt" TIMESTAMP(3),
+    "reviewRequestedAt" TIMESTAMP(3),
+    "stockReservedUntil" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -209,12 +286,15 @@ CREATE TABLE "orders" (
 
 -- CreateTable
 CREATE TABLE "order_items" (
-    "id" TEXT NOT NULL,
-    "orderId" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "orderId" UUID NOT NULL,
+    "productId" UUID NOT NULL,
     "titleSnapshot" TEXT NOT NULL,
     "imageSnapshot" TEXT,
+    "skuSnapshot" TEXT NOT NULL,
     "priceSnapshot" INTEGER NOT NULL,
+    "colorSnapshot" TEXT,
+    "sizeSnapshot" TEXT,
     "quantity" INTEGER NOT NULL,
 
     CONSTRAINT "order_items_pkey" PRIMARY KEY ("id")
@@ -222,25 +302,58 @@ CREATE TABLE "order_items" (
 
 -- CreateTable
 CREATE TABLE "transactions" (
-    "id" TEXT NOT NULL,
-    "orderId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "orderId" UUID NOT NULL,
     "amount" INTEGER NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'MGA',
     "method" "PaymentMethod" NOT NULL,
+    "provider" "MobileMoneyProvider",
     "status" "TransactionStatus" NOT NULL,
+    "externalId" TEXT,
+    "externalRequestId" TEXT,
+    "idempotencyKey" TEXT NOT NULL,
+    "rawCallback" JSONB,
+    "signatureVerified" BOOLEAN NOT NULL DEFAULT false,
+    "failureReason" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "completedAt" TIMESTAMP(3),
 
     CONSTRAINT "transactions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
+CREATE TABLE "payment_webhooks" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "provider" "MobileMoneyProvider" NOT NULL,
+    "externalId" TEXT,
+    "eventType" TEXT NOT NULL,
+    "rawPayload" JSONB NOT NULL,
+    "signature" TEXT,
+    "verified" BOOLEAN NOT NULL DEFAULT false,
+    "processedAt" TIMESTAMP(3),
+    "errorMessage" TEXT,
+    "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "payment_webhooks_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "product_reviews" (
-    "id" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "productId" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "orderId" UUID,
     "rating" INTEGER NOT NULL,
     "title" TEXT,
     "comment" TEXT NOT NULL,
     "isVerifiedPurchase" BOOLEAN NOT NULL DEFAULT false,
+    "isApproved" BOOLEAN NOT NULL DEFAULT false,
+    "approvedBy" TEXT,
+    "approvedAt" TIMESTAMP(3),
+    "rejectedBy" TEXT,
+    "rejectedAt" TIMESTAMP(3),
+    "rejectionReason" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -249,13 +362,16 @@ CREATE TABLE "product_reviews" (
 
 -- CreateTable
 CREATE TABLE "service_feedbacks" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
     "overallRating" INTEGER NOT NULL,
     "criteria" JSONB,
     "category" "FeedbackCategory" NOT NULL,
     "comment" TEXT NOT NULL,
     "teamResponse" TEXT,
+    "isApproved" BOOLEAN NOT NULL DEFAULT false,
+    "approvedBy" TEXT,
+    "approvedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -264,8 +380,8 @@ CREATE TABLE "service_feedbacks" (
 
 -- CreateTable
 CREATE TABLE "notifications" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
     "type" "NotificationType" NOT NULL,
     "title" TEXT NOT NULL,
     "message" TEXT NOT NULL,
@@ -273,6 +389,7 @@ CREATE TABLE "notifications" (
     "imageUrl" TEXT,
     "referenceKey" TEXT NOT NULL,
     "read" BOOLEAN NOT NULL DEFAULT false,
+    "readAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "notifications_pkey" PRIMARY KEY ("id")
@@ -280,8 +397,8 @@ CREATE TABLE "notifications" (
 
 -- CreateTable
 CREATE TABLE "profile_change_requests" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
     "requestedFullName" TEXT,
     "requestedEmail" TEXT,
     "requestedPhone" TEXT,
@@ -296,13 +413,14 @@ CREATE TABLE "profile_change_requests" (
 
 -- CreateTable
 CREATE TABLE "user_messages" (
-    "id" TEXT NOT NULL,
-    "recipientId" TEXT NOT NULL,
-    "senderId" TEXT,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "recipientId" UUID NOT NULL,
+    "senderId" UUID,
     "type" "MessageType" NOT NULL DEFAULT 'ADMIN_MESSAGE',
     "subject" TEXT NOT NULL,
     "body" TEXT NOT NULL,
     "read" BOOLEAN NOT NULL DEFAULT false,
+    "readAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "user_messages_pkey" PRIMARY KEY ("id")
@@ -310,12 +428,14 @@ CREATE TABLE "user_messages" (
 
 -- CreateTable
 CREATE TABLE "audit_logs" (
-    "id" TEXT NOT NULL,
-    "actorUserId" TEXT,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "actorUserId" UUID,
     "action" TEXT NOT NULL,
     "entityType" TEXT NOT NULL,
     "entityId" TEXT,
     "metadata" JSONB,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id")
@@ -323,14 +443,16 @@ CREATE TABLE "audit_logs" (
 
 -- CreateTable
 CREATE TABLE "admin_notifications" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "type" "AdminNotificationType" NOT NULL,
     "title" TEXT NOT NULL,
     "message" TEXT NOT NULL,
     "entityType" TEXT NOT NULL,
     "entityId" TEXT NOT NULL,
     "actorUserId" TEXT,
+    "priority" INTEGER NOT NULL DEFAULT 0,
     "read" BOOLEAN NOT NULL DEFAULT false,
+    "readAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "admin_notifications_pkey" PRIMARY KEY ("id")
@@ -338,8 +460,8 @@ CREATE TABLE "admin_notifications" (
 
 -- CreateTable
 CREATE TABLE "account_deletion_requests" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
     "reason" TEXT,
     "status" "DeletionRequestStatus" NOT NULL DEFAULT 'PENDING',
     "adminNote" TEXT,
@@ -351,8 +473,13 @@ CREATE TABLE "account_deletion_requests" (
 
 -- CreateTable
 CREATE TABLE "newsletter_subscribers" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "email" TEXT NOT NULL,
+    "confirmationToken" TEXT,
+    "confirmedAt" TIMESTAMP(3),
+    "unsubscribedAt" TIMESTAMP(3),
+    "unsubscribeReason" TEXT,
+    "createdByIp" TEXT,
     "subscribedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "newsletter_subscribers_pkey" PRIMARY KEY ("id")
@@ -360,15 +487,18 @@ CREATE TABLE "newsletter_subscribers" (
 
 -- CreateTable
 CREATE TABLE "verification_requests" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
     "status" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
-    "code" TEXT,
+    "codeHash" TEXT,
     "expiresAt" TIMESTAMP(3),
     "approvedAt" TIMESTAMP(3),
     "approvedBy" TEXT,
     "usedAt" TIMESTAMP(3),
     "reason" TEXT,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "maxAttempts" INTEGER NOT NULL DEFAULT 5,
+    "lastAttemptAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -382,7 +512,19 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "users_phone_key" ON "users"("phone");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_verificationToken_key" ON "users"("verificationToken");
+CREATE INDEX "users_email_idx" ON "users"("email");
+
+-- CreateIndex
+CREATE INDEX "users_phone_idx" ON "users"("phone");
+
+-- CreateIndex
+CREATE INDEX "users_deletedAt_idx" ON "users"("deletedAt");
+
+-- CreateIndex
+CREATE INDEX "oauth_accounts_userId_idx" ON "oauth_accounts"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "oauth_accounts_provider_providerUserId_key" ON "oauth_accounts"("provider", "providerUserId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "refresh_tokens_tokenHash_key" ON "refresh_tokens"("tokenHash");
@@ -391,7 +533,19 @@ CREATE UNIQUE INDEX "refresh_tokens_tokenHash_key" ON "refresh_tokens"("tokenHas
 CREATE INDEX "refresh_tokens_userId_idx" ON "refresh_tokens"("userId");
 
 -- CreateIndex
+CREATE INDEX "refresh_tokens_expiresAt_idx" ON "refresh_tokens"("expiresAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "password_reset_tokens_tokenHash_key" ON "password_reset_tokens"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "password_reset_tokens_userId_idx" ON "password_reset_tokens"("userId");
+
+-- CreateIndex
 CREATE INDEX "addresses_userId_idx" ON "addresses"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "shipping_zones_name_key" ON "shipping_zones"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "categories_slug_key" ON "categories"("slug");
@@ -409,6 +563,12 @@ CREATE INDEX "products_price_idx" ON "products"("price");
 CREATE INDEX "products_createdAt_idx" ON "products"("createdAt");
 
 -- CreateIndex
+CREATE INDEX "products_stock_idx" ON "products"("stock");
+
+-- CreateIndex
+CREATE INDEX "products_isActive_idx" ON "products"("isActive");
+
+-- CreateIndex
 CREATE INDEX "product_images_productId_idx" ON "product_images"("productId");
 
 -- CreateIndex
@@ -424,7 +584,7 @@ CREATE INDEX "product_categories_categoryId_idx" ON "product_categories"("catego
 CREATE INDEX "cart_items_userId_idx" ON "cart_items"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "cart_items_userId_productId_key" ON "cart_items"("userId", "productId");
+CREATE UNIQUE INDEX "cart_items_userId_productId_colorId_sizeId_key" ON "cart_items"("userId", "productId", "colorId", "sizeId");
 
 -- CreateIndex
 CREATE INDEX "favorite_items_userId_idx" ON "favorite_items"("userId");
@@ -433,19 +593,55 @@ CREATE INDEX "favorite_items_userId_idx" ON "favorite_items"("userId");
 CREATE UNIQUE INDEX "favorite_items_userId_productId_key" ON "favorite_items"("userId", "productId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "orders_orderNumber_key" ON "orders"("orderNumber");
+
+-- CreateIndex
 CREATE INDEX "orders_userId_idx" ON "orders"("userId");
 
 -- CreateIndex
 CREATE INDEX "orders_status_idx" ON "orders"("status");
 
 -- CreateIndex
+CREATE INDEX "orders_orderNumber_idx" ON "orders"("orderNumber");
+
+-- CreateIndex
+CREATE INDEX "orders_status_createdAt_idx" ON "orders"("status", "createdAt" DESC);
+
+-- CreateIndex
+CREATE INDEX "orders_userId_status_createdAt_idx" ON "orders"("userId", "status", "createdAt" DESC);
+
+-- CreateIndex
 CREATE INDEX "order_items_orderId_idx" ON "order_items"("orderId");
+
+-- CreateIndex
+CREATE INDEX "order_items_productId_idx" ON "order_items"("productId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "transactions_externalId_key" ON "transactions"("externalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "transactions_idempotencyKey_key" ON "transactions"("idempotencyKey");
 
 -- CreateIndex
 CREATE INDEX "transactions_orderId_idx" ON "transactions"("orderId");
 
 -- CreateIndex
-CREATE INDEX "product_reviews_productId_idx" ON "product_reviews"("productId");
+CREATE INDEX "transactions_externalId_idx" ON "transactions"("externalId");
+
+-- CreateIndex
+CREATE INDEX "transactions_status_idx" ON "transactions"("status");
+
+-- CreateIndex
+CREATE INDEX "payment_webhooks_provider_externalId_idx" ON "payment_webhooks"("provider", "externalId");
+
+-- CreateIndex
+CREATE INDEX "payment_webhooks_processedAt_idx" ON "payment_webhooks"("processedAt");
+
+-- CreateIndex
+CREATE INDEX "product_reviews_productId_isApproved_idx" ON "product_reviews"("productId", "isApproved");
+
+-- CreateIndex
+CREATE INDEX "product_reviews_isApproved_createdAt_idx" ON "product_reviews"("isApproved", "createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "product_reviews_productId_userId_key" ON "product_reviews"("productId", "userId");
@@ -454,7 +650,10 @@ CREATE UNIQUE INDEX "product_reviews_productId_userId_key" ON "product_reviews"(
 CREATE INDEX "service_feedbacks_userId_idx" ON "service_feedbacks"("userId");
 
 -- CreateIndex
-CREATE INDEX "notifications_userId_idx" ON "notifications"("userId");
+CREATE INDEX "service_feedbacks_isApproved_createdAt_idx" ON "service_feedbacks"("isApproved", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "notifications_userId_read_createdAt_idx" ON "notifications"("userId", "read", "createdAt" DESC);
 
 -- CreateIndex
 CREATE UNIQUE INDEX "notifications_userId_referenceKey_key" ON "notifications"("userId", "referenceKey");
@@ -493,13 +692,28 @@ CREATE INDEX "account_deletion_requests_userId_idx" ON "account_deletion_request
 CREATE UNIQUE INDEX "newsletter_subscribers_email_key" ON "newsletter_subscribers"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "newsletter_subscribers_confirmationToken_key" ON "newsletter_subscribers"("confirmationToken");
+
+-- CreateIndex
+CREATE INDEX "newsletter_subscribers_confirmedAt_idx" ON "newsletter_subscribers"("confirmedAt");
+
+-- CreateIndex
 CREATE INDEX "verification_requests_userId_idx" ON "verification_requests"("userId");
 
 -- CreateIndex
 CREATE INDEX "verification_requests_status_idx" ON "verification_requests"("status");
 
 -- AddForeignKey
+ALTER TABLE "oauth_accounts" ADD CONSTRAINT "oauth_accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_replacedById_fkey" FOREIGN KEY ("replacedById") REFERENCES "refresh_tokens"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "addresses" ADD CONSTRAINT "addresses_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -526,6 +740,12 @@ ALTER TABLE "cart_items" ADD CONSTRAINT "cart_items_userId_fkey" FOREIGN KEY ("u
 ALTER TABLE "cart_items" ADD CONSTRAINT "cart_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "cart_items" ADD CONSTRAINT "cart_items_colorId_fkey" FOREIGN KEY ("colorId") REFERENCES "product_colors"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "cart_items" ADD CONSTRAINT "cart_items_sizeId_fkey" FOREIGN KEY ("sizeId") REFERENCES "product_sizes"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "favorite_items" ADD CONSTRAINT "favorite_items_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -533,6 +753,9 @@ ALTER TABLE "favorite_items" ADD CONSTRAINT "favorite_items_productId_fkey" FORE
 
 -- AddForeignKey
 ALTER TABLE "orders" ADD CONSTRAINT "orders_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "orders" ADD CONSTRAINT "orders_shippingZoneId_fkey" FOREIGN KEY ("shippingZoneId") REFERENCES "shipping_zones"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -548,6 +771,9 @@ ALTER TABLE "product_reviews" ADD CONSTRAINT "product_reviews_productId_fkey" FO
 
 -- AddForeignKey
 ALTER TABLE "product_reviews" ADD CONSTRAINT "product_reviews_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_reviews" ADD CONSTRAINT "product_reviews_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "service_feedbacks" ADD CONSTRAINT "service_feedbacks_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

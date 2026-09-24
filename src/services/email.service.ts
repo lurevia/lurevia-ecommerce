@@ -5,7 +5,7 @@ import { AppError } from "../errors/AppError";
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
   port: env.SMTP_PORT,
-  secure: env.SMTP_PORT === 465,
+  secure: env.SMTP_PORT === 587,
   auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD },
 });
 
@@ -23,6 +23,19 @@ export const emailService = {
         to: input.to,
         subject: "Votre code de vérification Lurevia",
         text: `Bonjour ${input.fullName},\n\nVotre code de vérification Lurevia est : ${input.code}\nIl expire le ${input.expiresAt.toISOString()}.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`,
+      });
+    } catch (error) {
+      throw new EmailDeliveryError(error);
+    }
+  },
+
+  async sendPasswordResetEmail(input: { to: string; fullName: string; resetLink: string }) {
+    try {
+      await transporter.sendMail({
+        from: env.SMTP_FROM,
+        to: input.to,
+        subject: "Réinitialisation de votre mot de passe Lurevia",
+        text: `Bonjour ${input.fullName},\n\nNous avons reçu une demande de réinitialisation de mot de passe pour votre compte Lurevia.\n\nCliquez sur le lien suivant pour définir un nouveau mot de passe :\n${input.resetLink}\n\nSi vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail en toute sécurité.`,
       });
     } catch (error) {
       throw new EmailDeliveryError(error);

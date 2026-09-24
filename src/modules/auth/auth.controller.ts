@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { authService } from "./auth.service";
+import { oauthService } from "./oauth.service";
 import { clearRefreshTokenCookie, REFRESH_COOKIE_NAME, setRefreshTokenCookie } from "../../utils/cookies";
 import { UnauthorizedError } from "../../errors/AppError";
 
@@ -51,5 +52,25 @@ export const authController = {
   verificationStatus: asyncHandler(async (req: Request, res: Response) => {
     const status = await authService.getVerificationStatus(req.user!.id);
     res.status(200).json({ data: status });
+  }),
+
+  forgotPassword: asyncHandler(async (req: Request, res: Response) => {
+    const result = await authService.requestPasswordReset(req.body, req.ip);
+    res.status(200).json({ data: result });
+  }),
+
+  resetPassword: asyncHandler(async (req: Request, res: Response) => {
+    await authService.resetPassword(req.body);
+    res.status(200).json({ message: "Mot de passe réinitialisé avec succès." });
+  }),
+
+  oauthCallback: asyncHandler(async (req: Request, res: Response) => {
+    const { user, tokens } = await oauthService.authenticateWithOAuth(
+      req.body.provider,
+      req.body.token,
+      req.ip
+    );
+    setRefreshTokenCookie(res, tokens.refreshToken, tokens.refreshTokenExpiresAt);
+    res.status(200).json({ data: { user, accessToken: tokens.accessToken } });
   }),
 };

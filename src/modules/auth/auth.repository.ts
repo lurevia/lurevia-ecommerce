@@ -46,4 +46,44 @@ export const authRepository = {
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     }),
+
+  // ─── Password Reset ────────────────────────────────────────────────
+  createPasswordResetToken: (data: Prisma.PasswordResetTokenCreateInput) =>
+    prisma.passwordResetToken.create({ data }),
+
+  findPasswordResetTokenByHash: (tokenHash: string) =>
+    prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    }),
+
+  markPasswordResetTokenUsed: (id: string) =>
+    prisma.passwordResetToken.update({
+      where: { id },
+      data: { usedAt: new Date() },
+    }),
+
+  updateUserPassword: (userId: string, passwordHash: string) =>
+    prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    }),
+
+  // ─── OAuth ────────────────────────────────────────────────────────
+  findOAuthAccount: (provider: Prisma.AuthProvider, providerUserId: string) =>
+    prisma.oAuthAccount.findUnique({
+      where: {
+        provider_providerUserId: { provider, providerUserId },
+      },
+      include: { user: true },
+    }),
+
+  createOAuthAccount: (data: Prisma.OAuthAccountCreateInput) =>
+    prisma.oAuthAccount.create({ data }),
+
+  updateOAuthAccount: (id: string, data: Prisma.OAuthAccountUpdateInput) =>
+    prisma.oAuthAccount.update({
+      where: { id },
+      data,
+    }),
 };
