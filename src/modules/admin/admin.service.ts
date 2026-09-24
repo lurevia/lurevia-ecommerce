@@ -1,4 +1,4 @@
-import { randomInt } from "crypto";
+import crypto from "crypto";
 import type { DeletionRequestStatus, FeedbackCategory } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { adminRepository } from "./admin.repository";
@@ -267,15 +267,17 @@ export const adminVerificationService = {
     if (!request) throw new NotFoundError("Demande introuvable.");
     if (request.status !== "PENDING") throw new BadRequestError("Cette demande a déjà été traitée.");
 
-    const code = randomInt(100000, 1000000).toString();
+    const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     // L'envoi précède la transaction : en cas d'échec SMTP, la demande reste
     // PENDING et peut être retentée sans approbation partiellement enregistrée.
+    const verificationLink = `https://lurevia.github.io/verify-account?token=${token}`;
     await emailService.sendVerificationCode({
       to: request.user.email,
       fullName: request.user.fullName,
-      code,
+      code: token, // On utilise le champ 'code' pour passer le token au service email
       expiresAt,
+      link: verificationLink,
     });
     return prisma.$transaction(async (tx) => {
       const current = await tx.verificationRequest.findUnique({ where: { id: requestId } });
@@ -288,16 +290,17 @@ export const adminVerificationService = {
         include: { user: { select: { fullName: true, email: true } } },
       });
 
+
       // Sans ça, le client ne sait jamais que son code est arrivé —
       // il ne consulte pas forcément ses emails, la notification dans
       // l'app est le canal le plus fiable pour le ramener sur la page
-      // de saisie du code.
+      // de saisie du token.
       await tx.notification.create({
         data: {
           userId: request.userId,
           type: "ACCOUNT_VERIFICATION",
-          title: "Votre code de vérification est prêt",
-          message: `Un code vous a été envoyé par e-mail à ${request.user.email}. Il expire dans 24h.`,
+          title: "Votre compte a été approuvé",
+          message: `Un lien de vérification vous a été envoyé par e-mail à ${request.user.email}. Cliquez dessus pour activer votre compte.`,
           actionUrl: "/compte",
           referenceKey: `verification-approved:${requestId}`,
           read: false,

@@ -16,13 +16,17 @@ export class EmailDeliveryError extends AppError {
 }
 
 export const emailService = {
-  async sendVerificationCode(input: { to: string; fullName: string; code: string; expiresAt: Date }) {
+  async sendVerificationCode(input: { to: string; fullName: string; code: string; expiresAt: Date; link?: string }) {
     try {
+      const message = input.link
+        ? `Bonjour ${input.fullName},\n\nVotre compte a été approuvé ! Cliquez sur le lien suivant pour vérifier votre compte :\n${input.link}\n\nCe lien expire le ${input.expiresAt.toISOString()}.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`
+        : `Bonjour ${input.fullName},\n\nVotre code de vérification Lurevia est : ${input.code}\nIl expire le ${input.expiresAt.toISOString()}.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`;
+
       await transporter.sendMail({
         from: env.SMTP_FROM,
         to: input.to,
-        subject: "Votre code de vérification Lurevia",
-        text: `Bonjour ${input.fullName},\n\nVotre code de vérification Lurevia est : ${input.code}\nIl expire le ${input.expiresAt.toISOString()}.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`,
+        subject: "Votre vérification de compte Lurevia",
+        text: message,
       });
     } catch (error) {
       throw new EmailDeliveryError(error);

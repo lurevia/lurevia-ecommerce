@@ -32,7 +32,7 @@ export const loginSchema = z.object({
 });
 
 export const verificationCodeSchema = z.object({
-  code: z.string().regex(/^\d{6}$/, "Le code doit contenir 6 chiffres"),
+  token: z.string().min(1, "Le token de vérification est requis"),
 });
 
 export const forgotPasswordSchema = z.object({

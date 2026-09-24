@@ -1,4 +1,7 @@
 -- CreateEnum
+CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE', 'OTHER');
+
+-- CreateEnum
 CREATE TYPE "Role" AS ENUM ('SELLER', 'CUSTOMER', 'ADMIN');
 
 -- CreateEnum
@@ -43,6 +46,9 @@ CREATE TYPE "MessageType" AS ENUM ('ADMIN_MESSAGE', 'ORDER_UPDATE', 'PROMO', 'SY
 -- CreateEnum
 CREATE TYPE "VerificationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'USED', 'EXPIRED');
 
+-- CreateEnum
+CREATE TYPE "BidStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED');
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -50,6 +56,8 @@ CREATE TABLE "users" (
     "email" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
     "avatarUrl" TEXT,
+    "age" INTEGER,
+    "gender" "Gender",
     "passwordHash" TEXT,
     "primaryIdentifier" "AuthIdentifier" NOT NULL DEFAULT 'EMAIL',
     "primaryProvider" "AuthProvider" NOT NULL DEFAULT 'LOCAL',
@@ -123,6 +131,8 @@ CREATE TABLE "addresses" (
     "address" TEXT NOT NULL,
     "city" TEXT NOT NULL,
     "region" TEXT NOT NULL,
+    "latitude" DOUBLE PRECISION,
+    "longitude" DOUBLE PRECISION,
     "notes" TEXT,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -144,6 +154,20 @@ CREATE TABLE "shipping_zones" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "shipping_zones_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "product_bids" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "productId" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "proposedPrice" INTEGER NOT NULL,
+    "comment" TEXT,
+    "status" "BidStatus" NOT NULL DEFAULT 'PENDING',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "product_bids_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -548,6 +572,12 @@ CREATE INDEX "addresses_userId_idx" ON "addresses"("userId");
 CREATE UNIQUE INDEX "shipping_zones_name_key" ON "shipping_zones"("name");
 
 -- CreateIndex
+CREATE INDEX "product_bids_productId_idx" ON "product_bids"("productId");
+
+-- CreateIndex
+CREATE INDEX "product_bids_userId_idx" ON "product_bids"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "categories_slug_key" ON "categories"("slug");
 
 -- CreateIndex
@@ -717,6 +747,12 @@ ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_userId
 
 -- AddForeignKey
 ALTER TABLE "addresses" ADD CONSTRAINT "addresses_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_bids" ADD CONSTRAINT "product_bids_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_bids" ADD CONSTRAINT "product_bids_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_images" ADD CONSTRAINT "product_images_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;

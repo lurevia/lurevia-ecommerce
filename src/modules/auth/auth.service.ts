@@ -256,21 +256,20 @@ export const authService = {
    * L'utilisateur confirme son code → vérifie son compte et supprime la
    * notification associée.
    */
-  async confirmVerification(userId: string, code: string) {
-    if (!code || code.trim().length === 0) {
-      throw new ConflictError("Code requis.");
+  async confirmVerification(userId: string, token: string) {
+    if (!token || token.trim().length === 0) {
+      throw new ConflictError("Token requis.");
     }
 
     const request = await prisma.verificationRequest.findFirst({
       where: {
         userId,
-        // On retire la recherche par 'code' car le champ a été supprimé du schéma
         status: "APPROVED",
       },
     });
 
     if (!request) {
-      throw new ConflictError("Code invalide.");
+      throw new ConflictError("Lien de vérification invalide.");
     }
 
     if (request.expiresAt && request.expiresAt < new Date()) {

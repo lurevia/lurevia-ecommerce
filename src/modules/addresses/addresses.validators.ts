@@ -11,6 +11,8 @@ export const addressBodySchema = z.object({
   address: z.string().trim().min(3).max(255),
   city: z.string().trim().min(1).max(100),
   region: z.string().trim().min(1).max(100),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
   notes: z.string().trim().max(500).optional(),
   isDefault: z.boolean().default(false),
 });

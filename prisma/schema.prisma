@@ -11,6 +11,12 @@ datasource db {
 // ENUMS
 // ═════════════════════════════════════════════════════════════════════════════
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
 enum Role {
   SELLER
   CUSTOMER
@@ -120,13 +126,15 @@ enum VerificationStatus {
   EXPIRED
 }
 
+enum BidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // MODÈLES
 // ═════════════════════════════════════════════════════════════════════════════
-
-// ─────────────────────────────────────────────────────────────────────────────
-// UTILISATEURS & AUTHENTIFICATION
-// ─────────────────────────────────────────────────────────────────────────────
 
 model User {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -134,6 +142,8 @@ model User {
   email              String          @unique
   phone              String          @unique
   avatarUrl          String?
+  age                Int?
+  gender             Gender?
 
   passwordHash       String?
   primaryIdentifier  AuthIdentifier  @default(EMAIL)
@@ -166,6 +176,7 @@ model User {
   messagesReceived      UserMessage[]     @relation("MessageRecipient")
   messagesSent          UserMessage[]     @relation("MessageSender")
   auditLogs             AuditLog[]        @relation("AuditActor")
+  bids                  ProductBid[]
 
   @@index([email])
   @@index([phone])
@@ -242,6 +253,8 @@ model Address {
   address   String
   city      String
   region    String
+  latitude  Float?
+  longitude Float?
   notes     String?
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -250,10 +263,6 @@ model Address {
   @@index([userId])
   @@map("addresses")
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LIVRAISON
-// ─────────────────────────────────────────────────────────────────────────────
 
 model ShippingZone {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -271,9 +280,22 @@ model ShippingZone {
   @@map("shipping_zones")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CATALOGUE
-// ─────────────────────────────────────────────────────────────────────────────
+model ProductBid {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId   String   @db.Uuid
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proposedPrice Int
+  comment     String?
+  status      BidStatus @default(PENDING)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([productId])
+  @@index([userId])
+  @@map("product_bids")
+}
 
 model Category {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -327,6 +349,7 @@ model Product {
   favorites  FavoriteItem[]
   orderItems OrderItem[]
   reviews    ProductReview[]
+  bids       ProductBid[]
 
   @@index([price])
   @@index([createdAt])
@@ -382,10 +405,6 @@ model ProductCategory {
   @@map("product_categories")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PANIER & FAVORIS
-// ─────────────────────────────────────────────────────────────────────────────
-
 model CartItem {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @db.Uuid
@@ -418,10 +437,6 @@ model FavoriteItem {
   @@index([userId])
   @@map("favorite_items")
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// COMMANDES & PAIEMENTS
-// ─────────────────────────────────────────────────────────────────────────────
 
 model Order {
   id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -539,10 +554,6 @@ model PaymentWebhook {
   @@map("payment_webhooks")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AVIS PRODUITS & FEEDBACK DE SERVICE
-// ─────────────────────────────────────────────────────────────────────────────
-
 model ProductReview {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productId          String   @db.Uuid
@@ -594,10 +605,6 @@ model ServiceFeedback {
   @@index([isApproved, createdAt])
   @@map("service_feedbacks")
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NOTIFICATIONS
-// ─────────────────────────────────────────────────────────────────────────────
 
 model Notification {
   id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -704,10 +711,6 @@ model AccountDeletionRequest {
   @@map("account_deletion_requests")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NEWSLETTER
-// ─────────────────────────────────────────────────────────────────────────────
-
 model NewsletterSubscriber {
   id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email             String    @unique
@@ -721,10 +724,6 @@ model NewsletterSubscriber {
   @@index([confirmedAt])
   @@map("newsletter_subscribers")
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// VÉRIFICATIONS
-// ─────────────────────────────────────────────────────────────────────────────
 
 model VerificationRequest {
   id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
