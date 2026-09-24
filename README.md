@@ -270,6 +270,36 @@ sont disponibles sur `/admin/financial/stats`.
 
 ## Mobile Money (configuration future)
 
+## Authentification Google et Facebook
+
+Le frontend utilise un flux OAuth popup et redirige vers :
+
+```text
+https://lurevia.github.io/auth/callback
+```
+
+Configurez cette URL exactement dans les consoles Google et Facebook, puis
+ajoutez uniquement les identifiants publics côté build frontend :
+
+```env
+VITE_GOOGLE_CLIENT_ID=...
+VITE_FACEBOOK_APP_ID=...
+```
+
+Le backend doit recevoir les mêmes paramètres dans Render :
+
+```env
+GOOGLE_CLIENT_ID=...
+FACEBOOK_APP_ID=...
+FACEBOOK_APP_SECRET=...
+```
+
+Pour Facebook, l'application doit être en mode Live pour les utilisateurs
+réels et la permission `email` doit être activée. Pour Google, ajoutez le
+domaine `lurevia.github.io` dans les origines JavaScript autorisées et l'URI
+de callback dans les URI de redirection autorisées. Les secrets restent
+uniquement dans Render et ne doivent jamais être placés dans le frontend.
+
 Le checkout accepte encore `mobile-money`, mais aucune sortie d'argent vendeur
 ni appel MVola, Orange Money ou Airtel Money n'est activé. Pour activer un
 connecteur, il faudra fournir par variables d'environnement (sans les commiter)
