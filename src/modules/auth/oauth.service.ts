@@ -124,14 +124,15 @@ export const oauthService = {
       return { user: existingUser, tokens };
     }
 
-    // 3. Créer un nouvel utilisateur (Auto-vérifié car provenant d'un provider fiable)
+    // 3. Créer un utilisateur incomplet : le téléphone et la validation admin
+    // restent obligatoires avant d'utiliser les fonctions protégées.
     const newUser = await prisma.user.create({
       data: {
         fullName: profile.fullName,
         email: profile.email,
-        phone: "NOT_PROVIDED", // Valeur par défaut car obligatoire dans le schéma
-        isVerified: true,
-        primaryProvider: "LOCAL",
+        phone: null,
+        isVerified: false,
+        primaryProvider: provider,
         primaryIdentifier: "EMAIL",
         lastLoginAt: new Date(),
         oauthAccounts: {

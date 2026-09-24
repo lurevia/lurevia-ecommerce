@@ -20,10 +20,17 @@ export const changePasswordSchema = z.object({
     .regex(/[0-9]/),
 });
 
+export const completeOAuthProfileSchema = z.object({
+  fullName: z.string().trim().min(2).max(120).optional(),
+  phone: z.string().trim().regex(/^(\+261|0)[0-9]{9}$/, "Numéro malgache invalide"),
+  password: z.string().min(8).max(128).regex(/[a-z]/).regex(/[A-Z]/).regex(/[0-9]/).optional(),
+}).strict();
+
 export const requestDeletionSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type CompleteOAuthProfileInput = z.infer<typeof completeOAuthProfileSchema>;
 export type RequestDeletionInput = z.infer<typeof requestDeletionSchema>;

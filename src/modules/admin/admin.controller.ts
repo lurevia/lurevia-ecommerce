@@ -140,4 +140,11 @@ export const adminController = {
     const result = await adminFoundationService.sendMessage(req.user!.id, req.body);
     res.status(201).json({ data: result });
   }),
+  createAdmin: asyncHandler(async (req: Request, res: Response) => {
+    const user = await adminService.createAdmin(req.body, req.user!.id, {
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined,
+    });
+    res.status(201).json({ data: { user } });
+  }),
 };

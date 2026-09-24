@@ -227,6 +227,9 @@ export const authService = {
     if (user.isVerified) {
       throw new ConflictError("Votre compte est déjà vérifié.");
     }
+    if (!user.phone) {
+      throw new ConflictError("Ajoutez votre numéro de téléphone avant de demander la validation.");
+    }
 
     // Y a-t-il déjà une demande en attente ?
     const pending = await prisma.verificationRequest.findFirst({

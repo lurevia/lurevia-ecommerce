@@ -4,9 +4,28 @@ import { toPublicUser } from "../auth/auth.mapper";
 import { verifyPassword, hashPassword } from "../../utils/password";
 import { adminNotificationsService } from "../admin/adminNotifications.service";
 import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from "../../errors/AppError";
-import type { ChangePasswordInput, RequestDeletionInput, UpdateProfileInput } from "./users.validators";
+import type { ChangePasswordInput, CompleteOAuthProfileInput, RequestDeletionInput, UpdateProfileInput } from "./users.validators";
 
 export const usersService = {
+  async completeOAuthProfile(userId: string, input: CompleteOAuthProfileInput) {
+    const user = await usersRepository.findById(userId);
+    if (!user) throw new NotFoundError("Utilisateur");
+    if (user.primaryProvider === "LOCAL") {
+      throw new BadRequestError("Cette route est réservée aux comptes sociaux incomplets.");
+    }
+    const existingPhone = await authRepository.findByPhone(input.phone);
+    if (existingPhone && existingPhone.id !== userId) {
+      throw new ConflictError("Ce numéro est déjà utilisé.");
+    }
+    const updated = await usersRepository.update(userId, {
+      fullName: input.fullName ?? user.fullName,
+      phone: input.phone,
+      ...(input.password ? { passwordHash: await hashPassword(input.password) } : {}),
+      isVerified: false,
+    });
+    return toPublicUser(updated);
+  },
+
   async updateProfile(userId: string, input: UpdateProfileInput) {
     const user = await usersRepository.findById(userId);
     if (!user) throw new NotFoundError("Utilisateur");

@@ -114,8 +114,38 @@ Voir `.env.example` pour la liste complète et les valeurs par défaut. Les plus
 | `SMTP_USER`                | Identifiant SMTP                                                              |
 | `SMTP_PASSWORD`            | Mot de passe SMTP (à conserver uniquement dans les secrets de déploiement)   |
 | `SMTP_FROM`                | Adresse d'expédition validée par le fournisseur SMTP                         |
+| `MEDIA_GITHUB_TOKEN`       | Token GitHub fine-grained (permission Contents: Read and write) — secret de déploiement |
+| `MEDIA_GITHUB_OWNER`       | Propriétaire du dépôt public qui reçoit les images                         |
+| `MEDIA_GITHUB_REPOSITORY`  | Nom du dépôt public de médias                                               |
+| `MEDIA_GITHUB_BRANCH`      | Branche cible (défaut : `main`)                                             |
+| `MEDIA_GITHUB_PATH`        | Dossier cible dans le dépôt (défaut : `media`)                              |
+| `MEDIA_MAX_BYTES`           | Taille maximale téléchargée (défaut : 10 MiB)                               |
+| `GOOGLE_PHOTOS_ACCESS_TOKEN`| Token OAuth Photos optionnel ; sans worker OAuth, les archives restent `PENDING` |
 
 Le serveur **refuse de démarrer** si une variable requise est absente ou invalide (validation stricte via Zod dans `src/config/env.ts`) — c'est volontaire : mieux vaut échouer immédiatement au démarrage qu'en pleine production.
+
+### Import média sécurisé
+
+Tout utilisateur authentifié peut appeler `POST /api/v1/media/import` avec
+`{"url":"https://..."}` (jamais multipart). Le serveur n'accepte que HTTP(S),
+résout la cible et refuse les adresses locales/privées, limite la taille,
+contrôle le type et la signature de l'image, puis l'envoie via l'API Contents
+GitHub. La réponse contient l'URL publique `raw.githubusercontent.com` et seules
+les métadonnées sont stockées dans `media_assets`.
+
+Créez un dépôt GitHub public dédié et un fine-grained token limité à ce dépôt
+avec **Contents: Read and write**, puis configurez les variables `MEDIA_*` dans
+les secrets du déploiement (ne les commitez jamais et ne les mettez pas dans la
+documentation). Les redirections sont refusées afin d'éviter de contourner le
+contrôle SSRF.
+
+L'archivage Google Photos est optionnel et son worker n'est pas encore livré. Pour l'activer,
+il faudra configurer un projet
+Google OAuth, activez l'API Google Photos Library et fournissez un jeton OAuth
+dans `GOOGLE_PHOTOS_ACCESS_TOKEN` via le gestionnaire de secrets. Cette version
+ne prétend pas avoir archivé une image : sans identifiants le statut est
+`NOT_CONFIGURED`, et avec un jeton il reste `PENDING` jusqu'à l'installation
+d'un worker OAuth/Photos qui finalisera l'archivage.
 
 Les demandes de vérification approuvées par un administrateur déclenchent l'envoi
 du code par SMTP. Le code n'est jamais renvoyé dans la réponse HTTP admin ; si
@@ -321,6 +351,18 @@ INITIAL_ADMIN_RESET_PASSWORD=true
 
 Puis supprimez cette variable après l'exécution. La connexion admin utilise
 l'adresse email ou le numéro de téléphone exacts, sans espaces.
+
+Un administrateur déjà connecté peut créer un autre compte administrateur via
+`POST /api/v1/admin/admins` avec `fullName`, `email`, `phone` et `password`.
+Cette route exige les rôles `ADMIN` et n'est pas disponible depuis l'inscription
+publique. Le mot de passe est haché côté API et l'action est enregistrée dans
+le journal d'audit.
+
+Les comptes Google et Facebook sont créés sans `passwordHash` et sans numéro
+fictif. Après la connexion sociale, l'utilisateur doit renseigner un numéro
+malgache via `PATCH /api/v1/users/me/oauth-profile`, puis envoyer sa demande de
+validation. La migration `20260924162000_oauth_phone_nullable` supprime aussi
+les anciennes valeurs `NOT_PROVIDED`.
 
 Le checkout accepte encore `mobile-money`, mais aucune sortie d'argent vendeur
 ni appel MVola, Orange Money ou Airtel Money n'est activé. Pour activer un

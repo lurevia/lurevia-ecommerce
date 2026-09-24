@@ -57,6 +57,15 @@ export const adminMessageSchema = z.object({
   body: z.string().trim().min(1).max(10000),
 }).refine((v) => Boolean(v.userId) !== Boolean(v.allUsers), { message: "Choisissez un utilisateur ou tous les utilisateurs." });
 export const reviewProfileChangeSchema = z.object({ approved: z.boolean(), adminNote: z.string().trim().max(1000).optional() });
+export const createAdminSchema = z.object({
+  fullName: z.string().trim().min(2, "Le nom doit contenir au moins 2 caractères").max(120),
+  email: z.string().trim().toLowerCase().email("Email invalide"),
+  phone: z.string().trim().regex(/^(\+261|0)[0-9]{9}$/, "Numéro malgache invalide"),
+  password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères").max(128)
+    .regex(/[a-z]/, "Le mot de passe doit contenir une minuscule")
+    .regex(/[A-Z]/, "Le mot de passe doit contenir une majuscule")
+    .regex(/[0-9]/, "Le mot de passe doit contenir un chiffre"),
+});
 
 export type ListOrdersQuery = z.infer<typeof listOrdersQuerySchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
@@ -66,3 +75,4 @@ export type ListDeletionRequestsQuery = z.infer<typeof listDeletionRequestsQuery
 export type ListNotificationsQuery = z.infer<typeof listNotificationsQuerySchema>;
 export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
 export type ProcessDeletionRequestInput = z.infer<typeof processDeletionRequestSchema>;
+export type CreateAdminInput = z.infer<typeof createAdminSchema>;

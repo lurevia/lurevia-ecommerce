@@ -21,6 +21,7 @@ import {
   profileChangeStatusQuerySchema,
   adminMessageSchema,
   reviewProfileChangeSchema,
+  createAdminSchema,
 } from "./admin.validators";
 
 const router = Router();
@@ -39,6 +40,7 @@ router.get("/stats", adminController.stats);
 router.get("/profile-change-requests", validate({ query: profileChangeStatusQuerySchema }), adminController.listProfileChanges);
 router.post("/profile-change-requests/:id/review", validate({ params: idParamsSchema, body: reviewProfileChangeSchema }), adminController.reviewProfileChange);
 router.post("/messages", validate({ body: adminMessageSchema }), adminController.sendMessage);
+router.post("/admins", validate({ body: createAdminSchema }), adminController.createAdmin);
 
 router.get(
   "/verifications",

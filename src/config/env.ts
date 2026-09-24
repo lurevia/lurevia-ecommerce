@@ -46,6 +46,14 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   FACEBOOK_APP_ID: z.string().optional(),
   FACEBOOK_APP_SECRET: z.string().optional(),
+
+  MEDIA_GITHUB_TOKEN: z.string().optional(),
+  MEDIA_GITHUB_OWNER: z.string().optional(),
+  MEDIA_GITHUB_REPOSITORY: z.string().optional(),
+  MEDIA_GITHUB_BRANCH: z.string().default("main"),
+  MEDIA_GITHUB_PATH: z.string().default("media"),
+  MEDIA_MAX_BYTES: z.coerce.number().int().positive().max(25 * 1024 * 1024).default(10 * 1024 * 1024),
+  GOOGLE_PHOTOS_ACCESS_TOKEN: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

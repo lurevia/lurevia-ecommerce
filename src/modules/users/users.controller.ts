@@ -7,6 +7,10 @@ export const usersController = {
     const user = await usersService.updateProfile(req.user!.id, req.body);
     res.status(200).json({ data: { user } });
   }),
+  completeOAuthProfile: asyncHandler(async (req: Request, res: Response) => {
+    const user = await usersService.completeOAuthProfile(req.user!.id, req.body);
+    res.status(200).json({ data: { user } });
+  }),
 
   changePassword: asyncHandler(async (req: Request, res: Response) => {
     await usersService.changePassword(req.user!.id, req.body);

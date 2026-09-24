@@ -7,6 +7,8 @@ import { toOrderDto, ORDER_STATUS_FROM_API } from "../orders/orders.mapper";
 import { buildPaginatedResult, normalizePagination } from "../../utils/pagination";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../errors/AppError";
 import { emailService } from "../../services/email.service";
+import { hashPassword } from "../../utils/password";
+import type { CreateAdminInput } from "./admin.validators";
 import type {
   ListDeletionRequestsQuery,
   ListOrdersQuery,
@@ -96,6 +98,49 @@ const toDeletionRequestDto = (d: {
 });
 
 export const adminService = {
+  async createAdmin(input: CreateAdminInput, actorUserId: string, requestMeta: { ipAddress?: string; userAgent?: string }) {
+    const [emailTaken, phoneTaken] = await Promise.all([
+      prisma.user.findUnique({ where: { email: input.email }, select: { id: true } }),
+      prisma.user.findUnique({ where: { phone: input.phone }, select: { id: true } }),
+    ]);
+    if (emailTaken) throw new ConflictError("Cet email est déjà utilisé.");
+    if (phoneTaken) throw new ConflictError("Ce numéro est déjà utilisé.");
+
+    const passwordHash = await hashPassword(input.password);
+    try {
+      const user = await prisma.user.create({
+        data: {
+          fullName: input.fullName,
+          email: input.email,
+          phone: input.phone,
+          passwordHash,
+          role: "ADMIN",
+          primaryIdentifier: "EMAIL",
+          primaryProvider: "LOCAL",
+          emailVerified: true,
+          phoneVerified: true,
+          isVerified: true,
+          lastLoginAt: null,
+        },
+        select: { id: true, fullName: true, email: true, phone: true, role: true, createdAt: true },
+      });
+      await prisma.auditLog.create({
+        data: {
+          actorUserId,
+          action: "ADMIN_CREATED",
+          entityType: "USER",
+          entityId: user.id,
+          metadata: { email: user.email, role: user.role },
+          ipAddress: requestMeta.ipAddress,
+          userAgent: requestMeta.userAgent,
+        },
+      });
+      return user;
+    } catch (error: any) {
+      if (error?.code === "P2002") throw new ConflictError("Cet email ou ce numéro est déjà utilisé.");
+      throw error;
+    }
+  },
   stats: () => adminRepository.stats(),
 
   async listOrders(query: ListOrdersQuery) {

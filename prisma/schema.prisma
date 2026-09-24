@@ -152,6 +152,13 @@ enum SettlementStatus {
   CANCELLED
 }
 
+enum MediaArchiveStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  NOT_CONFIGURED
+}
+
 enum TransferStatus {
   PENDING
   PROCESSING
@@ -168,7 +175,7 @@ model User {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   fullName           String
   email              String          @unique
-  phone              String          @unique
+  phone              String?         @unique
   avatarUrl          String?
   age                Int?
   gender             Gender?
@@ -209,11 +216,32 @@ model User {
   sellerContracts       SellerContract[]
   settlements           SellerSettlement[]
   transfers             TransferLedger[]
+  mediaAssets         MediaAsset[]
 
   @@index([email])
   @@index([phone])
   @@index([deletedAt])
   @@map("users")
+}
+
+model MediaAsset {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId              String             @db.Uuid
+  owner                User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sourceUrl            String             @db.Text
+  publicUrl            String             @db.Text
+  githubPath           String             @db.Text
+  contentType          String             @db.VarChar(100)
+  byteSize             Int
+  githubSha            String?            @db.VarChar(100)
+  googleArchiveStatus  MediaArchiveStatus @default(NOT_CONFIGURED)
+  googleArchiveError   String?            @db.Text
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@index([googleArchiveStatus])
+  @@map("media_assets")
 }
 
 model OAuthAccount {
