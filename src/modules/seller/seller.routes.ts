@@ -1,11 +1,12 @@
 import { Router } from "express";
-import { requireAuth, requireRole } from "../../middlewares/auth.middleware";
+import { requireAuth, requireRole, requireVerified } from "../../middlewares/auth.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import { sellerController } from "./seller.controller";
-import { createProductSchema, sellerListSchema, sellerProductIdSchema, sellerStatusSchema, updateProductSchema } from "./seller.validators";
+import { applySellerSchema, createProductSchema, sellerListSchema, sellerProductIdSchema, sellerStatusSchema, updateProductSchema } from "./seller.validators";
 import { financialController } from "../financial/financial.controller";
 import { createContractSchema } from "../financial/financial.validators";
 const router = Router();
+router.post("/apply", requireAuth, requireVerified, validate({ body: applySellerSchema }), sellerController.apply);
 router.use(requireAuth, requireRole("SELLER"));
 router.post("/contracts", validate({ body: createContractSchema }), financialController.createContract);
 router.get("/stats", sellerController.stats);

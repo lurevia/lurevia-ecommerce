@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { sellerService } from "./seller.service";
 export const sellerController = {
+  apply: asyncHandler(async (req: Request, res: Response) => res.status(201).json({ data: await sellerService.apply(req.user!.id, req.body) })),
   products: asyncHandler(async (req: Request, res: Response) => res.json({ data: { products: await sellerService.listProducts(req.user!.id, Number(req.query.page), Number(req.query.limit)) } })),
   createProduct: asyncHandler(async (req: Request, res: Response) => res.status(201).json({ data: { product: await sellerService.createProduct(req.user!.id, req.body) } })),
   updateProduct: asyncHandler(async (req: Request, res: Response) => res.json({ data: { product: await sellerService.updateProduct(req.user!.id, req.params.id, req.body) } })),
