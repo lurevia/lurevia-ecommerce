@@ -37,10 +37,18 @@ const envSchema = z.object({
   FREE_SHIPPING_THRESHOLD: z.coerce.number().int().nonnegative().default(250000),
   REVIEW_DELAY_DAYS: z.coerce.number().int().nonnegative().default(5),
 
+  // ── Email transactionnel ──
+  // Render bloque le trafic SMTP sortant (ports 25/465/587) sur son offre
+  // gratuite : https://render.com/changelog/free-web-services-will-no-longer-allow-outbound-traffic-to-smtp-ports
+  // On utilise donc l'API HTTP de Resend (port 443) comme transport
+  // principal — voir src/services/email.service.ts. Le SMTP reste
+  // supporté comme repli pour le développement local si RESEND_API_KEY
+  // n'est pas défini (ex : Mailtrap, Gmail avec mot de passe d'application).
+  RESEND_API_KEY: z.string().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
-   SMTP_USER: z.string().optional(),
-   SMTP_PASSWORD: z.string().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().email("SMTP_FROM doit être une adresse e-mail valide").optional(),
 
   GOOGLE_CLIENT_ID: z.string().optional(),
