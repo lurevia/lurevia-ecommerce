@@ -19,6 +19,8 @@ export interface ProductDto {
   images: string[];
   colors: { label: string; hex: string }[];
   sizes: string[];
+  categoryIds: string[];
+  categories: { id: string; name: string; slug: string }[];
   categorySlugs: string[];
   createdAt: string;
 }
@@ -42,6 +44,12 @@ export const toProductDto = (product: ProductWithRelations): ProductDto => ({
   images: product.images.map((i) => i.url),
   colors: product.colors.map((c) => ({ label: c.label, hex: c.hex })),
   sizes: product.sizes.map((s) => s.value),
+  categoryIds: product.categories.map((pc) => pc.categoryId),
+  categories: product.categories.map((pc) => ({
+    id: pc.category.id,
+    name: pc.category.name,
+    slug: pc.category.slug,
+  })),
   categorySlugs: product.categories.map((pc) => pc.category.slug),
   createdAt: product.createdAt.toISOString(),
 });
