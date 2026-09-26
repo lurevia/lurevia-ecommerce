@@ -22,6 +22,8 @@ import {
   adminMessageSchema,
   reviewProfileChangeSchema,
   createAdminSchema,
+  sellerListQuerySchema,
+  rejectReviewSchema,
 } from "./admin.validators";
 
 const router = Router();
@@ -33,10 +35,12 @@ router.get("/financial/stats", financialController.stats);
 router.get("/financial/contracts", validate({ query: contractListSchema }), financialController.contracts);
 router.post("/financial/contracts/:id/review", validate({ params: contractIdSchema, body: reviewContractSchema }), financialController.reviewContract);
 router.get("/financial/settlements", validate({ query: financialListSchema }), financialController.settlements);
+router.get("/financial/commissions", validate({ query: financialListSchema }), financialController.commissions);
 router.get("/financial/transfers", validate({ query: financialListSchema }), financialController.transfers);
 router.post("/financial/settlements/:id/transfer", validate({ params: contractIdSchema, body: transferSchema }), financialController.createTransfer);
 
 router.get("/stats", adminController.stats);
+router.get("/sellers", validate({ query: sellerListQuerySchema }), adminController.listSellers);
 router.get("/profile-change-requests", validate({ query: profileChangeStatusQuerySchema }), adminController.listProfileChanges);
 router.post("/profile-change-requests/:id/review", validate({ params: idParamsSchema, body: reviewProfileChangeSchema }), adminController.reviewProfileChange);
 router.post("/messages", validate({ body: adminMessageSchema }), adminController.sendMessage);
@@ -71,6 +75,8 @@ router.patch(
 router.delete("/users/:id", validate({ params: idParamsSchema }), adminController.removeUser);
 
 router.get("/reviews", validate({ query: listReviewsQuerySchema }), adminController.listReviews);
+router.post("/reviews/:id/approve", validate({ params: idParamsSchema }), adminController.approveReview);
+router.post("/reviews/:id/reject", validate({ params: idParamsSchema, body: rejectReviewSchema }), adminController.rejectReview);
 router.delete("/reviews/:id", validate({ params: idParamsSchema }), adminController.removeReview);
 router.get("/feedback", validate({ query: listFeedbackQuerySchema }), adminController.listFeedback);
 router.patch(

@@ -2,9 +2,15 @@ import { prisma } from "../../lib/prisma";
 import { ConflictError, NotFoundError } from "../../errors/AppError";
 
 export const adminFoundationService = {
-  async listProfileChangeRequests(status: "PENDING" | "APPROVED" | "REJECTED" = "PENDING") {
+  async listProfileChangeRequests(status?: "PENDING" | "APPROVED" | "REJECTED", search?: string) {
     return prisma.profileChangeRequest.findMany({
-      where: { status },
+      where: {
+        ...(status ? { status } : {}),
+        ...(search ? { user: { OR: [
+          { fullName: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+        ] } } : {}),
+      },
       include: { user: { select: { id: true, fullName: true, email: true, phone: true, avatarUrl: true } } },
       orderBy: { createdAt: "desc" },
     });

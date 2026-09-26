@@ -889,3 +889,69 @@ model VerificationRequest {
   @@index([status])
   @@map("verification_requests")
 }
+
+
+model PlatformSettings {
+  id String @id @default("singleton") // ✅ singleton forcé
+
+  // ─── Général ───
+  siteName        String  @default("Lurevia")
+  siteTagline     String  @default("Artisanat malgache authentique")
+  siteDescription String  @default("Découvrez l'artisanat malgache fait main")
+  contactEmail    String  @default("contact@lurevia.mg")
+  contactPhone    String  @default("+261 34 12 345 67")
+  contactAddress  String  @default("Antananarivo, Madagascar")
+  defaultCurrency String  @default("MGA")
+
+  // ─── Marque ───
+  logoUrl         String?
+  faviconUrl      String?
+  primaryColor    String  @default("#2F7BF6")
+  secondaryColor  String  @default("#0A1B3D")
+  accentColor     String  @default("#E8A33D")
+
+  // ─── Réseaux sociaux ───
+  facebookUrl     String?
+  instagramUrl    String?
+  tiktokUrl       String?
+  whatsappNumber  String?
+  linkedinUrl     String?
+
+  // ─── Confidentialité & légal ───
+  privacyPolicy   String  @db.Text @default("")
+  termsOfService  String  @db.Text @default("")
+  cookieMessage   String  @db.Text @default("Nous utilisons des cookies pour améliorer votre expérience.")
+  legalCompanyName String @default("Lurevia SARL")
+  legalRegistrationNumber String?
+
+  // ─── Livraison ───
+  freeShippingThreshold Int @default(250000)
+  defaultShippingCost   Int @default(8000)
+
+  // ─── Paiements ───
+  enableMVola          Boolean @default(true)
+  enableCOD            Boolean @default(true)
+  enableCard           Boolean @default(false)
+  enableBankTransfer   Boolean @default(false)
+  mvolaMerchantNumber  String?
+  codMaxAmount         Int?    // plafond COD
+
+  // ─── Notifications ───
+  notifyOnNewOrder     Boolean @default(true)
+  notifyOnNewReview    Boolean @default(true)
+  notifyOnLowStock     Boolean @default(true)
+  lowStockThreshold    Int     @default(5)
+  sendOrderConfirmation Boolean @default(true)
+  sendShippingNotification Boolean @default(true)
+
+  // ─── SEO ───
+  metaTitle       String?
+  metaDescription String?
+
+  // ─── Maintenance ───
+  maintenanceMode Boolean @default(false)
+  maintenanceMessage String @db.Text @default("")
+
+  updatedAt DateTime @updatedAt
+  updatedBy String?  @db.Uuid
+}

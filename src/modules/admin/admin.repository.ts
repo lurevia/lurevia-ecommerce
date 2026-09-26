@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma";
-import type { DeletionRequestStatus, FeedbackCategory, OrderStatus } from "@prisma/client";
+import type { DeletionRequestStatus, FeedbackCategory, OrderStatus, PaymentMethod } from "@prisma/client";
 import { orderDetailInclude } from "../orders/orders.repository";
 
 export const adminRepository = {
@@ -52,12 +52,14 @@ export const adminRepository = {
   },
 
   // ── Commandes (toutes) ───────────────────────────────────────────
-  findManyOrders: (params: { skip: number; take: number; status?: OrderStatus; search?: string }) => {
+  findManyOrders: (params: { skip: number; take: number; status?: OrderStatus; paymentMethod?: PaymentMethod; search?: string }) => {
     const where = {
       ...(params.status ? { status: params.status } : {}),
+      ...(params.paymentMethod ? { paymentMethod: params.paymentMethod } : {}),
       ...(params.search
         ? {
             OR: [
+              { orderNumber: { contains: params.search, mode: "insensitive" as const } },
               { id: { contains: params.search, mode: "insensitive" as const } },
               { shippingFullName: { contains: params.search, mode: "insensitive" as const } },
               { shippingEmail: { contains: params.search, mode: "insensitive" as const } },
@@ -81,16 +83,24 @@ export const adminRepository = {
     prisma.order.findUnique({ where: { id }, include: orderDetailInclude }),
 
   // ── Utilisateurs (tous) ──────────────────────────────────────────
-  findManyUsers: (params: { skip: number; take: number; search?: string }) => {
-    const where = params.search
-      ? {
+  findManyUsers: (params: { skip: number; take: number; search?: string; role?: "CUSTOMER" | "SELLER" | "ADMIN"; gender?: "MALE" | "FEMALE" | "OTHER"; age?: string }) => {
+    const where = {
+      ...(params.role ? { role: params.role } : {}),
+      ...(params.gender ? { gender: params.gender } : {}),
+      ...(params.age === "unknown" ? { age: null } : params.age ? {
+        age: {
+          gte: Number(params.age.split("-")[0]),
+          lte: Number(params.age.split("-")[1]),
+        },
+      } : {}),
+      ...(params.search ? {
           OR: [
             { fullName: { contains: params.search, mode: "insensitive" as const } },
             { email: { contains: params.search, mode: "insensitive" as const } },
             { phone: { contains: params.search, mode: "insensitive" as const } },
           ],
-        }
-      : {};
+      } : {}),
+    };
     return prisma.$transaction([
       prisma.user.findMany({
         where,
@@ -104,6 +114,10 @@ export const adminRepository = {
           phone: true,
           role: true,
           avatarUrl: true,
+          age: true,
+          gender: true,
+          isVerified: true,
+          isActive: true,
           createdAt: true,
           lastLoginAt: true,
           _count: { select: { orders: true } },
@@ -123,6 +137,10 @@ export const adminRepository = {
         phone: true,
         role: true,
         avatarUrl: true,
+        age: true,
+        gender: true,
+        isVerified: true,
+        isActive: true,
         createdAt: true,
         lastLoginAt: true,
         _count: { select: { orders: true } },
@@ -134,13 +152,27 @@ export const adminRepository = {
   deleteUser: (id: string) => prisma.user.delete({ where: { id } }),
 
   // ── Avis (modération) ────────────────────────────────────────────
-  findManyReviews: (params: { skip: number; take: number; productId?: string }) => {
-    const where = params.productId ? { productId: params.productId } : {};
+  findManyReviews: (params: { skip: number; take: number; productId?: string; search?: string; status?: "pending" | "approved" | "rejected"; rating?: number }) => {
+    const where = {
+      ...(params.productId ? { productId: params.productId } : {}),
+      ...(params.rating ? { rating: params.rating } : {}),
+      ...(params.status === "pending" ? { isApproved: false, rejectedAt: null } : {}),
+      ...(params.status === "approved" ? { isApproved: true } : {}),
+      ...(params.status === "rejected" ? { rejectedAt: { not: null } } : {}),
+      ...(params.search ? {
+        OR: [
+          { comment: { contains: params.search, mode: "insensitive" as const } },
+          { title: { contains: params.search, mode: "insensitive" as const } },
+          { user: { fullName: { contains: params.search, mode: "insensitive" as const } } },
+          { product: { title: { contains: params.search, mode: "insensitive" as const } } },
+        ],
+      } : {}),
+    };
     return prisma.$transaction([
       prisma.productReview.findMany({
         where,
         include: {
-          user: { select: { fullName: true, avatarUrl: true } },
+          user: { select: { fullName: true, email: true, avatarUrl: true } },
           product: { select: { title: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -174,12 +206,18 @@ export const adminRepository = {
   deleteFeedback: (id: string) => prisma.serviceFeedback.delete({ where: { id } }),
 
   // ── Demandes de suppression de compte ────────────────────────────
-  findManyDeletionRequests: (params: { skip: number; take: number; status?: DeletionRequestStatus }) => {
-    const where = params.status ? { status: params.status } : {};
+  findManyDeletionRequests: (params: { skip: number; take: number; status?: DeletionRequestStatus; search?: string }) => {
+    const where = {
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.search ? { user: { OR: [
+        { fullName: { contains: params.search, mode: "insensitive" as const } },
+        { email: { contains: params.search, mode: "insensitive" as const } },
+      ] } } : {}),
+    };
     return prisma.$transaction([
       prisma.accountDeletionRequest.findMany({
         where,
-        include: { user: { select: { fullName: true, email: true, phone: true } } },
+        include: { user: { select: { fullName: true, email: true, phone: true, avatarUrl: true } } },
         orderBy: { createdAt: "desc" },
         skip: params.skip,
         take: params.take,

@@ -17,6 +17,7 @@ import adminRoutes from "../modules/admin/admin.routes";
 import messagesRoutes from "../modules/messages/messages.routes";
 import sellerRoutes from "../modules/seller/seller.routes";
 import mediaRoutes from "../modules/media/media.routes";
+import settingsRoutes from "../modules/settings/settings.routes";
 
 const router = Router();
 
@@ -39,6 +40,7 @@ router.use("/messages", messagesRoutes);
 router.use("/newsletter", newsletterRoutes);
 router.use("/seller", sellerRoutes);
 router.use("/media", mediaRoutes);
+router.use(settingsRoutes);
 
 router.get("/health", (_req, res) => {
   res.status(200).json({ data: { status: "ok", timestamp: new Date().toISOString() } });

@@ -24,6 +24,11 @@ export const adminController = {
     res.status(200).json({ data: result });
   }),
 
+  listSellers: asyncHandler(async (req: Request, res: Response) => {
+    const result = await adminService.listSellers(req.query as never);
+    res.status(200).json({ data: result });
+  }),
+
   getUser: asyncHandler(async (req: Request, res: Response) => {
     const user = await adminService.getUser(req.params.id);
     res.status(200).json({ data: { user } });
@@ -42,6 +47,16 @@ export const adminController = {
   listReviews: asyncHandler(async (req: Request, res: Response) => {
     const result = await adminService.listReviews(req.query as never);
     res.status(200).json({ data: result });
+  }),
+
+  approveReview: asyncHandler(async (req: Request, res: Response) => {
+    const review = await adminService.approveReview(req.params.id, req.user!.id);
+    res.status(200).json({ data: { review } });
+  }),
+
+  rejectReview: asyncHandler(async (req: Request, res: Response) => {
+    const review = await adminService.rejectReview(req.params.id, req.user!.id, req.body.reason);
+    res.status(200).json({ data: { review } });
   }),
 
   removeReview: asyncHandler(async (req: Request, res: Response) => {
@@ -105,8 +120,8 @@ export const adminController = {
   }),
 
   listVerifications: asyncHandler(async (req: Request, res: Response) => {
-    const status = (req.query.status as "PENDING" | "APPROVED" | "REJECTED" | "USED" | "EXPIRED") ?? "PENDING";
-    const requests = await adminVerificationService.listRequests(status);
+    const status = req.query.status as "PENDING" | "APPROVED" | "REJECTED" | "USED" | "EXPIRED" | undefined;
+    const requests = await adminVerificationService.listRequests(status, req.query.search as string | undefined);
     res.status(200).json({ data: { requests } });
   }),
 
@@ -129,7 +144,10 @@ export const adminController = {
     res.status(204).send();
   }),
   listProfileChanges: asyncHandler(async (req: Request, res: Response) => {
-    const requests = await adminFoundationService.listProfileChangeRequests(req.query.status as any);
+    const requests = await adminFoundationService.listProfileChangeRequests(
+      req.query.status as any,
+      req.query.search as string | undefined
+    );
     res.status(200).json({ data: { requests } });
   }),
   reviewProfileChange: asyncHandler(async (req: Request, res: Response) => {

@@ -136,7 +136,9 @@ export const ordersService = {
     const order = await ordersRepository.findById(orderId);
     if (!order) throw new NotFoundError("Commande");
 
-    const nextStatus = ORDER_STATUS_FROM_API[statusApi];
+    const statusKey = statusApi.toLowerCase().replaceAll("_", "-");
+    const nextStatus = ORDER_STATUS_FROM_API[statusApi] ?? ORDER_STATUS_FROM_API[statusKey];
+    if (!nextStatus) throw new BadRequestError("Statut de commande invalide.");
     const updated = await ordersRepository.updateStatus(orderId, nextStatus);
 
     if (nextStatus === "SHIPPED") {

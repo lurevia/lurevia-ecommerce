@@ -51,6 +51,7 @@ type OrderWithRelations = Order & { items: OrderItem[]; transactions: Transactio
 
 export const toOrderDto = (order: OrderWithRelations) => ({
   id: order.id,
+  orderNumber: order.orderNumber,
   userId: order.userId,
   status: ORDER_STATUS_TO_API[order.status],
   paymentMethod: PAYMENT_METHOD_TO_API[order.paymentMethod],

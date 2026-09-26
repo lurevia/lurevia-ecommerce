@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 export const reviewsRepository = {
   findByProduct: (productId: string) =>
     prisma.productReview.findMany({
-      where: { productId },
+      where: { productId, isApproved: true },
       include: { user: { select: { id: true, fullName: true, avatarUrl: true } } },
       orderBy: { createdAt: "desc" },
     }),
@@ -24,7 +24,7 @@ export const reviewsRepository = {
   distributionByProduct: (productId: string) =>
     prisma.productReview.groupBy({
       by: ["rating"],
-      where: { productId },
+      where: { productId, isApproved: true },
       _count: { rating: true },
     }),
 

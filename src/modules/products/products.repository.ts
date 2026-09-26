@@ -12,14 +12,19 @@ export const productDetailInclude = {
 
 export type ProductWithRelations = Prisma.ProductGetPayload<{ include: typeof productDetailInclude }>;
 
-const buildWhere = (query: Pick<
+const buildWhere = async (query: Pick<
   ListProductsQuery,
-  "categories" | "sizes" | "colors" | "priceMin" | "priceMax" | "availability" | "search"
->): Prisma.ProductWhereInput => {
+  | "categories" | "sizes" | "colors" | "priceMin" | "priceMax" | "availability"
+  | "search" | "categoryId" | "priceRange" | "stock" | "status"
+>): Promise<Prisma.ProductWhereInput> => {
   const where: Prisma.ProductWhereInput = {};
 
   if (query.categories?.length) {
     where.categories = { some: { category: { slug: { in: query.categories } } } };
+  }
+
+  if (query.categoryId) {
+    where.categories = { some: { categoryId: query.categoryId } };
   }
 
   if (query.sizes?.length) {
@@ -30,21 +35,36 @@ const buildWhere = (query: Pick<
     where.colors = { some: { label: { in: query.colors, mode: "insensitive" } } };
   }
 
-  if (query.priceMin !== undefined || query.priceMax !== undefined) {
+  const range = query.priceRange?.split("-").map(Number);
+  if (query.priceMin !== undefined || query.priceMax !== undefined || range) {
     where.price = {
-      ...(query.priceMin !== undefined ? { gte: query.priceMin } : {}),
-      ...(query.priceMax !== undefined ? { lte: query.priceMax } : {}),
+      ...(query.priceMin !== undefined || range ? { gte: query.priceMin ?? range?.[0] } : {}),
+      ...(query.priceMax !== undefined || range ? { lte: query.priceMax ?? range?.[1] } : {}),
     };
   }
+
+  if (query.stock === "out") where.stock = 0;
+  if (query.stock === "low") where.stock = { gte: 1, lte: 5 };
+  if (query.stock === "in") where.stock = { gte: 6, lte: 50 };
+  if (query.stock === "high") where.stock = { gte: 50 };
+  if (query.status === "new") where.isNew = true;
+  if (query.status === "promo") where.originalPrice = { not: null };
 
   if (query.availability === "in-stock") where.stock = { gt: 0 };
   if (query.availability === "out-of-stock") where.stock = { lte: 0 };
 
   if (query.search) {
+    const tagMatches = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "products"
+      WHERE EXISTS (
+        SELECT 1 FROM unnest("tags") AS tag(value)
+        WHERE tag.value ILIKE ${`%${query.search}%`}
+      )
+    `);
     where.OR = [
       { title: { contains: query.search, mode: "insensitive" } },
-      { description: { contains: query.search, mode: "insensitive" } },
-      { tags: { has: query.search.toLowerCase() } },
+      { sku: { contains: query.search, mode: "insensitive" } },
+      { id: { in: tagMatches.map(({ id }) => id) } },
     ];
   }
 
@@ -77,8 +97,10 @@ export const productsRepository = {
       prisma.product.count({ where: { ownerId } }),
     ]),
   async findMany(query: ListProductsQuery) {
-    const where = buildWhere(query);
-    const orderBy = buildOrderBy(query.sortBy);
+    const where = await buildWhere(query);
+    const orderBy = query.status === "popular"
+      ? { reviewCountCache: "desc" as const }
+      : buildOrderBy(query.sortBy);
     const skip = (query.page - 1) * query.limit;
 
     const [items, totalItems] = await prisma.$transaction([
@@ -170,7 +192,7 @@ export const productsRepository = {
   /** Recalcule et persiste la moyenne/compte des avis — appelé après chaque écriture d'avis. */
   refreshRatingCache: async (productId: string) => {
     const aggregate = await prisma.productReview.aggregate({
-      where: { productId },
+      where: { productId, isApproved: true },
       _avg: { rating: true },
       _count: { rating: true },
     });

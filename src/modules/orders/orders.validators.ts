@@ -55,7 +55,12 @@ export const orderIdParamsSchema = z.object({
 });
 
 export const updateOrderStatusSchema = z.object({
-  status: z.enum(["pending", "paid", "shipped", "delivered", "cancelled"]),
+  status: z.enum([
+    "pending", "paid", "shipped", "delivered", "cancelled",
+    "cod-pending", "cod-failed", "refunded", "payment-failed",
+    "PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED",
+    "COD_PENDING", "COD_FAILED", "REFUNDED", "PAYMENT_FAILED",
+  ]),
 });
 
 export const listOrdersQuerySchema = z.object({

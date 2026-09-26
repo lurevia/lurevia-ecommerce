@@ -2,11 +2,31 @@ import { NotFoundError, ConflictError } from "../../errors/AppError";
 import { buildPaginatedResult, normalizePagination } from "../../utils/pagination";
 import { financialRepository } from "./financial.repository";
 
+const sellerSearchFilter = (search?: string) => search ? {
+  seller: {
+    is: {
+      OR: [
+        { fullName: { contains: search, mode: "insensitive" as const } },
+        { email: { contains: search, mode: "insensitive" as const } },
+      ],
+    },
+  },
+} : {};
+
 export const financialService = {
   async listContracts(query: any) {
     const p = normalizePagination(query.page, query.limit);
-    const [items, total] = await financialRepository.contracts({ status: query.status, sellerId: query.sellerId }, (p.page - 1) * p.limit, p.limit);
-    return buildPaginatedResult(items, total, p);
+    const [items, total] = await financialRepository.contracts({
+      status: query.status,
+      sellerId: query.sellerId,
+      ...sellerSearchFilter(query.search),
+    }, (p.page - 1) * p.limit, p.limit);
+    return buildPaginatedResult(items.map((item: any) => ({
+      ...item,
+      sellerName: item.seller.fullName,
+      email: item.seller.email,
+      sellerId: item.seller.id,
+    })), total, p);
   },
   async createContract(sellerId: string, input: any) {
     return financialRepository.createContract({ ...input, sellerId, version: await financialRepository.nextVersion(sellerId) });
@@ -19,13 +39,46 @@ export const financialService = {
   },
   async listSettlements(query: any) {
     const p = normalizePagination(query.page, query.limit);
-    const [items, total] = await financialRepository.settlements({ status: query.status, sellerId: query.sellerId }, (p.page - 1) * p.limit, p.limit);
-    return buildPaginatedResult(items, total, p);
+    const [items, total] = await financialRepository.settlements({
+      status: query.status,
+      sellerId: query.sellerId,
+      ...sellerSearchFilter(query.search),
+    }, (p.page - 1) * p.limit, p.limit);
+    return buildPaginatedResult(items.map((item: any) => ({
+      ...item,
+      sellerName: item.seller.fullName,
+      email: item.seller.email,
+      sellerId: item.seller.id,
+    })), total, p);
   },
   async listTransfers(query: any) {
     const p = normalizePagination(query.page, query.limit);
-    const [items, total] = await financialRepository.transfers({ sellerId: query.sellerId, status: query.status }, (p.page - 1) * p.limit, p.limit);
-    return buildPaginatedResult(items, total, p);
+    const [items, total] = await financialRepository.transfers({
+      sellerId: query.sellerId,
+      status: query.status,
+      ...sellerSearchFilter(query.search),
+    }, (p.page - 1) * p.limit, p.limit);
+    return buildPaginatedResult(items.map((item: any) => ({
+      ...item,
+      sellerName: item.seller.fullName,
+      email: item.seller.email,
+      sellerId: item.seller.id,
+    })), total, p);
+  },
+  async listCommissions(query: any) {
+    const p = normalizePagination(query.page, query.limit);
+    const [items, total] = await financialRepository.settlements({
+      sellerId: query.sellerId,
+      ...sellerSearchFilter(query.search),
+    }, (p.page - 1) * p.limit, p.limit);
+    return buildPaginatedResult(items.map((item: any) => ({
+      ...item,
+      sellerName: item.seller.fullName,
+      email: item.seller.email,
+      sellerId: item.seller.id,
+      value: item.commissionAmount,
+      type: "FIXED",
+    })), total, p);
   },
   async createTransfer(settlementId: string, idempotencyKey: string) {
     const transfer = await financialRepository.createTransfer(settlementId, idempotencyKey);

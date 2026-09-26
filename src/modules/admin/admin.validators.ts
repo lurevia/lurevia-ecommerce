@@ -6,16 +6,23 @@ export const listQuerySchema = z.object({
 });
 
 export const listOrdersQuerySchema = listQuerySchema.extend({
-  status: z.enum(["pending", "paid", "shipped", "delivered", "cancelled"]).optional(),
+  status: z.enum(["pending", "paid", "shipped", "delivered", "cancelled", "cod-pending", "cod-failed", "refunded", "payment-failed", "PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED", "COD_PENDING", "COD_FAILED", "REFUNDED", "PAYMENT_FAILED"]).optional(),
+  paymentMethod: z.enum(["MOBILE_MONEY", "COD", "CARD", "BANK_TRANSFERT", "mobile-money", "cash", "bank-transfer", "card"]).optional(),
   search: z.string().trim().max(150).optional(),
 });
 
 export const listUsersQuerySchema = listQuerySchema.extend({
   search: z.string().trim().max(150).optional(),
+  role: z.enum(["CUSTOMER", "SELLER", "ADMIN"]).optional(),
+  gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
+  age: z.enum(["18-25", "26-35", "36-50", "51-99", "unknown"]).optional(),
 });
 
 export const listReviewsQuerySchema = listQuerySchema.extend({
   productId: z.string().uuid().optional(),
+  search: z.string().trim().max(150).optional(),
+  status: z.enum(["pending", "approved", "rejected"]).optional(),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
 });
 
 export const listFeedbackQuerySchema = listQuerySchema.extend({
@@ -28,6 +35,7 @@ export const feedbackResponseSchema = z.object({
 
 export const listDeletionRequestsQuerySchema = listQuerySchema.extend({
   status: z.enum(["pending", "approved", "rejected"]).optional(),
+  search: z.string().trim().max(150).optional(),
 });
 
 export const listNotificationsQuerySchema = listQuerySchema.extend({
@@ -45,11 +53,20 @@ export const processDeletionRequestSchema = z.object({
 export const idParamsSchema = z.object({ id: z.string().uuid("Identifiant invalide") });
 export const verificationStatusQuerySchema = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED", "USED", "EXPIRED"]).optional(),
+  search: z.string().trim().max(150).optional(),
 });
 export const verificationRejectSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
 });
-export const profileChangeStatusQuerySchema = z.object({ status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional() });
+export const profileChangeStatusQuerySchema = z.object({
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  search: z.string().trim().max(150).optional(),
+});
+export const sellerListQuerySchema = listQuerySchema.extend({
+  search: z.string().trim().max(150).optional(),
+  status: z.enum(["active", "pending", "suspended"]).optional(),
+});
+export const rejectReviewSchema = z.object({ reason: z.string().trim().max(1000).optional() });
 export const adminMessageSchema = z.object({
   userId: z.string().uuid().optional(),
   allUsers: z.boolean().optional(),
@@ -76,3 +93,4 @@ export type ListNotificationsQuery = z.infer<typeof listNotificationsQuerySchema
 export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
 export type ProcessDeletionRequestInput = z.infer<typeof processDeletionRequestSchema>;
 export type CreateAdminInput = z.infer<typeof createAdminSchema>;
+export type SellerListQuery = z.infer<typeof sellerListQuerySchema>;

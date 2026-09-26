@@ -7,13 +7,17 @@ const csvToArray = (value: unknown): string[] | undefined => {
 
 export const listProductsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(60).default(12),
+  limit: z.coerce.number().int().positive().max(100).default(12),
   categories: z.preprocess(csvToArray, z.array(z.string()).optional()),
   sizes: z.preprocess(csvToArray, z.array(z.string().trim().min(1).max(60)).optional()),
   colors: z.preprocess(csvToArray, z.array(z.string()).optional()),
   priceMin: z.coerce.number().int().nonnegative().optional(),
   priceMax: z.coerce.number().int().nonnegative().optional(),
   availability: z.enum(["all", "in-stock", "out-of-stock"]).default("all"),
+  categoryId: z.string().uuid().optional(),
+  priceRange: z.string().regex(/^\d+-\d+$/).optional(),
+  stock: z.enum(["out", "low", "in", "high"]).optional(),
+  status: z.enum(["new", "promo", "popular"]).optional(),
   sortBy: z.enum(["newest", "price-asc", "price-desc", "rating-desc", "popular"]).default("newest"),
   search: z.string().trim().max(150).optional(),
 });

@@ -260,50 +260,12 @@ export const authService = {
    * notification associée.
    */
   async confirmVerification(userId: string, token: string) {
-    if (!token || token.trim().length === 0) {
-      throw new ConflictError("Token requis.");
+    void token;
+    const user = await authRepository.findUserById(userId);
+    if (!user) throw new UnauthorizedError("Utilisateur introuvable.");
+    if (!user.isVerified) {
+      throw new ConflictError("Seul un administrateur peut valider ce compte.");
     }
-
-    const request = await prisma.verificationRequest.findFirst({
-      where: {
-        userId,
-        status: "APPROVED",
-      },
-    });
-
-    if (!request) {
-      throw new ConflictError("Lien de vérification invalide.");
-    }
-
-    if (request.expiresAt && request.expiresAt < new Date()) {
-      await prisma.verificationRequest.update({
-        where: { id: request.id },
-        data: { status: "EXPIRED" },
-      });
-      throw new ConflictError("Code expiré. Demandez un nouveau code.");
-    }
-
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          isVerified: true,
-        },
-      }),
-      prisma.verificationRequest.update({
-        where: { id: request.id },
-        data: { status: "USED", usedAt: new Date() },
-      }),
-      prisma.notification.deleteMany({
-        where: {
-          userId,
-          type: "ACCOUNT_VERIFICATION",
-        },
-      }),
-    ]);
-
-    logger.info({ userId }, "Compte vérifié avec succès");
-
     return { success: true };
   },
 

@@ -6,7 +6,7 @@ import { logger } from "../lib/logger";
 export class EmailDeliveryError extends AppError {
   constructor(cause?: unknown) {
     super(
-      "Le code de vérification n'a pas pu être envoyé par e-mail. L'approbation n'a pas été enregistrée.",
+      "L'e-mail n'a pas pu être envoyé.",
       502,
       "EMAIL_DELIVERY_FAILED",
       cause
@@ -74,18 +74,6 @@ const send = (input: MailInput): Promise<void> =>
   env.RESEND_API_KEY ? sendViaResend(input) : sendViaSmtp(input);
 
 export const emailService = {
-  async sendVerificationCode(input: { to: string; fullName: string; code: string; expiresAt: Date; link?: string }) {
-    const text = input.link
-      ? `Bonjour ${input.fullName},\n\nVotre compte a été approuvé ! Cliquez sur le lien suivant pour vérifier votre compte :\n${input.link}\n\nCe lien expire le ${input.expiresAt.toISOString()}.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`
-      : `Bonjour ${input.fullName},\n\nVotre code de vérification Lurevia est : ${input.code}\nIl expire le ${input.expiresAt.toISOString()}.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`;
-
-    try {
-      await send({ to: input.to, subject: "Votre vérification de compte Lurevia", text });
-    } catch (error) {
-      throw new EmailDeliveryError(error);
-    }
-  },
-
   async sendPasswordResetEmail(input: { to: string; fullName: string; resetLink: string }) {
     try {
       await send({

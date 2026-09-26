@@ -1,13 +1,12 @@
-import crypto from "crypto";
-import type { DeletionRequestStatus, FeedbackCategory } from "@prisma/client";
+import type { DeletionRequestStatus, FeedbackCategory, OrderStatus, PaymentMethod } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { adminRepository } from "./admin.repository";
 import { adminNotificationsService } from "./adminNotifications.service";
-import { toOrderDto, ORDER_STATUS_FROM_API } from "../orders/orders.mapper";
+import { toOrderDto, ORDER_STATUS_FROM_API, PAYMENT_METHOD_FROM_API } from "../orders/orders.mapper";
 import { buildPaginatedResult, normalizePagination } from "../../utils/pagination";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../errors/AppError";
-import { emailService } from "../../services/email.service";
 import { hashPassword } from "../../utils/password";
+import { productsRepository } from "../products/products.repository";
 import type { CreateAdminInput } from "./admin.validators";
 import type {
   ListDeletionRequestsQuery,
@@ -37,6 +36,10 @@ const toUserDto = (u: {
   avatarUrl: string | null;
   createdAt: Date;
   lastLoginAt: Date | null;
+  age: number | null;
+  gender: string | null;
+  isVerified: boolean;
+  isActive: boolean;
   _count: { orders: number };
 }) => ({
   id: u.id,
@@ -45,6 +48,10 @@ const toUserDto = (u: {
   phone: u.phone ?? undefined,
   role: u.role,
   avatarUrl: u.avatarUrl ?? undefined,
+  age: u.age ?? undefined,
+  gender: u.gender ?? undefined,
+  isVerified: u.isVerified,
+  isActive: u.isActive,
   ordersCount: u._count.orders,
   createdAt: u.createdAt.toISOString(),
   lastLoginAt: u.lastLoginAt?.toISOString(),
@@ -57,9 +64,13 @@ const toReviewDto = (r: {
   rating: number;
   title: string | null;
   comment: string;
+  isApproved: boolean;
+  approvedAt: Date | null;
+  rejectedAt: Date | null;
+  rejectionReason: string | null;
   isVerifiedPurchase: boolean;
   createdAt: Date;
-  user: { fullName: string; avatarUrl: string | null };
+  user: { fullName: string; email: string | null; avatarUrl: string | null };
   product: { title: string };
 }) => ({
   id: r.id,
@@ -67,7 +78,12 @@ const toReviewDto = (r: {
   productTitle: r.product.title,
   userId: r.userId,
   userName: r.user.fullName,
+  userEmail: r.user.email ?? undefined,
   userAvatar: r.user.avatarUrl ?? undefined,
+  isApproved: r.isApproved,
+  approvedAt: r.approvedAt?.toISOString(),
+  rejectedAt: r.rejectedAt?.toISOString(),
+  rejectionReason: r.rejectionReason ?? undefined,
   rating: r.rating,
   title: r.title ?? undefined,
   comment: r.comment,
@@ -83,13 +99,14 @@ const toDeletionRequestDto = (d: {
   adminNote: string | null;
   createdAt: Date;
   processedAt: Date | null;
-  user: { fullName: string; email: string | null; phone: string | null };
+  user: { fullName: string; email: string | null; phone: string | null; avatarUrl?: string | null };
 }) => ({
   id: d.id,
   userId: d.userId,
   userName: d.user.fullName,
   userEmail: d.user.email ?? undefined,
   userPhone: d.user.phone ?? undefined,
+  userAvatarUrl: d.user.avatarUrl ?? undefined,
   reason: d.reason ?? undefined,
   status: DELETION_STATUS_TO_API[d.status],
   adminNote: d.adminNote ?? undefined,
@@ -148,7 +165,12 @@ export const adminService = {
     const [orders, totalItems] = await adminRepository.findManyOrders({
       skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
-      status: query.status ? ORDER_STATUS_FROM_API[query.status] : undefined,
+      status: query.status
+        ? ORDER_STATUS_FROM_API[query.status] ?? query.status.toUpperCase() as OrderStatus
+        : undefined,
+      paymentMethod: query.paymentMethod
+        ? PAYMENT_METHOD_FROM_API[query.paymentMethod as keyof typeof PAYMENT_METHOD_FROM_API] ?? query.paymentMethod.toUpperCase().replaceAll("-", "_") as PaymentMethod
+        : undefined,
       search: query.search,
     });
     return buildPaginatedResult(orders.map(toOrderDto), totalItems, pagination);
@@ -166,6 +188,9 @@ export const adminService = {
       skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
       search: query.search,
+      role: query.role,
+      gender: query.gender,
+      age: query.age,
     });
     return buildPaginatedResult(users.map(toUserDto), totalItems, pagination);
   },
@@ -174,6 +199,41 @@ export const adminService = {
     const user = await adminRepository.findUserById(id);
     if (!user) throw new NotFoundError("Utilisateur");
     return toUserDto(user);
+  },
+
+  async listSellers(query: import("./admin.validators").SellerListQuery) {
+    const pagination = normalizePagination(query.page, query.limit);
+    const where = {
+      role: "SELLER" as const,
+      ...(query.status === "active" ? { isActive: true, isVerified: true } : {}),
+      ...(query.status === "pending" ? { isActive: true, isVerified: false } : {}),
+      ...(query.status === "suspended" ? { isActive: false } : {}),
+      ...(query.search ? { OR: [
+        { fullName: { contains: query.search, mode: "insensitive" as const } },
+        { email: { contains: query.search, mode: "insensitive" as const } },
+        { phone: { contains: query.search, mode: "insensitive" as const } },
+      ] } : {}),
+    };
+    const [users, totalItems] = await prisma.$transaction([
+      prisma.user.findMany({
+        where,
+        include: { sellerContracts: { orderBy: { version: "desc" }, take: 1, select: { type: true, value: true } } },
+        orderBy: { createdAt: "desc" },
+        skip: (pagination.page - 1) * pagination.limit,
+        take: pagination.limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
+    const items = users.map((user) => ({
+      id: user.id,
+      name: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      commissionRate: user.sellerContracts[0]?.type === "PERCENTAGE" ? user.sellerContracts[0].value : null,
+      status: !user.isActive ? "suspended" : user.isVerified ? "active" : "pending",
+      createdAt: user.createdAt.toISOString(),
+    }));
+    return buildPaginatedResult(items, totalItems, pagination);
   },
 
   async updateUserRole(id: string, role: "CUSTOMER" | "SELLER" | "ADMIN") {
@@ -197,6 +257,9 @@ export const adminService = {
       skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
       productId: query.productId,
+      search: query.search,
+      status: query.status,
+      rating: query.rating,
     });
     return buildPaginatedResult(reviews.map(toReviewDto), totalItems, pagination);
   },
@@ -206,6 +269,32 @@ export const adminService = {
     const review = await adminRepository.findReviewById(id);
     if (!review) throw new NotFoundError("Avis");
     await adminRepository.deleteReview(id);
+    await productsRepository.refreshRatingCache(review.productId);
+  },
+
+  async approveReview(id: string, adminId: string) {
+    const review = await adminRepository.findReviewById(id);
+    if (!review) throw new NotFoundError("Avis");
+    if (review.rejectedAt) throw new ConflictError("Cet avis a déjà été rejeté.");
+    const updated = await prisma.productReview.update({
+      where: { id },
+      data: { isApproved: true, approvedBy: adminId, approvedAt: new Date(), rejectedBy: null, rejectedAt: null, rejectionReason: null },
+      include: { user: { select: { fullName: true, email: true, avatarUrl: true } }, product: { select: { title: true } } },
+    });
+    await productsRepository.refreshRatingCache(review.productId);
+    return toReviewDto(updated);
+  },
+
+  async rejectReview(id: string, adminId: string, reason?: string) {
+    const review = await adminRepository.findReviewById(id);
+    if (!review) throw new NotFoundError("Avis");
+    const updated = await prisma.productReview.update({
+      where: { id },
+      data: { isApproved: false, rejectedBy: adminId, rejectedAt: new Date(), rejectionReason: reason ?? null },
+      include: { user: { select: { fullName: true, email: true, avatarUrl: true } }, product: { select: { title: true } } },
+    });
+    await productsRepository.refreshRatingCache(review.productId);
+    return toReviewDto(updated);
   },
 
   async listFeedback(query: import("./admin.validators").ListFeedbackQuery) {
@@ -251,6 +340,7 @@ export const adminService = {
       skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
       status: query.status ? DELETION_STATUS_FROM_API[query.status] : undefined,
+      search: query.search,
     });
     return buildPaginatedResult(requests.map(toDeletionRequestDto), totalItems, pagination);
   },
@@ -291,12 +381,18 @@ export const adminService = {
 type VerificationStatus = "PENDING" | "APPROVED" | "REJECTED" | "USED" | "EXPIRED";
 
 export const adminVerificationService = {
-  async listRequests(status: VerificationStatus = "PENDING") {
+  async listRequests(status?: VerificationStatus, search?: string) {
     return prisma.verificationRequest.findMany({
-      where: { status },
+      where: {
+        ...(status ? { status } : {}),
+        ...(search ? { user: { OR: [
+          { fullName: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+        ] } } : {}),
+      },
       include: {
         user: {
-          select: { id: true, fullName: true, email: true, phone: true, createdAt: true },
+          select: { id: true, fullName: true, email: true, phone: true, avatarUrl: true, createdAt: true },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -312,18 +408,6 @@ export const adminVerificationService = {
     if (!request) throw new NotFoundError("Demande introuvable.");
     if (request.status !== "PENDING") throw new BadRequestError("Cette demande a déjà été traitée.");
 
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    // L'envoi précède la transaction : en cas d'échec SMTP, la demande reste
-    // PENDING et peut être retentée sans approbation partiellement enregistrée.
-    const verificationLink = `https://lurevia.github.io/verify-account?token=${token}`;
-    await emailService.sendVerificationCode({
-      to: request.user.email,
-      fullName: request.user.fullName,
-      code: token, // On utilise le champ 'code' pour passer le token au service email
-      expiresAt,
-      link: verificationLink,
-    });
     return prisma.$transaction(async (tx) => {
       const current = await tx.verificationRequest.findUnique({ where: { id: requestId } });
       if (!current || current.status !== "PENDING") {
@@ -331,21 +415,16 @@ export const adminVerificationService = {
       }
       const updated = await tx.verificationRequest.update({
         where: { id: requestId },
-        data: { status: "APPROVED", expiresAt, approvedAt: new Date(), approvedBy: adminId },
-        include: { user: { select: { fullName: true, email: true } } },
+        data: { status: "APPROVED", codeHash: null, expiresAt: null, approvedAt: new Date(), approvedBy: adminId },
+        include: { user: { select: { id: true, fullName: true, email: true, phone: true, avatarUrl: true } } },
       });
-
-
-      // Sans ça, le client ne sait jamais que son code est arrivé —
-      // il ne consulte pas forcément ses emails, la notification dans
-      // l'app est le canal le plus fiable pour le ramener sur la page
-      // de saisie du token.
+      await tx.user.update({ where: { id: request.userId }, data: { isVerified: true } });
       await tx.notification.create({
         data: {
           userId: request.userId,
           type: "ACCOUNT_VERIFICATION",
-          title: "Votre compte a été approuvé",
-          message: `Un lien de vérification vous a été envoyé par e-mail à ${request.user.email}. Cliquez dessus pour activer votre compte.`,
+          title: "Compte vérifié",
+          message: "Votre compte a été vérifié avec succès. Toutes les fonctionnalités sont maintenant activées.",
           actionUrl: "/compte",
           referenceKey: `verification-approved:${requestId}`,
           read: false,

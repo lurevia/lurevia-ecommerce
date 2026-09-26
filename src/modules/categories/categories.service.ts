@@ -6,7 +6,13 @@ import type { CreateCategoryInput, UpdateCategoryInput } from "./categories.vali
 const toSlug = (name: string) => slugify(name, { lower: true, strict: true, locale: "fr" });
 
 export const categoriesService = {
-  list: () => categoriesRepository.findAll(),
+  async list() {
+    const categories = await categoriesRepository.findAll();
+    return categories.map(({ _count, ...category }) => ({
+      ...category,
+      productCount: _count.products,
+    }));
+  },
 
   async getBySlug(slug: string) {
     const category = await categoriesRepository.findBySlug(slug);

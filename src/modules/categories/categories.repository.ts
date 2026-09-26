@@ -2,7 +2,10 @@ import { prisma } from "../../lib/prisma";
 import type { Prisma } from "@prisma/client";
 
 export const categoriesRepository = {
-  findAll: () => prisma.category.findMany({ orderBy: { name: "asc" } }),
+  findAll: () => prisma.category.findMany({
+    orderBy: { name: "asc" },
+    include: { _count: { select: { products: true } } },
+  }),
 
   findBySlug: (slug: string) => prisma.category.findUnique({ where: { slug } }),
 

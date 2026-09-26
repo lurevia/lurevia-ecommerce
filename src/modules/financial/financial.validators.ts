@@ -4,6 +4,7 @@ export const contractIdSchema = z.object({ id: z.string().uuid() });
 export const contractListSchema = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
   sellerId: z.string().uuid().optional(),
+  search: z.string().trim().max(150).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -18,8 +19,9 @@ export const reviewContractSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 export const financialListSchema = z.object({
-  status: z.enum(["PENDING_REVIEW", "READY", "TRANSFER_PENDING", "PAID", "FAILED", "CANCELLED"]).optional(),
+  status: z.enum(["PENDING_REVIEW", "READY", "TRANSFER_PENDING", "PAID", "FAILED", "CANCELLED", "PENDING", "PROCESSING", "COMPLETED"]).optional(),
   sellerId: z.string().uuid().optional(),
+  search: z.string().trim().max(150).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
