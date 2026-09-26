@@ -22,7 +22,7 @@ export const createFeedbackSchema = z.object({
 export const updateFeedbackSchema = createFeedbackSchema.partial();
 
 export const feedbackIdParamsSchema = z.object({
-  id: z.string().cuid("Identifiant de feedback invalide"),
+  id: z.string().uuid("Identifiant de feedback invalide"),
 });
 
 export const listFeedbackQuerySchema = z.object({

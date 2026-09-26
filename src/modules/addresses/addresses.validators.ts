@@ -20,7 +20,7 @@ export const addressBodySchema = z.object({
 export const updateAddressBodySchema = addressBodySchema.partial();
 
 export const addressIdParamsSchema = z.object({
-  id: z.string().cuid("Identifiant d'adresse invalide"),
+  id: z.string().uuid("Identifiant d'adresse invalide"),
 });
 
 export type AddressInput = z.infer<typeof addressBodySchema>;

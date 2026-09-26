@@ -13,11 +13,11 @@ export const updateReviewSchema = z.object({
 });
 
 export const productIdParamsSchema = z.object({
-  productId: z.string().cuid("Identifiant de produit invalide"),
+  productId: z.string().uuid("Identifiant de produit invalide"),
 });
 
 export const reviewIdParamsSchema = z.object({
-  id: z.string().cuid("Identifiant d'avis invalide"),
+  id: z.string().uuid("Identifiant d'avis invalide"),
 });
 
 export type CreateReviewInput = z.infer<typeof createReviewSchema>;

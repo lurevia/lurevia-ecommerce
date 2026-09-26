@@ -19,7 +19,7 @@ export const listProductsQuerySchema = z.object({
 });
 
 export const productIdParamsSchema = z.object({
-  id: z.string().cuid("Identifiant de produit invalide"),
+  id: z.string().uuid("Identifiant de produit invalide"),
 });
 
 export const searchSuggestionsQuerySchema = z.object({
@@ -45,7 +45,7 @@ export const createProductSchema = z.object({
   stock: z.number().int().nonnegative().default(0),
   isNew: z.boolean().default(false),
   tags: z.array(z.string().trim().max(40)).max(20).default([]),
-  categoryIds: z.array(z.string().cuid()).min(1, "Au moins une catégorie est requise"),
+  categoryIds: z.array(z.string().uuid()).min(1, "Au moins une catégorie est requise"),
   images: z.array(z.string().trim().min(1).max(2048)).min(1, "Au moins une image est requise"),
   colors: z.array(colorSchema).default([]),
   sizes: z.array(z.string().trim().min(1).max(60)).default([]),

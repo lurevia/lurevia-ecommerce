@@ -15,7 +15,7 @@ export const categorySlugParamsSchema = z.object({
 });
 
 export const categoryIdParamsSchema = z.object({
-  id: z.string().cuid("Identifiant de catégorie invalide"),
+  id: z.string().uuid("Identifiant de catégorie invalide"),
 });
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;

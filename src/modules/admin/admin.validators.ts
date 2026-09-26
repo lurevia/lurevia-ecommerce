@@ -15,7 +15,7 @@ export const listUsersQuerySchema = listQuerySchema.extend({
 });
 
 export const listReviewsQuerySchema = listQuerySchema.extend({
-  productId: z.string().cuid().optional(),
+  productId: z.string().uuid().optional(),
 });
 
 export const listFeedbackQuerySchema = listQuerySchema.extend({
@@ -42,7 +42,7 @@ export const processDeletionRequestSchema = z.object({
   adminNote: z.string().trim().max(1000).optional(),
 });
 
-export const idParamsSchema = z.object({ id: z.string().cuid("Identifiant invalide") });
+export const idParamsSchema = z.object({ id: z.string().uuid("Identifiant invalide") });
 export const verificationStatusQuerySchema = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED", "USED", "EXPIRED"]).optional(),
 });
@@ -51,7 +51,7 @@ export const verificationRejectSchema = z.object({
 });
 export const profileChangeStatusQuerySchema = z.object({ status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional() });
 export const adminMessageSchema = z.object({
-  userId: z.string().cuid().optional(),
+  userId: z.string().uuid().optional(),
   allUsers: z.boolean().optional(),
   subject: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(10000),

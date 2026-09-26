@@ -6,7 +6,7 @@ import { requireAuth } from "../../middlewares/auth.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import { notificationsService } from "./notifications.service";
 
-const notificationIdParamsSchema = z.object({ id: z.string().cuid() });
+const notificationIdParamsSchema = z.object({ id: z.string().uuid() });
 
 const notificationsController = {
   list: asyncHandler(async (req: Request, res: Response) => {

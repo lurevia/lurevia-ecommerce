@@ -22,7 +22,7 @@ const shippingSchema = z.object({
  */
 export const checkoutSchema = z
   .object({
-    addressId: z.string().cuid().optional(),
+    addressId: z.string().uuid().optional(),
     shipping: shippingSchema.optional(),
     paymentMethod: z.enum(["mobile-money", "card", "cash"]),
     mobileMoney: z
@@ -51,7 +51,7 @@ export const checkoutSchema = z
   });
 
 export const orderIdParamsSchema = z.object({
-  id: z.string().cuid("Identifiant de commande invalide"),
+  id: z.string().uuid("Identifiant de commande invalide"),
 });
 
 export const updateOrderStatusSchema = z.object({
