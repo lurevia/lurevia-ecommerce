@@ -1,0 +1,2779 @@
+openapi: 3.0.3
+info:
+  title: Lurevia E-Commerce API
+  description: |
+    API REST complète pour **Lurevia** — Plateforme e-commerce artisanale malgache et enchères en direct.
+    
+    ### Fonctionnalités principales :
+    - **Authentification & Profils** : JWT (access token 15m, refresh token 30j), OAuth2 Google, vérification d'identité CIN.
+    - **Catalogue artisanal** : Produits, catégories hiérarchiques, recherche texte/suggestions, gestion des stocks.
+    - **Enchères en direct (Auctions)** : Système d'enchères temps réel, anti-snipe 2 min, chat de salle d'enchères, suivi en direct.
+    - **Paniers & Favoris** : Gestion des articles, calcul des frais de livraison, calcul récapitulatif.
+    - **Commandes & Expéditions** : Cycle de commande (PENDING -> PAID -> PROCESSING -> SHIPPED -> DELIVERED), points relais (pickup points), zones tarifaires Madagascar.
+    - **Paiements Mobile Money Madagascar** : MVola (Telma), Orange Money, Airtel Money avec signature HMAC-SHA256 et webhooks sécurisés.
+    - **Suivi de livraison (Delivery Tracking)** : Numéro de suivi unique, journal d'événements géolocalisés, mise à jour de statut.
+    - **Vendeurs & Artisans** : Tableaux de bord, contrats vendeurs (signature électronique), règlements (settlements), virements bancaires/mobile money.
+    - **Cartes & Géolocalisation** : Intégration hybride SerpApi (Google Local) & OpenStreetMap (Nominatim) sans clé obligatoire.
+    - **Administration & Export** : Gestion RBAC (BUYER, SELLER, ADMIN, SUPER_ADMIN), métriques financières, exports Excel multi-onglets.
+  version: 1.0.0
+  contact:
+    name: Support Technique Lurevia
+    email: contact@lurevia.mg
+    url: https://lurevia-ecommerce.onrender.com
+  license:
+    name: Propriétaire - Tous droits réservés Lurevia Madagascar
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Serveur de Développement Local
+  - url: https://lurevia-ecommerce.onrender.com/api/v1
+    description: Serveur de Production (Render)
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Santé & Système
+    description: Surveillance et état de santé du serveur
+  - name: Authentification
+    description: Connexion, inscription, refresh tokens, Google OAuth et vérification d'identité
+  - name: Utilisateurs & Profils
+    description: Gestion des comptes utilisateurs, profils, avatars et coordonnées
+  - name: Vérification CIN
+    description: Soumission et validation des cartes d'identité nationales
+  - name: Adresses
+    description: Carnet d'adresses de livraison et facturation à Madagascar
+  - name: Catégories
+    description: Arborescence des catégories de produits artisanaux
+  - name: Produits
+    description: Catalogue de produits, recherche, filtres et gestion artisanale
+  - name: Avis & Notations
+    description: Avis vérifiés sur les produits et votes d'utilité
+  - name: Enchères (Auctions)
+    description: Système d'enchères artisanales en temps réel
+  - name: Offres d'enchères (Bids)
+    description: Placement et historique des offres d'enchères
+  - name: Panier
+    description: Gestion du panier d'achat et validation
+  - name: Favoris
+    description: Liste d'envies et articles favoris
+  - name: Commandes
+    description: Création, suivi d'état et annulation de commandes
+  - name: Paiements (Mobile Money)
+    description: MVola, Orange Money, Airtel Money et webhooks opérateurs
+  - name: Suivi de livraison
+    description: Suivi des colis en temps réel et événements d'expédition
+  - name: Points Relais
+    description: Réseau de points de collecte à Madagascar
+  - name: Zones de livraison
+    description: Tarifs et zones d'expédition régionales
+  - name: Cartes & Lieux
+    description: Recherche de lieux et géolocalisation (SerpApi & OpenStreetMap)
+  - name: Retours & Réclamations
+    description: Retours clients, réclamations et feedback
+  - name: Notifications
+    description: Notifications in-app pour acheteurs et vendeurs
+  - name: Messagerie
+    description: Messagerie directe acheteur-vendeur
+  - name: Newsletter
+    description: Inscriptions et désabonnements aux actualités
+  - name: Espace Vendeur
+    description: Tableau de bord, ventes et métriques vendeurs
+  - name: Contrats Vendeurs
+    description: Gestion et signature électronique des contrats artisans
+  - name: Règlements & Virements
+    description: Règlements financiers (settlements) et virements bancaires/mobile money
+  - name: Médias & Images
+    description: Téléversement et gestion d'images
+  - name: Administration
+    description: Modération, gestion des utilisateurs, statistiques globales
+  - name: Paramètres
+    description: Configuration de la plateforme
+  - name: Export Excel
+    description: Exportation de données administratives et comptables
+
+paths:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 1. Santé
+  # ═══════════════════════════════════════════════════════════════════════════
+  /health:
+    get:
+      tags: [Santé & Système]
+      summary: État de santé du service
+      description: Vérification de l'état du serveur backend pour monitoring et sondes de santé.
+      security: []
+      responses:
+        "200":
+          description: Le serveur fonctionne normalement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: ok
+                      version:
+                        type: string
+                        example: 1.0.0
+                      timestamp:
+                        type: string
+                        format: date-time
+                        example: "2026-09-29T12:00:00.000Z"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 2. Authentification
+  # ═══════════════════════════════════════════════════════════════════════════
+  /auth/login:
+    post:
+      tags: [Authentification]
+      summary: Connexion par identifiant (Email ou Téléphone) et mot de passe
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, password]
+              properties:
+                identifier:
+                  type: string
+                  description: Adresse email ou numéro de téléphone malgache (ex 0341234567)
+                  example: client@lurevia.mg
+                password:
+                  type: string
+                  format: password
+                  example: MotDePasseSecurise123!
+      responses:
+        "200":
+          description: Connexion réussie, tokens retournés
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /auth/oauth/callback:
+    post:
+      tags: [Authentification]
+      summary: Authentification sociale via Google OAuth2
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, idToken]
+              properties:
+                provider:
+                  type: string
+                  enum: [google]
+                  example: google
+                idToken:
+                  type: string
+                  description: Token d'identité Google JWT
+                  example: eyJhbGciOiJSUzI1NiIsImtpZCI6...
+      responses:
+        "200":
+          description: Connexion Google réussie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/refresh:
+    post:
+      tags: [Authentification]
+      summary: Rafraîchir la paire de jetons JWT
+      security: []
+      description: Utilise le refresh token fourni dans le body ou le cookie HttpOnly.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        "200":
+          description: Nouveaux jetons émis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokensResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /auth/logout:
+    post:
+      tags: [Authentification]
+      summary: Déconnexion utilisateur
+      description: Invalide le refresh token et supprime les cookies de session.
+      responses:
+        "200":
+          description: Déconnexion réussie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+
+  /auth/me:
+    get:
+      tags: [Authentification]
+      summary: Informations du compte connecté
+      responses:
+        "200":
+          description: Données du compte utilisateur actuel
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /auth/verification/request:
+    post:
+      tags: [Authentification]
+      summary: Demander la vérification de téléphone ou d'email (envoi code OTP)
+      responses:
+        "200":
+          description: Demande envoyée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+
+  /auth/verification/status:
+    get:
+      tags: [Authentification]
+      summary: Statut de vérification de l'utilisateur
+      responses:
+        "200":
+          description: État des vérifications (téléphone, email, identité)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      emailVerified:
+                        type: boolean
+                      phoneVerified:
+                        type: boolean
+                      identityVerified:
+                        type: boolean
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 3. Utilisateurs & Profils
+  # ═══════════════════════════════════════════════════════════════════════════
+  /users/me:
+    get:
+      tags: [Utilisateurs & Profils]
+      summary: Profil complet de l'utilisateur connecté
+      responses:
+        "200":
+          description: Profil utilisateur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserProfile"
+    patch:
+      tags: [Utilisateurs & Profils]
+      summary: Mise à jour du profil (nom, téléphone, bio, préférences)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                phone:
+                  type: string
+                bio:
+                  type: string
+                city:
+                  type: string
+                province:
+                  type: string
+      responses:
+        "200":
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserProfile"
+
+  /users/me/avatar:
+    patch:
+      tags: [Utilisateurs & Profils]
+      summary: Changer la photo de profil (avatar)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [avatarUrl]
+              properties:
+                avatarUrl:
+                  type: string
+                  format: uri
+      responses:
+        "200":
+          description: Avatar mis à jour avec succès
+
+  /users/{id}:
+    get:
+      tags: [Utilisateurs & Profils]
+      summary: Profil public d'un artisan ou utilisateur
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Profil public
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PublicUser"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 4. Vérification CIN
+  # ═══════════════════════════════════════════════════════════════════════════
+  /identity-verifications:
+    get:
+      tags: [Vérification CIN]
+      summary: Lister toutes les demandes de vérification (Admin)
+      responses:
+        "200":
+          description: Liste des vérifications
+    post:
+      tags: [Vérification CIN]
+      summary: Soumettre une pièce d'identité malgache (CIN / Passeport)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cinNumber, cinFrontUrl, cinBackUrl]
+              properties:
+                cinNumber:
+                  type: string
+                  example: "101234567890"
+                cinIssueDate:
+                  type: string
+                  format: date
+                cinIssuePlace:
+                  type: string
+                  example: Antananarivo
+                cinFrontUrl:
+                  type: string
+                  format: uri
+                cinBackUrl:
+                  type: string
+                  format: uri
+      responses:
+        "201":
+          description: Demande de vérification enregistrée
+
+  /identity-verifications/me:
+    get:
+      tags: [Vérification CIN]
+      summary: Obtenir l'état de sa propre vérification CIN
+      responses:
+        "200":
+          description: Statut de la vérification (PENDING, APPROVED, REJECTED)
+
+  /identity-verifications/{id}/status:
+    patch:
+      tags: [Vérification CIN]
+      summary: Approuver ou rejeter une vérification CIN (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [APPROVED, REJECTED]
+                rejectionReason:
+                  type: string
+      responses:
+        "200":
+          description: Statut mis à jour
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 5. Adresses
+  # ═══════════════════════════════════════════════════════════════════════════
+  /addresses:
+    get:
+      tags: [Adresses]
+      summary: Obtenir les adresses de livraison enregistrées
+      responses:
+        "200":
+          description: Liste des adresses de l'utilisateur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Address"
+    post:
+      tags: [Adresses]
+      summary: Ajouter une nouvelle adresse de livraison à Madagascar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressInput"
+      responses:
+        "201":
+          description: Adresse créée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Address"
+
+  /addresses/{id}:
+    get:
+      tags: [Adresses]
+      summary: Détail d'une adresse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détails de l'adresse
+    patch:
+      tags: [Adresses]
+      summary: Modifier une adresse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressInput"
+      responses:
+        "200":
+          description: Adresse modifiée
+    delete:
+      tags: [Adresses]
+      summary: Supprimer une adresse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Adresse supprimée
+
+  /addresses/{id}/set-default:
+    patch:
+      tags: [Adresses]
+      summary: Définir comme adresse principale par défaut
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Adresse définie par défaut
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 6. Catégories
+  # ═══════════════════════════════════════════════════════════════════════════
+  /categories:
+    get:
+      tags: [Catégories]
+      summary: Lister toutes les catégories artisanales
+      security: []
+      responses:
+        "200":
+          description: Arborescence des catégories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+    post:
+      tags: [Catégories]
+      summary: Créer une catégorie (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: Vannerie & Raphia
+                description:
+                  type: string
+                parentId:
+                  type: string
+                  nullable: true
+                imageUrl:
+                  type: string
+                  format: uri
+      responses:
+        "201":
+          description: Catégorie créée
+
+  /categories/slug/{slug}:
+    get:
+      tags: [Catégories]
+      summary: Obtenir une catégorie par son slug
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          example: vannerie-raphia
+      responses:
+        "200":
+          description: Détails de la catégorie
+
+  /categories/{id}:
+    get:
+      tags: [Catégories]
+      summary: Détails d'une catégorie par ID
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Catégorie trouvée
+    patch:
+      tags: [Catégories]
+      summary: Modifier une catégorie (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Catégorie modifiée
+    delete:
+      tags: [Catégories]
+      summary: Supprimer une catégorie (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Catégorie supprimée
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 7. Produits
+  # ═══════════════════════════════════════════════════════════════════════════
+  /products:
+    get:
+      tags: [Produits]
+      summary: Rechercher et filtrer les produits du catalogue
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Recherche texte sur le titre ou la description
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt_desc, price_asc, price_desc, rating_desc, popular]
+        - name: isHandmade
+          in: query
+          schema:
+            type: boolean
+        - name: originRegion
+          in: query
+          schema:
+            type: string
+          description: Région d'origine (ex Analamanga, Atsinanana)
+      responses:
+        "200":
+          description: Liste paginée de produits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedProducts"
+    post:
+      tags: [Produits]
+      summary: Créer un nouveau produit artisanal (Vendeur / Artisan)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "201":
+          description: Produit créé avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Product"
+
+  /products/search/suggestions:
+    get:
+      tags: [Produits]
+      summary: Suggestions d'autocomplétion pour la barre de recherche
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          example: panier
+      responses:
+        "200":
+          description: Mots-clés et produits suggérés
+
+  /products/slug/{slug}:
+    get:
+      tags: [Produits]
+      summary: Obtenir un produit par son identifiant textuel (slug)
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          example: panier-en-raphia-tresse-main
+      responses:
+        "200":
+          description: Fiche produit complète
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Product"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /products/{id}:
+    get:
+      tags: [Produits]
+      summary: Obtenir un produit par son ID
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Fiche produit trouvée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Product"
+    patch:
+      tags: [Produits]
+      summary: Mettre à jour un produit existant (Vendeur propriétaire ou Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "200":
+          description: Produit mis à jour
+    delete:
+      tags: [Produits]
+      summary: Supprimer un produit (Vendeur propriétaire ou Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Produit supprimé
+
+  /products/{id}/related:
+    get:
+      tags: [Produits]
+      summary: Produits similaires ou recommandés
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste de produits associés
+
+  /products/seller/mine:
+    get:
+      tags: [Produits]
+      summary: Lister les produits de l'artisan connecté
+      responses:
+        "200":
+          description: Produits de l'artisan
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 8. Avis & Notations
+  # ═══════════════════════════════════════════════════════════════════════════
+  /products/{productId}/reviews:
+    get:
+      tags: [Avis & Notations]
+      summary: Lister les avis clients sur un produit
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste des avis vérifiés
+    post:
+      tags: [Avis & Notations]
+      summary: Publier un avis après commande livrée
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating, comment]
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  example: 5
+                title:
+                  type: string
+                  example: Qualité magnifique
+                comment:
+                  type: string
+                  example: Le tressage est d'une grande finesse, livraison rapide à Tana.
+                photos:
+                  type: array
+                  items:
+                    type: string
+                    format: uri
+      responses:
+        "201":
+          description: Avis publié
+
+  /reviews/{id}/vote:
+    post:
+      tags: [Avis & Notations]
+      summary: Voter pour indiquer si un avis est utile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isHelpful]
+              properties:
+                isHelpful:
+                  type: boolean
+      responses:
+        "200":
+          description: Vote enregistré
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 9. Enchères (Auctions)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /auctions:
+    get:
+      tags: [Enchères (Auctions)]
+      summary: Lister toutes les enchères actives ou à venir
+      security: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, ACTIVE, ENDED, CANCELLED]
+      responses:
+        "200":
+          description: Liste des enchères
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Auction"
+
+  /auctions/{productId}:
+    get:
+      tags: [Enchères (Auctions)]
+      summary: Détails de l'enchère liée à un produit
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détails de l'enchère
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Auction"
+
+  /auctions/{productId}/stats:
+    get:
+      tags: [Enchères (Auctions)]
+      summary: Statistiques de l'enchère (offre la plus haute, nombre d'enchérisseurs)
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Statistiques d'enchère
+
+  /auctions/{productId}/messages:
+    get:
+      tags: [Enchères (Auctions)]
+      summary: Messages du tchat public de l'enchère
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Flux des messages de la salle d'enchère
+    post:
+      tags: [Enchères (Auctions)]
+      summary: Envoyer un message dans le salon de l'enchère
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  example: Superbe pièce d'artisanat !
+      responses:
+        "201":
+          description: Message diffusé
+
+  /auctions/{productId}/watch:
+    post:
+      tags: [Enchères (Auctions)]
+      summary: S'abonner aux notifications en direct d'une enchère
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Enchère suivie
+    delete:
+      tags: [Enchères (Auctions)]
+      summary: Se désabonner du suivi de l'enchère
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Suivi arrêté
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 10. Offres d'enchères (Bids)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /bids:
+    post:
+      tags: [Offres d'enchères (Bids)]
+      summary: Placer une nouvelle enchère sur un article
+      description: |
+        Vérifie que l'enchère est active, que le montant dépasse l'enchère précédente du pas minimum,
+        et prolonge automatiquement l'enchère si l'offre intervient dans les 2 dernières minutes (anti-snipe).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, amount]
+              properties:
+                productId:
+                  type: string
+                amount:
+                  type: integer
+                  description: Montant de l'offre en Ariary (MGA)
+                  example: 125000
+      responses:
+        "201":
+          description: Enchère placée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Bid"
+        "409":
+          description: Montant insuffisant ou surenchère dépassée
+
+  /bids/me:
+    get:
+      tags: [Offres d'enchères (Bids)]
+      summary: Historique de mes offres d'enchères
+      responses:
+        "200":
+          description: Liste des enchères placées par l'acheteur
+
+  /bids/product/{productId}:
+    get:
+      tags: [Offres d'enchères (Bids)]
+      summary: Historique complet des offres sur un produit
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste ordonnée des enchères
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 11. Panier (Cart)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /cart:
+    get:
+      tags: [Panier]
+      summary: Obtenir le contenu du panier actuel
+      responses:
+        "200":
+          description: Panier avec calcul des totaux et articles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartResponse"
+    delete:
+      tags: [Panier]
+      summary: Vider l'intégralité du panier
+      responses:
+        "200":
+          description: Panier vidé
+
+  /cart/items:
+    post:
+      tags: [Panier]
+      summary: Ajouter un article au panier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity]
+              properties:
+                productId:
+                  type: string
+                quantity:
+                  type: integer
+                  minimum: 1
+                  default: 1
+      responses:
+        "201":
+          description: Article ajouté au panier
+
+  /cart/items/{id}:
+    patch:
+      tags: [Panier]
+      summary: Modifier la quantité d'un article dans le panier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Quantité mise à jour
+    delete:
+      tags: [Panier]
+      summary: Retirer un article du panier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Article retiré
+
+  /cart/checkout-summary:
+    post:
+      tags: [Panier]
+      summary: Calculer le devis de commande (sous-total, livraison, remises)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                addressId:
+                  type: string
+                shippingZoneId:
+                  type: string
+      responses:
+        "200":
+          description: Récapitulatif tarifaire détaillé
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 12. Favoris (Favorites)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /favorites:
+    get:
+      tags: [Favoris]
+      summary: Obtenir tous les produits ajoutés aux favoris
+      responses:
+        "200":
+          description: Liste des favoris
+
+  /favorites/{productId}:
+    post:
+      tags: [Favoris]
+      summary: Ajouter un produit aux favoris
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ajouté aux favoris
+    delete:
+      tags: [Favoris]
+      summary: Retirer un produit des favoris
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Retiré des favoris
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 13. Commandes (Orders)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /orders:
+    get:
+      tags: [Commandes]
+      summary: Historique des commandes de l'utilisateur
+      responses:
+        "200":
+          description: Liste des commandes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Order"
+    post:
+      tags: [Commandes]
+      summary: Valider et créer une commande à partir du panier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderInput"
+      responses:
+        "201":
+          description: Commande créée en statut PENDING
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Order"
+
+  /orders/{id}:
+    get:
+      tags: [Commandes]
+      summary: Détail complet d'une commande
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Fiche commande trouvée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Order"
+
+  /orders/{id}/cancel:
+    post:
+      tags: [Commandes]
+      summary: Annuler une commande (si non encore expédiée)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Commande annulée
+
+  /orders/{id}/status:
+    patch:
+      tags: [Commandes]
+      summary: Mettre à jour l'état d'une commande (Vendeur / Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+      responses:
+        "200":
+          description: Statut mis à jour
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 14. Paiements (Mobile Money Madagascar)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /payments/initiate:
+    post:
+      tags: [Paiements (Mobile Money)]
+      summary: Initier un paiement Mobile Money (MVola, Orange Money, Airtel Money)
+      description: |
+        Déclenche une notification Push USSD vers le téléphone de l'acheteur pour valider la transaction
+        avec son code PIN opérateur. En mode présentation / dev, fonctionne sans blocage même si les clés
+        sandbox ne sont pas encore renseignées.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, provider, phoneNumber]
+              properties:
+                orderId:
+                  type: string
+                  example: cmd_clz9823abc
+                provider:
+                  type: string
+                  enum: [MVOLA, ORANGE_MONEY, AIRTEL_MONEY]
+                  example: MVOLA
+                phoneNumber:
+                  type: string
+                  description: Numéro de téléphone opérateur (ex 0340000000, 0320000000, 0330000000)
+                  example: "0341234567"
+      responses:
+        "200":
+          description: Paiement initié avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PaymentTransaction"
+        "409":
+          description: Opérateur indisponible ou solde insuffisant
+
+  /payments/transactions/{id}:
+    get:
+      tags: [Paiements (Mobile Money)]
+      summary: Vérifier le statut d'une transaction de paiement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détails et statut de la transaction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PaymentTransaction"
+
+  /payments/order/{orderId}:
+    get:
+      tags: [Paiements (Mobile Money)]
+      summary: Obtenir les transactions liées à une commande
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transactions de la commande
+
+  /payments/webhooks/{provider}:
+    post:
+      tags: [Paiements (Mobile Money)]
+      summary: Webhook de rappel opérateur (MVola, Orange Money, Airtel Money)
+      security: []
+      description: Reçoit la notification instantanée de paiement signée avec HMAC-SHA256.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [MVOLA, ORANGE_MONEY, AIRTEL_MONEY]
+        - name: x-signature
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Signature HMAC de l'opérateur
+      responses:
+        "200":
+          description: Notification traitée avec succès
+
+  /payments/transactions/{id}/refund:
+    post:
+      tags: [Paiements (Mobile Money)]
+      summary: Rembourser une transaction (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  example: "Article non disponible, accord acheteur"
+      responses:
+        "200":
+          description: Remboursement effectué
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 15. Suivi de livraison (Delivery Tracking)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /delivery-tracking/order/{orderId}:
+    get:
+      tags: [Suivi de livraison]
+      summary: Obtenir le suivi d'expédition d'une commande
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Suivi et événements d'expédition
+
+  /delivery-tracking/{trackingNumber}:
+    get:
+      tags: [Suivi de livraison]
+      summary: Suivre un colis via son numéro de tracking public (ex LV-MG-2026-XXXX)
+      security: []
+      parameters:
+        - name: trackingNumber
+          in: path
+          required: true
+          schema:
+            type: string
+          example: LV-MG-2026-98124
+      responses:
+        "200":
+          description: Historique de livraison du colis
+
+  /delivery-tracking/{id}/events:
+    post:
+      tags: [Suivi de livraison]
+      summary: Ajouter une étape ou un événement d'expédition (Livreur / Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, description]
+              properties:
+                status:
+                  type: string
+                  example: IN_TRANSIT
+                description:
+                  type: string
+                  example: "Colis pris en charge à l'agence Antananarivo Analakely"
+                location:
+                  type: string
+                  example: "Antananarivo"
+      responses:
+        "201":
+          description: Événement ajouté
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 16. Points Relais (Pickup Points)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /pickup-points:
+    get:
+      tags: [Points Relais]
+      summary: Lister les points de collecte et relais à Madagascar
+      security: []
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+          example: Antananarivo
+      responses:
+        "200":
+          description: Liste des points relais disponibles
+    post:
+      tags: [Points Relais]
+      summary: Ajouter un nouveau point relais (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PickupPointInput"
+      responses:
+        "201":
+          description: Point relais créé
+
+  /pickup-points/{id}:
+    get:
+      tags: [Points Relais]
+      summary: Détails d'un point relais
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Point relais trouvé
+    patch:
+      tags: [Points Relais]
+      summary: Modifier un point relais (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Point relais mis à jour
+    delete:
+      tags: [Points Relais]
+      summary: Supprimer un point relais (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Point relais supprimé
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 17. Zones de livraison (Shipping Zones)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /shipping-zones:
+    get:
+      tags: [Zones de livraison]
+      summary: Lister les zones et tarifs de livraison
+      security: []
+      responses:
+        "200":
+          description: Liste des zones
+    post:
+      tags: [Zones de livraison]
+      summary: Créer une zone tarifaire de livraison (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, baseFee, estimatedDays]
+              properties:
+                name:
+                  type: string
+                  example: Antananarivo Intra-Muros
+                baseFee:
+                  type: integer
+                  example: 5000
+                estimatedDays:
+                  type: integer
+                  example: 1
+      responses:
+        "201":
+          description: Zone créée
+
+  /shipping-zones/calculate:
+    post:
+      tags: [Zones de livraison]
+      summary: Calculer le coût de livraison pour une destination donnée
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [destinationCity]
+              properties:
+                destinationCity:
+                  type: string
+                  example: Tamatave
+                orderTotal:
+                  type: integer
+                  example: 150000
+      responses:
+        "200":
+          description: Devis de transport calculé
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 18. Cartes & Lieux (Places Service)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /places/search:
+    get:
+      tags: [Cartes & Lieux]
+      summary: Recherche de lieux et adresses à Madagascar (SerpApi & OpenStreetMap)
+      security: []
+      description: |
+        Permet de géocoder et trouver des adresses à Madagascar sans clé obligatoire.
+        Interroge SerpApi si configuré, bascule automatiquement sur OpenStreetMap (Nominatim),
+        avec repli de secours instantané.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Analakely Antananarivo
+        - name: location
+          in: query
+          schema:
+            type: string
+            default: Madagascar
+      responses:
+        "200":
+          description: Résultats de recherche géographique
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PlaceResult"
+
+  /places/status:
+    get:
+      tags: [Cartes & Lieux]
+      summary: Fournisseur actif de cartographie (SerpApi / OpenStreetMap)
+      security: []
+      responses:
+        "200":
+          description: État et configuration des cartes
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 19. Retours & Réclamations (Feedback)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /feedback:
+    get:
+      tags: [Retours & Réclamations]
+      summary: Lister les retours et réclamations (Admin)
+      responses:
+        "200":
+          description: Liste des retours
+    post:
+      tags: [Retours & Réclamations]
+      summary: Soumettre un ticket de réclamation ou un retour produit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, subject, message]
+              properties:
+                type:
+                  type: string
+                  enum: [BUG, COMPLAINT, SUGGESTION, RETURN_REQUEST]
+                orderId:
+                  type: string
+                  nullable: true
+                subject:
+                  type: string
+                  example: "Demande d'échange de taille"
+                message:
+                  type: string
+      responses:
+        "201":
+          description: Ticket enregistré
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 20. Notifications
+  # ═══════════════════════════════════════════════════════════════════════════
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Obtenir les notifications de l'utilisateur
+      responses:
+        "200":
+          description: Flux des notifications
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Nombre de notifications non lues
+      responses:
+        "200":
+          description: Compteur
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Marquer une notification comme lue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Notification marquée comme lue
+
+  /notifications/mark-all-read:
+    patch:
+      tags: [Notifications]
+      summary: Marquer toutes les notifications comme lues
+      responses:
+        "200":
+          description: Toutes les notifications marquées comme lues
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 21. Messagerie
+  # ═══════════════════════════════════════════════════════════════════════════
+  /messages/conversations:
+    get:
+      tags: [Messagerie]
+      summary: Lister les conversations privées
+      responses:
+        "200":
+          description: Liste des conversations
+    post:
+      tags: [Messagerie]
+      summary: Démarrer une conversation avec un vendeur ou un acheteur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipientId, initialMessage]
+              properties:
+                recipientId:
+                  type: string
+                initialMessage:
+                  type: string
+      responses:
+        "201":
+          description: Conversation initialisée
+
+  /messages/conversations/{id}/messages:
+    get:
+      tags: [Messagerie]
+      summary: Messages d'une conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste des messages
+    post:
+      tags: [Messagerie]
+      summary: Envoyer un message dans la conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        "201":
+          description: Message envoyé
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 22. Newsletter
+  # ═══════════════════════════════════════════════════════════════════════════
+  /newsletter/subscribe:
+    post:
+      tags: [Newsletter]
+      summary: S'abonner aux lettres d'information Lurevia
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: client@lurevia.mg
+      responses:
+        "200":
+          description: Inscription confirmée
+
+  /newsletter/unsubscribe:
+    post:
+      tags: [Newsletter]
+      summary: Se désabonner de la newsletter
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Désabonnement effectué
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 23. Espace Vendeur
+  # ═══════════════════════════════════════════════════════════════════════════
+  /seller/dashboard:
+    get:
+      tags: [Espace Vendeur]
+      summary: Métriques et indicateurs de performance de la boutique
+      responses:
+        "200":
+          description: Chiffre d'affaires, commandes en attente, articles populaires
+
+  /seller/products:
+    get:
+      tags: [Espace Vendeur]
+      summary: Gestion des stocks et produits du vendeur
+      responses:
+        "200":
+          description: Produits de la boutique
+
+  /seller/orders:
+    get:
+      tags: [Espace Vendeur]
+      summary: Commandes passées auprès de la boutique
+      responses:
+        "200":
+          description: Commandes à préparer et expédier
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 24. Contrats Vendeurs
+  # ═══════════════════════════════════════════════════════════════════════════
+  /seller-contracts:
+    get:
+      tags: [Contrats Vendeurs]
+      summary: Obtenir les contrats de partenariat vendeur
+      responses:
+        "200":
+          description: Liste des contrats
+    post:
+      tags: [Contrats Vendeurs]
+      summary: Générer un contrat vendeur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [commissionRate]
+              properties:
+                commissionRate:
+                  type: number
+                  example: 0.12
+      responses:
+        "201":
+          description: Contrat généré
+
+  /seller-contracts/{id}/sign:
+    post:
+      tags: [Contrats Vendeurs]
+      summary: Signer électroniquement un contrat vendeur
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signatureText]
+              properties:
+                signatureText:
+                  type: string
+                  example: "Lu et approuvé - Artisan Rakoto"
+      responses:
+        "200":
+          description: Contrat signé avec succès
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 25. Règlements & Virements
+  # ═══════════════════════════════════════════════════════════════════════════
+  /settlements:
+    get:
+      tags: [Règlements & Virements]
+      summary: Historique des règlements financiers des ventes
+      responses:
+        "200":
+          description: Liste des règlements
+
+  /settlements/generate:
+    post:
+      tags: [Règlements & Virements]
+      summary: Calculer et générer les règlements de la période (Admin)
+      responses:
+        "201":
+          description: Règlements générés
+
+  /transfers:
+    get:
+      tags: [Règlements & Virements]
+      summary: Historique des transferts d'argent vers les artisans
+      responses:
+        "200":
+          description: Liste des virements
+    post:
+      tags: [Règlements & Virements]
+      summary: Émettre un virement bancaire ou Mobile Money (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sellerId, amount, method, destinationAccount]
+              properties:
+                sellerId:
+                  type: string
+                amount:
+                  type: integer
+                  example: 450000
+                method:
+                  type: string
+                  enum: [MVOLA, ORANGE_MONEY, AIRTEL_MONEY, BANK_TRANSFER]
+                destinationAccount:
+                  type: string
+                  example: "0341234567"
+      responses:
+        "201":
+          description: Transfert enregistré
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 26. Médias & Images
+  # ═══════════════════════════════════════════════════════════════════════════
+  /media/upload:
+    post:
+      tags: [Médias & Images]
+      summary: Téléverser une image (base64 ou multipart)
+      description: Permet d'héberger les photos de produits, avatars et pièces CIN.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file, filename]
+              properties:
+                file:
+                  type: string
+                  description: Fichier encodé en base64
+                filename:
+                  type: string
+                  example: photo-panier.jpg
+                folder:
+                  type: string
+                  default: products
+      responses:
+        "201":
+          description: Image téléversée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+                        example: "https://media.lurevia.mg/products/photo-panier.jpg"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 27. Administration
+  # ═══════════════════════════════════════════════════════════════════════════
+  /admin/dashboard:
+    get:
+      tags: [Administration]
+      summary: Tableau de bord global et statistiques clés de Lurevia (Admin)
+      responses:
+        "200":
+          description: Métriques de vente, utilisateurs, commandes et volume d'enchères
+
+  /admin/users:
+    get:
+      tags: [Administration]
+      summary: Liste complète des utilisateurs et filtrage des rôles (Admin)
+      responses:
+        "200":
+          description: Utilisateurs inscrits
+
+  /admin/users/{id}/role:
+    patch:
+      tags: [Administration]
+      summary: Modifier le rôle d'un utilisateur (BUYER, SELLER, ADMIN)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [BUYER, SELLER, ADMIN, SUPER_ADMIN]
+      responses:
+        "200":
+          description: Rôle modifié
+
+  /admin/sellers:
+    get:
+      tags: [Administration]
+      summary: Liste des vendeurs et statut de vérification (Admin)
+      responses:
+        "200":
+          description: Vendeurs partenaires
+
+  /admin/sellers/{id}/status:
+    patch:
+      tags: [Administration]
+      summary: Approuver, suspendre ou réactiver une boutique vendeuse (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PENDING, ACTIVE, SUSPENDED]
+      responses:
+        "200":
+          description: Statut vendeur mis à jour
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 28. Paramètres de plateforme
+  # ═══════════════════════════════════════════════════════════════════════════
+  /settings:
+    get:
+      tags: [Paramètres]
+      summary: Obtenir les paramètres globaux (frais de port par défaut, seuil franco)
+      security: []
+      responses:
+        "200":
+          description: Paramètres système
+    put:
+      tags: [Paramètres]
+      summary: Mettre à jour les paramètres globaux (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                defaultShippingCost:
+                  type: integer
+                  example: 8000
+                freeShippingThreshold:
+                  type: integer
+                  example: 250000
+      responses:
+        "200":
+          description: Paramètres enregistrés
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 29. Export Excel
+  # ═══════════════════════════════════════════════════════════════════════════
+  /export/orders:
+    get:
+      tags: [Export Excel]
+      summary: Exporter toutes les commandes au format Excel .xlsx (Admin / Vendeur)
+      responses:
+        "200":
+          description: Fichier Excel téléchargé
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  /export/profile:
+    get:
+      tags: [Export Excel]
+      summary: Exporter ses données personnelles au format Excel (RGPD)
+      responses:
+        "200":
+          description: Fichier Excel des données de compte
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  /export/activity:
+    get:
+      tags: [Export Excel]
+      summary: Exporter l'historique d'activité de la boutique (Vendeur)
+      responses:
+        "200":
+          description: Fichier Excel d'activité
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+# ═════════════════════════════════════════════════════════════════════════════
+# COMPOSANTS & SCHÉMAS DE DONNÉES
+# ═════════════════════════════════════════════════════════════════════════════
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Insérer le jeton JWT d'accès reçu après connexion (`/auth/login`).
+        Exemple : `Bearer eyJhbGciOi...`
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: refreshToken
+      description: Cookie HttpOnly contenant le refresh token.
+
+  responses:
+    UnauthorizedError:
+      description: Non authentifié ou jeton JWT invalide / expiré
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ForbiddenError:
+      description: Accès refusé - permissions insuffisantes
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFoundError:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: UNAUTHORIZED
+            message:
+              type: string
+              example: Jeton d'accès invalide ou expiré.
+            statusCode:
+              type: integer
+              example: 401
+
+    SuccessMessage:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Opération effectuée avec succès
+
+    AuthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+            tokens:
+              $ref: "#/components/schemas/TokensResponse"
+
+    TokensResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expiresIn:
+          type: string
+          example: 15m
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: usr_clz9823abc
+        email:
+          type: string
+          format: email
+          example: client@lurevia.mg
+        fullName:
+          type: string
+          example: Faly Rakotondrabe
+        phone:
+          type: string
+          nullable: true
+          example: "0341234567"
+        avatarUrl:
+          type: string
+          nullable: true
+          format: uri
+        role:
+          type: string
+          enum: [BUYER, SELLER, ADMIN, SUPER_ADMIN]
+          example: BUYER
+        isVerified:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+
+    UserProfile:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            bio:
+              type: string
+              nullable: true
+            city:
+              type: string
+              nullable: true
+              example: Antananarivo
+            province:
+              type: string
+              nullable: true
+              example: Analamanga
+
+    PublicUser:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        role:
+          type: string
+        bio:
+          type: string
+          nullable: true
+
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        phone:
+          type: string
+        addressLine1:
+          type: string
+        addressLine2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        region:
+          type: string
+        postalCode:
+          type: string
+          nullable: true
+        isDefault:
+          type: boolean
+
+    AddressInput:
+      type: object
+      required: [fullName, phone, addressLine1, city, region]
+      properties:
+        fullName:
+          type: string
+          example: Faly Rakotondrabe
+        phone:
+          type: string
+          example: "0341234567"
+        addressLine1:
+          type: string
+          example: Lot IVC 42bis Antanimena
+        addressLine2:
+          type: string
+          nullable: true
+        city:
+          type: string
+          example: Antananarivo
+        region:
+          type: string
+          example: Analamanga
+        postalCode:
+          type: string
+          example: "101"
+        isDefault:
+          type: boolean
+          default: false
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        parentId:
+          type: string
+          nullable: true
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          example: prd_clz9823abc
+        title:
+          type: string
+          example: "Panier artisanal en raphia tressé à la main"
+        slug:
+          type: string
+          example: panier-artisanal-en-raphia-tresse
+        description:
+          type: string
+          example: "Fabriqué traditionnellement par nos artisans vanniers d'Antsirabe."
+        price:
+          type: integer
+          description: Prix en Ariary (MGA)
+          example: 45000
+        compareAtPrice:
+          type: integer
+          nullable: true
+          example: 55000
+        stock:
+          type: integer
+          example: 15
+        isHandmade:
+          type: boolean
+          example: true
+        originRegion:
+          type: string
+          example: Vakinankaratra
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        category:
+          $ref: "#/components/schemas/Category"
+        seller:
+          $ref: "#/components/schemas/PublicUser"
+        ratingAvg:
+          type: number
+          example: 4.8
+        ratingCount:
+          type: integer
+          example: 12
+
+    ProductInput:
+      type: object
+      required: [title, description, price, stock, categoryId]
+      properties:
+        title:
+          type: string
+          example: "Sac rond en raphia et cuir d'artisan"
+        description:
+          type: string
+          example: "Tressé avec du raphia 100% naturel de Madagascar, anses en cuir véritable."
+        price:
+          type: integer
+          example: 65000
+        compareAtPrice:
+          type: integer
+          nullable: true
+        stock:
+          type: integer
+          example: 10
+        categoryId:
+          type: string
+        isHandmade:
+          type: boolean
+          default: true
+        originRegion:
+          type: string
+          example: Analamanga
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+
+    PaginatedProducts:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        meta:
+          type: object
+          properties:
+            page:
+              type: integer
+              example: 1
+            limit:
+              type: integer
+              example: 20
+            total:
+              type: integer
+              example: 145
+            totalPages:
+              type: integer
+              example: 8
+
+    Auction:
+      type: object
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        product:
+          $ref: "#/components/schemas/Product"
+        startPrice:
+          type: integer
+          example: 50000
+        currentPrice:
+          type: integer
+          example: 95000
+        reservePrice:
+          type: integer
+          nullable: true
+        minIncrement:
+          type: integer
+          example: 5000
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [PENDING, ACTIVE, ENDED, CANCELLED]
+          example: ACTIVE
+        bidsCount:
+          type: integer
+          example: 8
+        watchersCount:
+          type: integer
+          example: 24
+
+    Bid:
+      type: object
+      properties:
+        id:
+          type: string
+        auctionId:
+          type: string
+        bidderId:
+          type: string
+        amount:
+          type: integer
+          example: 100000
+        createdAt:
+          type: string
+          format: date-time
+        bidder:
+          type: object
+          properties:
+            fullName:
+              type: string
+            avatarUrl:
+              type: string
+              nullable: true
+
+    CartResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  productId:
+                    type: string
+                  quantity:
+                    type: integer
+                  product:
+                    $ref: "#/components/schemas/Product"
+            subtotal:
+              type: integer
+              example: 110000
+            shippingCost:
+              type: integer
+              example: 8000
+            total:
+              type: integer
+              example: 118000
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          example: ord_clz9823abc
+        orderNumber:
+          type: string
+          example: LV-2026-0042
+        status:
+          type: string
+          enum: [PENDING, PAID, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+          example: PAID
+        totalAmount:
+          type: integer
+          example: 118000
+        subtotalAmount:
+          type: integer
+          example: 110000
+        shippingAmount:
+          type: integer
+          example: 8000
+        shippingAddress:
+          $ref: "#/components/schemas/Address"
+        paymentProvider:
+          type: string
+          enum: [MVOLA, ORANGE_MONEY, AIRTEL_MONEY]
+          nullable: true
+          example: MVOLA
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              productId:
+                type: string
+              title:
+                type: string
+              quantity:
+                type: integer
+              unitPrice:
+                type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateOrderInput:
+      type: object
+      required: [addressId]
+      properties:
+        addressId:
+          type: string
+        pickupPointId:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    PaymentTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          example: tx_clz9823abc
+        orderId:
+          type: string
+        provider:
+          type: string
+          enum: [MVOLA, ORANGE_MONEY, AIRTEL_MONEY]
+          example: MVOLA
+        phoneNumber:
+          type: string
+          example: "0341234567"
+        amount:
+          type: integer
+          example: 118000
+        currency:
+          type: string
+          example: MGA
+        status:
+          type: string
+          enum: [INITIATED, SUCCESS, FAILED, REFUNDED]
+          example: SUCCESS
+        externalTransactionId:
+          type: string
+          nullable: true
+          example: "MV-98213-TX"
+        createdAt:
+          type: string
+          format: date-time
+
+    PickupPoint:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: "Relais Express Analakely"
+        address:
+          type: string
+          example: "Avenue de l'Indépendance, Antananarivo"
+        city:
+          type: string
+          example: Antananarivo
+        phone:
+          type: string
+          example: "0340011223"
+        openingHours:
+          type: string
+          example: "Lun-Sam: 08h00 - 18h00"
+
+    PickupPointInput:
+      type: object
+      required: [name, address, city, phone]
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        phone:
+          type: string
+        openingHours:
+          type: string
+
+    PlaceResult:
+      type: object
+      properties:
+        title:
+          type: string
+          example: "Analakely, Antananarivo"
+        address:
+          type: string
+          example: "Analakely, Antananarivo, Analamanga, Madagascar"
+        latitude:
+          type: number
+          example: -18.9083
+        longitude:
+          type: number
+          example: 47.5244
+        phone:
+          type: string
+          nullable: true
+        provider:
+          type: string
+          enum: [serpapi, openstreetmap, fallback]
+          example: openstreetmap

@@ -1,0 +1,1331 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// LUREVIA — SCHÉMA PRISMA FINAL
+// Marché malgache : enchères live, GPS, COD, 24 régions, CIN + tuteur
+// ═══════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── Identité & Auth ───
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Role {
+  SELLER
+  CUSTOMER
+  ADMIN
+}
+
+enum AuthIdentifier {
+  EMAIL
+  PHONE
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  FACEBOOK
+}
+
+enum IdentityDocumentType {
+  CIN
+  PASSPORT
+  DRIVER_LICENSE
+  RESIDENCE_PERMIT
+}
+
+enum GuardianRelation {
+  FATHER
+  MOTHER
+  TUTOR
+  LEGAL_GUARDIAN
+  OTHER
+}
+
+// ─── Catalogue ───
+enum ProductPricingMode {
+  FIXED // Prix fixe
+  NEGOTIABLE // Négociable (offre libre, sans date de fin)
+  AUCTION // Enchère live (date de fin, meilleure offre gagne)
+  ON_REQUEST // Prix sur demande
+}
+
+enum BidStatus {
+  PENDING // En attente
+  ACCEPTED // Acceptée (NEGOTIABLE)
+  REJECTED // Refusée
+  OUTBID // Dépassée (AUCTION)
+  WINNING // Meilleure offre actuelle (AUCTION)
+  WON // Gagnante (enchère terminée)
+  CANCELLED // Annulée par le client
+}
+
+enum AuctionStatus {
+  SCHEDULED // Programmée (pas encore commencée)
+  ACTIVE // En cours
+  ENDED // Terminée
+  CANCELLED // Annulée par le vendeur
+  SOLD // Vendue (gagnant désigné)
+  UNSOLD // Non vendue (prix de réserve non atteint)
+}
+
+enum AuctionMessageType {
+  CHAT // Message de chat normal
+  BID // Notification d'offre
+  SYSTEM // Message système ("enchère commencée", "5 min restantes")
+  MODERATION // Message de modération admin
+}
+
+// ─── Commandes & Paiements ───
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  COD_PENDING
+  COD_FAILED
+  REFUNDED
+  PAYMENT_FAILED
+}
+
+enum PaymentMethod {
+  MOBILE_MONEY
+  CARD
+  COD
+  BANK_TRANSFERT
+}
+
+enum MobileMoneyProvider {
+  MVOLA
+  ORANGE_MONEY
+  AIRTEL_MONEY
+}
+
+enum TransactionStatus {
+  INITIATED
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum DeliveryMode {
+  HOME_DELIVERY
+  PICKUP_POINT
+}
+
+// ─── Logistique ───
+enum ProvinceMadagascar {
+  ANTANANARIVO
+  ANTSIRANANA
+  MAHAJANGA
+  TOAMASINA
+  FIANARANTSOA
+  TOLIARA
+}
+
+// 24 régions officielles de Madagascar (depuis 2023)
+enum RegionMadagascar {
+  DIANA
+  SAVA
+
+  ITASY
+  ANALAMANGA
+  VAKINANKARATRA
+  BONGOLAVA
+
+  SOFIA
+  BOENY
+  BETSIBOKA
+  MELAKY
+
+  ALAOTRA_MANGORO
+  ATSINANANA
+  ANALANJIROFO
+  AMBATOSOA
+
+  AMORON_I_MANIA
+  HAUTE_MATSIATRA
+  VATOVAVY
+  FITOVINANY
+  ATSIMO_ATSINANANA
+  IHOROMBE
+
+  MENABE
+  ATSIMO_ANDREFANA
+  ANDROY
+  ANOSY
+}
+
+// ─── Avis & Feedback ───
+enum FeedbackCategory {
+  DELIVERY
+  PAYMENT
+  SUPPORT
+  WEBSITE
+  OTHER
+}
+
+// ─── Notifications ───
+enum NotificationType {
+  REVIEW_PENDING
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  PROMO
+  ACCOUNT_VERIFICATION
+  IDENTITY_VERIFIED
+  GUARDIAN_CONSENT_NEEDED
+  AUCTION_STARTED
+  AUCTION_OUTBID
+  AUCTION_WON
+  AUCTION_LOST
+  AUCTION_ENDING_SOON
+}
+
+enum AdminNotificationType {
+  NEW_ORDER
+  NEW_REVIEW
+  NEW_FEEDBACK
+  DELETION_REQUEST
+  LOW_STOCK
+  PROFILE_CHANGE_REQUEST
+  NEW_SELLER_KYC
+  CIN_VERIFICATION_REQUEST
+  GUARDIAN_CIN_VERIFICATION_REQUEST
+  AUCTION_DISPUTE
+  AUCTION_REPORT
+}
+
+enum MessageType {
+  ADMIN_MESSAGE
+  ORDER_UPDATE
+  PROMO
+  SYSTEM
+}
+
+// ─── Vérification / Demandes ───
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  USED
+  EXPIRED
+}
+
+enum IdentityVerificationStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum DeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProfileChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─── Business vendeur ───
+enum SellerContractType {
+  PERCENTAGE
+  MONTHLY_FIXED
+}
+
+enum SellerContractStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SettlementStatus {
+  PENDING_REVIEW
+  READY
+  TRANSFER_PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum TransferStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ─── Média ───
+enum MediaArchiveStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  NOT_CONFIGURED
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODÈLES
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── 1. IDENTITÉ & AUTH ───
+
+model User {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullName  String
+  email     String  @unique
+  phone     String? @unique
+  avatarUrl String?
+  age       Int?
+  gender    Gender?
+
+  // Auth
+  passwordHash      String?
+  passwordChangedAt DateTime?
+  primaryIdentifier AuthIdentifier @default(EMAIL)
+  primaryProvider   AuthProvider   @default(LOCAL)
+
+  // Vérification
+  emailVerified Boolean @default(false)
+  phoneVerified Boolean @default(false)
+  isVerified    Boolean @default(false)
+
+  // CIN personnel
+  cinNumber                  String?                    @unique
+  cinVerifiedAt              DateTime?
+  identityDocumentType       IdentityDocumentType?
+  identityDocumentNumber     String?                    @unique
+  identityDocumentUrl        String?                    @db.Text
+  identityVerifiedAt         DateTime?
+  identityVerificationStatus IdentityVerificationStatus @default(NOT_SUBMITTED)
+  identityRejectionReason    String?
+
+  // CIN du tuteur (mineurs ou sans CIN)
+  isMinor                Boolean           @default(false)
+  guardianFullName       String?
+  guardianCinNumber      String?
+  guardianPhone          String?
+  guardianEmail          String?
+  guardianRelation       GuardianRelation?
+  guardianCinDocumentUrl String?           @db.Text
+  guardianCinVerifiedAt  DateTime?
+  guardianConsentGivenAt DateTime?
+  guardianConsentIp      String?
+
+  role        Role      @default(CUSTOMER)
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Relations Auth
+  oauthAccounts         OAuthAccount[]
+  passwordResets        PasswordResetToken[]
+  refreshTokens         RefreshToken[]
+  verificationRequests  VerificationRequest[]
+  deletionRequests      AccountDeletionRequest[]
+  profileChangeRequests ProfileChangeRequest[]
+
+  // Relations client
+  addresses        Address[]
+  cartItems        CartItem[]
+  favorites        FavoriteItem[]
+  orders           Order[]
+  reviews          ProductReview[]
+  serviceFeedbacks ServiceFeedback[]
+  notifications    Notification[]
+  messagesReceived UserMessage[]     @relation("MessageRecipient")
+  messagesSent     UserMessage[]     @relation("MessageSender")
+  auditLogs        AuditLog[]        @relation("AuditActor")
+
+  // Relations vendeur
+  bids            ProductBid[]
+  ownedProducts   Product[]          @relation("ProductOwner")
+  sellerContracts SellerContract[]
+  settlements     SellerSettlement[]
+  transfers       TransferLedger[]
+  mediaAssets     MediaAsset[]
+
+  // Relations livreur
+  deliveries DeliveryTracking[] @relation("DeliveryCourier")
+
+  // ✅ Relations enchères
+  auctionProductsWon   Product[]              @relation("AuctionWinner")
+  auctionMessages      AuctionMessage[]
+  auctionWatchers      AuctionWatcher[]
+  IdentityVerification IdentityVerification[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([cinNumber])
+  @@index([guardianCinNumber])
+  @@index([identityVerificationStatus])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model IdentityVerification {
+  id     String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String                     @db.Uuid
+  user   User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status IdentityVerificationStatus @default(PENDING)
+
+  documentType    IdentityDocumentType?
+  documentNumber  String?
+  documentUrl     String?               @db.Text
+  documentUrlBack String?               @db.Text
+  selfieUrl       String?               @db.Text
+  cinNumber       String?
+
+  isGuardianVerification  Boolean           @default(false)
+  guardianFullName        String?
+  guardianCinNumber       String?
+  guardianRelation        GuardianRelation?
+  guardianCinDocumentUrl  String?           @db.Text
+  guardianPhone           String?
+  guardianConsentProofUrl String?           @db.Text
+
+  submittedAt     DateTime  @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?   @db.Uuid
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([guardianCinNumber])
+  @@map("identity_verifications")
+}
+
+model OAuthAccount {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String       @db.Uuid
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       AuthProvider
+  providerUserId String
+  providerEmail  String?
+  providerName   String?
+  avatarUrl      String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String         @db.Uuid
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String         @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?        @db.Uuid
+  replacedBy   RefreshToken?  @relation("TokenRotation", fields: [replacedById], references: [id])
+  replaces     RefreshToken[] @relation("TokenRotation")
+  createdByIp  String?
+  userAgent    String?
+  createdAt    DateTime       @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdByIp String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model VerificationRequest {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String             @db.Uuid
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        VerificationStatus @default(PENDING)
+  codeHash      String?
+  expiresAt     DateTime?
+  approvedAt    DateTime?
+  approvedBy    String?
+  usedAt        DateTime?
+  reason        String?
+  attempts      Int                @default(0)
+  maxAttempts   Int                @default(5)
+  lastAttemptAt DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("verification_requests")
+}
+
+model AccountDeletionRequest {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String                @db.Uuid
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason      String?
+  status      DeletionRequestStatus @default(PENDING)
+  adminNote   String?
+  createdAt   DateTime              @default(now())
+  processedAt DateTime?
+
+  @@index([status])
+  @@index([userId])
+  @@map("account_deletion_requests")
+}
+
+model ProfileChangeRequest {
+  id                String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String                     @db.Uuid
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestedFullName String?
+  requestedEmail    String?
+  requestedPhone    String?
+  status            ProfileChangeRequestStatus @default(PENDING)
+  adminNote         String?
+  reviewedBy        String?
+  createdAt         DateTime                   @default(now())
+  reviewedAt        DateTime?
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("profile_change_requests")
+}
+
+// ─── 2. ADRESSES & LOGISTIQUE ───
+
+model Address {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String             @db.Uuid
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label        String
+  fullName     String
+  phone        String
+  email        String?
+  province     ProvinceMadagascar
+  region       RegionMadagascar
+  city         String
+  neighborhood String?
+  address      String
+  latitude     Float?
+  longitude    Float?
+  notes        String?
+  isDefault    Boolean            @default(false)
+
+  pickupPointId String?      @db.Uuid
+  pickupPoint   PickupPoint? @relation(fields: [pickupPointId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([province, region])
+  @@map("addresses")
+}
+
+model PickupPoint {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  provider       String
+  phone          String?
+  email          String?
+  province       ProvinceMadagascar
+  region         RegionMadagascar
+  city           String
+  address        String
+  latitude       Float?
+  longitude      Float?
+  shippingZoneId String?            @db.Uuid
+  shippingZone   ShippingZone?      @relation(fields: [shippingZoneId], references: [id], onDelete: SetNull)
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  addresses Address[]
+  orders    Order[]
+
+  @@index([province, region])
+  @@index([provider])
+  @@index([isActive])
+  @@map("pickup_points")
+}
+
+model ShippingZone {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String              @unique
+  province      ProvinceMadagascar?
+  regions       RegionMadagascar[]
+  basePrice     Int
+  pricePerKg    Int?
+  estimatedDays Int?
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  orders       Order[]
+  pickupPoints PickupPoint[]
+
+  @@index([province])
+  @@map("shipping_zones")
+}
+
+model DeliveryTracking {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String  @db.Uuid
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courierId String? @db.Uuid
+  courier   User?   @relation("DeliveryCourier", fields: [courierId], references: [id], onDelete: SetNull)
+
+  latitude   Float
+  longitude  Float
+  accuracy   Float?
+  speed      Float?
+  heading    Float?
+  recordedAt DateTime @default(now())
+
+  @@index([orderId, recordedAt])
+  @@index([courierId, recordedAt])
+  @@map("delivery_tracking")
+}
+
+// ─── 3. CATALOGUE (avec enchères) ───
+
+model Category {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  slug        String   @unique
+  description String
+  imageUrl    String
+  bannerUrl   String
+  iconName    String   @default("ShoppingBag")
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products ProductCategory[]
+
+  @@map("categories")
+}
+
+model Product {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String? @db.Uuid
+  owner           User?   @relation("ProductOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  title           String
+  slug            String  @unique
+  sku             String  @unique
+  description     String?
+  longDescription String?
+
+  // Mode de vente
+  pricingMode ProductPricingMode @default(FIXED)
+
+  // Prix fixe / négociable
+  price         Int?
+  originalPrice Int?
+  minPrice      Int?
+  maxPrice      Int?
+
+  // ✅ Enchère
+  auctionStartPrice   Int? // Prix de départ
+  auctionReservePrice Int? // Prix de réserve (secret)
+  auctionCurrentPrice Int? // Meilleure offre actuelle (dénormalisé pour perf)
+  auctionStartAt      DateTime? // Début prévu
+  auctionEndAt        DateTime? // Fin prévue
+  auctionStatus       AuctionStatus? @default(ACTIVE)
+  auctionWinnerId     String?        @db.Uuid
+  auctionWinner       User?          @relation("AuctionWinner", fields: [auctionWinnerId], references: [id], onDelete: SetNull)
+  auctionFinalPrice   Int? // Prix final après clôture
+  auctionBidCount     Int            @default(0) // Nombre d'offres (dénormalisé)
+  auctionWatcherCount Int            @default(0) // Nombre de spectateurs (dénormalisé)
+
+  // Stock
+  stock             Int     @default(0)
+  lowStockThreshold Int     @default(5)
+  isActive          Boolean @default(true)
+  isNew             Boolean @default(false)
+
+  tags             String[] @default([])
+  ratingCache      Float    @default(0)
+  reviewCountCache Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images     ProductImage[]
+  colors     ProductColor[]
+  sizes      ProductSize[]
+  categories ProductCategory[]
+  cartItems  CartItem[]
+  favorites  FavoriteItem[]
+  orderItems OrderItem[]
+  reviews    ProductReview[]
+  bids       ProductBid[]
+  feedbacks  ServiceFeedback[] @relation("FeedbackProduct")
+
+  // Relations enchères
+  auctionMessages AuctionMessage[]
+  auctionWatchers AuctionWatcher[]
+
+  @@index([price])
+  @@index([createdAt])
+  @@index([stock])
+  @@index([isActive])
+  @@index([ownerId])
+  @@index([pricingMode, auctionStatus])
+  @@index([auctionEndAt])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int     @default(0)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model ProductColor {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String
+  hex       String
+
+  cartItems CartItem[]
+
+  @@index([productId])
+  @@map("product_colors")
+}
+
+model ProductSize {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  value     String  @db.VarChar(60)
+
+  cartItems CartItem[]
+
+  @@unique([productId, value])
+  @@map("product_sizes")
+}
+
+model ProductCategory {
+  productId  String   @db.Uuid
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  categoryId String   @db.Uuid
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+  @@map("product_categories")
+}
+
+model ProductBid {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String  @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  proposedPrice Int
+  comment       String?
+  status        BidStatus @default(PENDING)
+
+  // Enchères automatiques
+  isAutoBid    Boolean @default(false)
+  autoBidMax   Int?
+  isWinningBid Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, proposedPrice(sort: Desc)])
+  @@index([userId])
+  @@index([productId, status])
+  @@index([productId, isWinningBid])
+  @@map("product_bids")
+}
+
+// Chat live pendant les enchères
+model AuctionMessage {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String? @db.Uuid
+  user      User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  type     AuctionMessageType @default(CHAT)
+  content  String             @db.Text
+  metadata Json? // Pour BID: { amount: 5000 }, pour SYSTEM: { event: "..." }
+
+  isDeleted Boolean   @default(false)
+  deletedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@index([productId, type])
+  @@index([userId])
+  @@map("auction_messages")
+}
+
+// Suivi des spectateurs d'une enchère (pour "X personnes regardent")
+model AuctionWatcher {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String  @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt   DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  isActive   Boolean  @default(true)
+
+  @@unique([productId, userId])
+  @@index([productId, isActive])
+  @@index([lastSeenAt])
+  @@map("auction_watchers")
+}
+
+// ─── 4. PANIER & FAVORIS ───
+
+model CartItem {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String        @db.Uuid
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String        @db.Uuid
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  colorId   String?       @db.Uuid
+  color     ProductColor? @relation(fields: [colorId], references: [id], onDelete: SetNull)
+  sizeId    String?       @db.Uuid
+  size      ProductSize?  @relation(fields: [sizeId], references: [id], onDelete: SetNull)
+
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId, colorId, sizeId])
+  @@index([userId])
+  @@map("cart_items")
+}
+
+model FavoriteItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String   @db.Uuid
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("favorite_items")
+}
+
+// ─── 5. COMMANDES ───
+
+model Order {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNumber   String        @unique
+  userId        String        @db.Uuid
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod
+  currency      String        @default("MGA")
+
+  deliveryMode DeliveryMode
+
+  // Snapshot adresse
+  shippingFullName     String
+  shippingPhone        String
+  shippingEmail        String
+  shippingProvince     ProvinceMadagascar
+  shippingRegion       RegionMadagascar
+  shippingCity         String
+  shippingNeighborhood String?
+  shippingAddress      String
+  shippingNotes        String?
+
+  // GPS livraison
+  deliveryLatitude    Float?
+  deliveryLongitude   Float?
+  deliveryAccuracy    Float?
+  deliveryGpsSharedAt DateTime?
+
+  // Point relais
+  shippingZoneId        String?       @db.Uuid
+  shippingZone          ShippingZone? @relation(fields: [shippingZoneId], references: [id])
+  shippingPickupPointId String?       @db.Uuid
+  shippingPickupPoint   PickupPoint?  @relation(fields: [shippingPickupPointId], references: [id], onDelete: SetNull)
+
+  // Frais
+  subtotal     Int
+  shippingCost Int
+  total        Int
+
+  codAmountExpected Int?
+  codCollectedAt    DateTime?
+  codCollectedBy    String?
+
+  paidAt             DateTime?
+  shippedAt          DateTime?
+  deliveredAt        DateTime?
+  cancelledAt        DateTime?
+  refundedAt         DateTime?
+  reviewRequestedAt  DateTime?
+  stockReservedUntil DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items            OrderItem[]
+  transactions     Transaction[]
+  reviews          ProductReview[]
+  serviceFeedbacks ServiceFeedback[]
+  settlements      SellerSettlement[]
+  deliveryTracking DeliveryTracking[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([orderNumber])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId, status, createdAt(sort: Desc)])
+  @@index([deliveryMode, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String  @db.Uuid
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  titleSnapshot String
+  imageSnapshot String?
+  skuSnapshot   String
+  priceSnapshot Int
+  colorSnapshot String?
+  sizeSnapshot  String?
+  quantity      Int
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// ─── 6. PAIEMENTS ───
+
+model Transaction {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId String @db.Uuid
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  amount            Int
+  currency          String               @default("MGA")
+  method            PaymentMethod
+  provider          MobileMoneyProvider?
+  status            TransactionStatus
+  externalId        String?              @unique
+  externalRequestId String?
+  idempotencyKey    String               @unique
+  rawCallback       Json?
+  signatureVerified Boolean              @default(false)
+  failureReason     String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([orderId])
+  @@index([externalId])
+  @@index([status])
+  @@map("transactions")
+}
+
+model PaymentWebhook {
+  id           String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider     MobileMoneyProvider
+  externalId   String?
+  eventType    String
+  rawPayload   Json
+  signature    String?
+  verified     Boolean             @default(false)
+  processedAt  DateTime?
+  errorMessage String?
+  receivedAt   DateTime            @default(now())
+
+  @@index([provider, externalId])
+  @@index([processedAt])
+  @@map("payment_webhooks")
+}
+
+// ─── 7. AVIS & FEEDBACK ───
+
+model ProductReview {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String  @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId   String? @db.Uuid
+  order     Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  rating             Int
+  title              String?
+  comment            String
+  isVerifiedPurchase Boolean @default(false)
+
+  isApproved      Boolean   @default(false)
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectedBy      String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, userId])
+  @@index([productId, isApproved])
+  @@index([isApproved, createdAt])
+  @@map("product_reviews")
+}
+
+model ServiceFeedback {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId   String?  @db.Uuid
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  productId String?  @db.Uuid
+  product   Product? @relation("FeedbackProduct", fields: [productId], references: [id], onDelete: SetNull)
+
+  overallRating Int
+  criteria      Json?
+  category      FeedbackCategory
+  comment       String
+  teamResponse  String?
+
+  isApproved Boolean   @default(false)
+  approvedBy String?
+  approvedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isApproved, createdAt])
+  @@index([orderId])
+  @@index([productId])
+  @@map("service_feedbacks")
+}
+
+// ─── 8. NOTIFICATIONS & MESSAGES ───
+
+model Notification {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String           @db.Uuid
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         NotificationType
+  title        String
+  message      String
+  actionUrl    String
+  imageUrl     String?
+  referenceKey String
+  read         Boolean          @default(false)
+  readAt       DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@unique([userId, referenceKey])
+  @@index([userId, read, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model UserMessage {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientId String      @db.Uuid
+  recipient   User        @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  senderId    String?     @db.Uuid
+  sender      User?       @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  type        MessageType @default(ADMIN_MESSAGE)
+  subject     String
+  body        String
+  read        Boolean     @default(false)
+  readAt      DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@index([recipientId, createdAt])
+  @@index([senderId, createdAt])
+  @@map("user_messages")
+}
+
+model AdminNotification {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        AdminNotificationType
+  title       String
+  message     String
+  entityType  String
+  entityId    String
+  actorUserId String?
+  priority    Int                   @default(0)
+  read        Boolean               @default(false)
+  readAt      DateTime?
+  createdAt   DateTime              @default(now())
+
+  @@index([read, createdAt])
+  @@index([entityType, entityId])
+  @@map("admin_notifications")
+}
+
+model NewsletterSubscriber {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String    @unique
+  confirmationToken String?   @unique
+  confirmedAt       DateTime?
+  unsubscribedAt    DateTime?
+  unsubscribeReason String?
+  createdByIp       String?
+  subscribedAt      DateTime  @default(now())
+
+  @@index([confirmedAt])
+  @@map("newsletter_subscribers")
+}
+
+// ─── 9. BUSINESS VENDEUR ───
+
+model SellerContract {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sellerId        String               @db.Uuid
+  seller          User                 @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  version         Int
+  type            SellerContractType
+  value           Int
+  currency        String               @default("MGA")
+  status          SellerContractStatus @default(PENDING)
+  effectiveFrom   DateTime?
+  effectiveTo     DateTime?
+  rejectionReason String?
+  reviewedBy      String?              @db.Uuid
+  reviewedAt      DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  settlements SellerSettlement[]
+
+  @@unique([sellerId, version])
+  @@index([sellerId, status, effectiveFrom])
+  @@map("seller_contracts")
+}
+
+model SellerSettlement {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId          String           @db.Uuid
+  order            Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sellerId         String           @db.Uuid
+  seller           User             @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  contractId       String?          @db.Uuid
+  contract         SellerContract?  @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  contractVersion  Int?
+  grossAmount      Int
+  commissionAmount Int
+  netAmount        Int
+  status           SettlementStatus @default(PENDING_REVIEW)
+  reviewNote       String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  transfers TransferLedger[]
+
+  @@unique([orderId, sellerId])
+  @@index([sellerId, status, createdAt])
+  @@index([orderId])
+  @@map("seller_settlements")
+}
+
+model TransferLedger {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  settlementId      String           @db.Uuid
+  settlement        SellerSettlement @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  sellerId          String           @db.Uuid
+  seller            User             @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  amount            Int
+  currency          String           @default("MGA")
+  idempotencyKey    String           @unique
+  status            TransferStatus   @default(PENDING)
+  externalReference String?
+  failureReason     String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  completedAt       DateTime?
+
+  @@index([sellerId, status, createdAt])
+  @@index([settlementId])
+  @@map("transfer_ledger")
+}
+
+// ─── 10. ADMIN & AUDIT ───
+
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorUserId String?  @db.Uuid
+  actor       User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// ─── 11. MÉDIA ───
+
+model MediaAsset {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId             String             @db.Uuid
+  owner               User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sourceUrl           String             @db.Text
+  publicUrl           String             @db.Text
+  githubPath          String             @db.Text
+  contentType         String             @db.VarChar(100)
+  byteSize            Int
+  githubSha           String?            @db.VarChar(100)
+  googleArchiveStatus MediaArchiveStatus @default(NOT_CONFIGURED)
+  googleArchiveError  String?            @db.Text
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@index([googleArchiveStatus])
+  @@map("media_assets")
+}
+
+// ─── 12. CONFIGURATION PLATEFORME ───
+
+model PlatformSettings {
+  id String @id @default("singleton")
+
+  // Général
+  siteName        String @default("Lurevia")
+  siteTagline     String @default("Artisanat malgache authentique")
+  siteDescription String @default("Découvrez l'artisanat malgache fait main")
+  contactEmail    String @default("contact@lurevia.mg")
+  contactPhone    String @default("+261 34 12 345 67")
+  contactAddress  String @default("Antananarivo, Madagascar")
+  defaultCurrency String @default("MGA")
+
+  // Marque
+  logoUrl        String?
+  faviconUrl     String?
+  primaryColor   String  @default("#2F7BF6")
+  secondaryColor String  @default("#0A1B3D")
+  accentColor    String  @default("#E8A33D")
+
+  // Réseaux sociaux
+  facebookUrl    String?
+  instagramUrl   String?
+  tiktokUrl      String?
+  whatsappNumber String?
+  linkedinUrl    String?
+
+  // Légal
+  privacyPolicy           String  @default("") @db.Text
+  termsOfService          String  @default("") @db.Text
+  cookieMessage           String  @default("Nous utilisons des cookies pour améliorer votre expérience.") @db.Text
+  legalCompanyName        String  @default("Lurevia SARL")
+  legalRegistrationNumber String?
+
+  // Livraison
+  freeShippingThreshold Int     @default(250000)
+  defaultShippingCost   Int     @default(8000)
+  homeDeliveryEnabled   Boolean @default(true)
+  pickupPointEnabled    Boolean @default(true)
+
+  // Paiements
+  enableMVola         Boolean @default(true)
+  enableCOD           Boolean @default(true)
+  enableCard          Boolean @default(false)
+  enableBankTransfer  Boolean @default(false)
+  mvolaMerchantNumber String?
+  codMaxAmount        Int?
+
+  // KYC / CIN
+  requireCinForSellers   Boolean @default(true)
+  requireCinForCOD       Boolean @default(false)
+  cinVerificationEnabled Boolean @default(true)
+  allowMinorWithGuardian Boolean @default(true)
+  minorAgeThreshold      Int     @default(18)
+
+  // Enchères
+  auctionsEnabled          Boolean @default(true)
+  auctionMinIncrement      Int     @default(1000) // Incrément minimum en Ar
+  auctionAutoExtendMinutes Int     @default(2) // Anti-snipe : prolonge de X min si offre à la fin
+  auctionDefaultDurationH  Int     @default(24) // Durée par défaut en heures
+  auctionChatEnabled       Boolean @default(true)
+  auctionChatModeration    Boolean @default(true) // Filtre auto des messages
+
+  // Notifications
+  notifyOnNewOrder         Boolean @default(true)
+  notifyOnNewReview        Boolean @default(true)
+  notifyOnLowStock         Boolean @default(true)
+  lowStockThreshold        Int     @default(5)
+  sendOrderConfirmation    Boolean @default(true)
+  sendShippingNotification Boolean @default(true)
+
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+
+  // Maintenance
+  maintenanceMode    Boolean @default(false)
+  maintenanceMessage String  @default("") @db.Text
+
+  updatedAt DateTime @updatedAt
+  updatedBy String?  @db.Uuid
+}

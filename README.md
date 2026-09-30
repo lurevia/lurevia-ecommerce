@@ -1,0 +1,405 @@
+# Lurevia — API Backend
+
+Backend complet pour la boutique en ligne **Lurevia** (artisanat malgache), conçu pour remplacer le stockage `localStorage` du frontend par une vraie API REST sécurisée, scalable et prête pour la production.
+
+**Stack** : Node.js · Express · TypeScript · Prisma ORM · PostgreSQL
+
+---
+
+## Sommaire
+
+1. [Démarrage rapide avec Docker](#1-démarrage-rapide-avec-docker)
+2. [Installation manuelle](#2-installation-manuelle)
+3. [Variables d'environnement](#3-variables-denvironnement)
+4. [Comptes de démonstration](#4-comptes-de-démonstration)
+5. [Structure du projet](#5-structure-du-projet)
+6. [Vue d'ensemble de l'API](#6-vue-densemble-de-lapi)
+7. [Choix de sécurité importants](#7-choix-de-sécurité-importants)
+8. [Tests](#8-tests)
+9. [Déploiement en production](#9-déploiement-en-production)
+10. [Connexion avec le frontend](#10-connexion-avec-le-frontend)
+11. [Limitations connues & pistes d'évolution](#11-limitations-connues--pistes-dévolution)
+
+---
+
+## 1. Démarrage rapide avec Docker
+
+Prérequis : Docker + Docker Compose.
+
+```bash
+cd lurevia-backend
+
+# 1. Créez un fichier .env à la racine avec au minimum :
+cat > .env <<'EOF'
+JWT_ACCESS_SECRET=changez-moi-en-une-chaine-aleatoire-de-32-caracteres-minimum
+JWT_REFRESH_SECRET=changez-moi-aussi-en-une-autre-chaine-aleatoire-differente
+EOF
+
+# 2. Lancez PostgreSQL + l'API
+docker compose up --build
+```
+
+L'API démarre sur `http://localhost:4000/api/v1`. Le conteneur applique automatiquement le schéma à la base de données au démarrage.
+
+Pour peupler la base avec le catalogue de démonstration (30 produits, 6 catégories, 2 comptes) :
+
+```bash
+docker compose exec api npm run seed
+```
+
+---
+
+## 2. Installation manuelle
+
+Prérequis : Node.js ≥ 20, PostgreSQL ≥ 14 (local ou distant).
+
+```bash
+cd lurevia-backend
+npm install
+
+# Copiez et complétez le fichier d'environnement
+cp .env.example .env
+# → éditez .env : DATABASE_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET au minimum
+
+# Appliquer les migrations versionnées (développement)
+npm run prisma:migrate:dev
+
+# En production/Render, appliquer uniquement les migrations existantes
+npm run prisma:migrate
+
+# Peuple la base avec le catalogue de démonstration
+npm run seed
+
+# Lance le serveur en mode développement (rechargement à chaud)
+npm run dev
+```
+
+L'API est alors disponible sur `http://localhost:4000/api/v1`.
+
+**Commandes utiles :**
+
+| Commande                    | Description                                        |
+|------------------------------|-----------------------------------------------------|
+| `npm run dev`                | Serveur de développement avec rechargement à chaud  |
+| `npm run build`               | Compilation TypeScript → `dist/`                   |
+| `npm start`                   | Lance le build compilé (production)                |
+| `npm run typecheck`           | Vérifie les types sans compiler                    |
+| `npm run lint`                | Analyse statique du code                           |
+| `npm test`                    | Exécute la suite de tests                          |
+| `npm run prisma:studio`       | Interface graphique pour explorer la base          |
+| `npm run prisma:migrate:dev`  | Crée une nouvelle migration après modif du schéma  |
+| `npm run seed`                | Réimporte le catalogue de démonstration            |
+
+> ⚠️ **Important** : `prisma generate` (exécuté automatiquement via `postinstall`) télécharge le moteur Prisma correspondant à votre OS lors du premier `npm install`. Cela nécessite un accès internet sortant normal — aucune configuration réseau particulière n'est requise sur une machine de développement ou un serveur standard.
+
+---
+
+## 3. Variables d'environnement
+
+Voir `.env.example` pour la liste complète et les valeurs par défaut. Les plus importantes :
+
+| Variable                  | Description                                                                 |
+|----------------------------|------------------------------------------------------------------------------|
+| `DATABASE_URL`             | Chaîne de connexion PostgreSQL                                              |
+| `JWT_ACCESS_SECRET`        | Secret du token d'accès (≥ 32 caractères, à générer avec `openssl rand -base64 64`) |
+| `JWT_REFRESH_SECRET`       | Secret du refresh token (différent du précédent)                           |
+| `CORS_ORIGINS`             | Origines autorisées, séparées par des virgules (ex: URL de votre frontend) |
+| `COOKIE_SECURE`            | Mettre à `true` en production (HTTPS obligatoire)                          |
+| `DEFAULT_SHIPPING_COST`    | Frais de livraison par défaut, en Ariary                                   |
+| `FREE_SHIPPING_THRESHOLD`  | Montant au-delà duquel la livraison est gratuite                           |
+| `REVIEW_DELAY_DAYS`        | Délai avant qu'un client puisse laisser un avis après achat                |
+| `ADMIN_RATE_LIMIT_MAX`     | Limite dédiée aux opérations d'administration (plus permissive que l'auth) |
+| `SMTP_HOST`                | Hôte du serveur SMTP utilisé pour les codes de vérification                 |
+| `SMTP_PORT`                | Port SMTP (587 ou 465 selon votre fournisseur)                              |
+| `SMTP_USER`                | Identifiant SMTP                                                              |
+| `SMTP_PASSWORD`            | Mot de passe SMTP (à conserver uniquement dans les secrets de déploiement)   |
+| `SMTP_FROM`                | Adresse d'expédition validée par le fournisseur SMTP                         |
+| `MEDIA_GITHUB_TOKEN`       | Token GitHub fine-grained (permission Contents: Read and write) — secret de déploiement |
+| `MEDIA_GITHUB_OWNER`       | Propriétaire du dépôt public qui reçoit les images                         |
+| `MEDIA_GITHUB_REPOSITORY`  | Nom du dépôt public de médias                                               |
+| `MEDIA_GITHUB_BRANCH`      | Branche cible (défaut : `main`)                                             |
+| `MEDIA_GITHUB_PATH`        | Dossier cible dans le dépôt (défaut : `media`)                              |
+| `MEDIA_MAX_BYTES`           | Taille maximale téléchargée (défaut : 10 MiB)                               |
+| `GOOGLE_PHOTOS_ACCESS_TOKEN`| Token OAuth Photos optionnel ; sans worker OAuth, les archives restent `PENDING` |
+
+Le serveur **refuse de démarrer** si une variable requise est absente ou invalide (validation stricte via Zod dans `src/config/env.ts`) — c'est volontaire : mieux vaut échouer immédiatement au démarrage qu'en pleine production.
+
+### Import média sécurisé
+
+Tout utilisateur authentifié peut appeler `POST /api/v1/media/import` avec
+`{"url":"https://..."}` (jamais multipart). Le serveur n'accepte que HTTP(S),
+résout la cible et refuse les adresses locales/privées, limite la taille,
+contrôle le type et la signature de l'image, puis l'envoie via l'API Contents
+GitHub. La réponse contient l'URL publique `raw.githubusercontent.com` et seules
+les métadonnées sont stockées dans `media_assets`.
+
+Créez un dépôt GitHub public dédié et un fine-grained token limité à ce dépôt
+avec **Contents: Read and write**, puis configurez les variables `MEDIA_*` dans
+les secrets du déploiement (ne les commitez jamais et ne les mettez pas dans la
+documentation). Les redirections sont refusées afin d'éviter de contourner le
+contrôle SSRF.
+
+L'archivage Google Photos est optionnel et son worker n'est pas encore livré. Pour l'activer,
+il faudra configurer un projet
+Google OAuth, activez l'API Google Photos Library et fournissez un jeton OAuth
+dans `GOOGLE_PHOTOS_ACCESS_TOKEN` via le gestionnaire de secrets. Cette version
+ne prétend pas avoir archivé une image : sans identifiants le statut est
+`NOT_CONFIGURED`, et avec un jeton il reste `PENDING` jusqu'à l'installation
+d'un worker OAuth/Photos qui finalisera l'archivage.
+
+Les demandes de vérification approuvées par un administrateur déclenchent l'envoi
+du code par SMTP. Le code n'est jamais renvoyé dans la réponse HTTP admin ; si
+l'envoi échoue, la demande reste en attente et l'API renvoie une erreur explicite.
+
+---
+
+## 4. Comptes de démonstration
+
+Créés par `npm run seed` :
+
+| Rôle       | Identifiant           | Mot de passe   |
+|------------|------------------------|----------------|
+| Admin      | `admin@lurevia.mg`     | `Admin1234!`   |
+| Client     | `client@lurevia.mg`    | `Client1234!`  |
+
+**Changez ces mots de passe (ou supprimez ces comptes) avant toute mise en production réelle.**
+
+---
+
+## 5. Structure du projet
+
+```text
+prisma/
+  schema.prisma        Modèle de données complet
+  seed.ts               Script de peuplement (catalogue + comptes démo)
+  seed-src/              Données extraites du frontend (catégories, produits)
+src/
+  config/env.ts          Validation des variables d'environnement (Zod)
+  lib/                   Client Prisma singleton, logger structuré (Pino)
+  errors/AppError.ts     Hiérarchie d'erreurs métier
+  middlewares/           Auth, validation, gestion d'erreurs, rate limiting
+  utils/                 JWT, hashing, pagination, cookies, slugs...
+  modules/<domaine>/     Un dossier par domaine métier :
+    *.validators.ts        Schémas Zod (validation des entrées)
+    *.repository.ts         Accès aux données (Prisma)
+    *.service.ts             Logique métier
+    *.controller.ts           Adaptation requête/réponse HTTP
+    *.routes.ts                 Déclaration des routes Express
+  routes/index.ts        Assemblage de toutes les routes client et admin
+  app.ts                  Pipeline de middlewares Express
+  server.ts               Point d'entrée, démarrage, arrêt propre
+tests/                  Tests unitaires et d'intégration (Vitest)
+```
+
+Architecture en couches **Route → Controller → Service → Repository → Prisma**, cohérente sur l'ensemble des modules. Les deux anciens backends sont remplacés par cette seule application et ce seul singleton Prisma.
+
+La matrice complète des accès est disponible dans [docs/access-matrix.md](docs/access-matrix.md).
+
+---
+
+## 6. Vue d'ensemble de l'API
+
+Toutes les routes sont préfixées par `/api/v1` (configurable via `API_PREFIX`).
+
+| Domaine | Routes principales |
+|---|---|
+| **Auth** | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me` |
+| **Utilisateur** | `PATCH /users/me`, `POST /users/me/change-password` |
+| **Adresses** | `GET/POST /addresses`, `PATCH/DELETE /addresses/:id`, `POST /addresses/:id/default` |
+| **Catégories** | `GET /categories`, `GET /categories/:slug`, CRUD admin |
+| **Produits** | `GET /products` (filtres : catégorie, prix, taille, couleur, stock, recherche, tri, pagination), `GET /products/:id`, `GET /products/:id/related`, `GET /products/search/suggestions`, CRUD admin |
+| **Panier** | `GET /cart`, `POST /cart/items`, `PATCH/DELETE /cart/items/:productId`, `DELETE /cart` |
+| **Favoris** | `GET /favorites`, `POST /favorites/:productId/toggle` |
+| **Commandes** | `POST /orders` (checkout), `GET /orders`, `GET /orders/:id`, `POST /orders/:id/cancel`, `PATCH /orders/:id/status` (admin) |
+| **Avis produits** | `GET /products/:id/reviews`, `GET /products/:id/reviews/rating`, `GET /products/:id/reviews/eligibility`, `POST /products/:id/reviews`, `PATCH/DELETE /reviews/:id` |
+| **Feedback service** | `GET /feedback`, `GET /feedback/stats`, `POST /feedback`, `PATCH/DELETE /feedback/:id` |
+| **Notifications** | `GET /notifications`, `POST /notifications/:id/read`, `POST /notifications/read-all`, `DELETE /notifications` |
+| **Newsletter** | `POST /newsletter/subscribe` |
+| **Santé** | `GET /health` |
+
+Toutes les réponses suivent le format `{ "data": ... }` en succès et `{ "error": { "code", "message", "details?" } }` en erreur.
+
+### Authentification
+
+- Le token d'accès (**JWT**, 15 min par défaut) se transmet via l'en-tête `Authorization: Bearer <token>`.
+- Le refresh token (opaque, 30 jours par défaut) est stocké dans un **cookie httpOnly** — il n'est jamais accessible en JavaScript côté client, ce qui limite l'exposition aux attaques XSS.
+- Rotation automatique à chaque `POST /auth/refresh`, avec détection de rejeu (un token déjà utilisé/révoqué invalide immédiatement toutes les sessions de l'utilisateur, par précaution).
+
+---
+
+## 7. Choix de sécurité importants
+
+- **Mots de passe** hashés avec bcrypt (12 rounds), jamais renvoyés dans les réponses API.
+- **Aucune donnée de carte bancaire brute** (numéro, CVV) n'est acceptée par cette API — ce serait une violation PCI-DSS. Le paiement par carte doit être confirmé côté client via un prestataire tiers (Stripe, etc.) qui renvoie un jeton, jamais les données de carte.
+- **Rate limiting** renforcé sur les routes d'authentification (`/auth/*`) pour limiter le brute-force et le credential stuffing.
+- **Validation systématique** de toutes les entrées avec Zod — le frontend n'est jamais considéré comme une source de confiance.
+- **Totaux de commande calculés côté serveur**, jamais confiés au client.
+- **Autorisation vérifiée à chaque endpoint** sensible (propriété des ressources : une adresse, un panier, une commande, un avis n'appartenant pas à l'utilisateur connecté renvoie 403/404).
+- **En-têtes de sécurité** via Helmet, CORS strict par liste blanche, protection contre la pollution de paramètres HTTP (hpp).
+- **Gestion d'erreurs centralisée** : aucune stack trace, requête SQL ou secret n'est jamais renvoyé au client en production.
+- **Décrémentation atomique du stock** lors du checkout (transaction Prisma avec vérification conditionnelle) pour éviter la survente en cas de requêtes concurrentes.
+
+---
+
+## 8. Tests
+
+```bash
+npm test          # exécution unique
+npm run test:watch # mode watch
+```
+
+La suite couvre actuellement les utilitaires critiques (pagination, parsing de durées) et un test d'intégration du endpoint de santé. Le module `orders` (checkout, annulation, restauration de stock) et `auth` (rotation de tokens) sont les priorités naturelles pour étendre la couverture avant une mise en production réelle — une base de test PostgreSQL dédiée (ou `testcontainers`) serait alors recommandée.
+
+---
+
+## 9. Déploiement en production
+
+### Recréer l'historique après une base PostgreSQL neuve
+
+Si la base de production a réellement été supprimée puis recréée vide, le
+dossier `prisma/migrations/20260924174000_initial_schema` contient une
+migration initiale générée depuis le schéma actuel. Depuis un poste qui peut
+atteindre Aiven, vérifiez d'abord la connexion :
+
+```bash
+npx prisma migrate status
+```
+
+Si l'ancienne table `_prisma_migrations` existe encore avec une migration
+échouée, réparez uniquement son état avant de déployer la nouvelle migration :
+
+```bash
+npx prisma migrate resolve --rolled-back 20260924162000_oauth_phone_nullable
+npx prisma migrate deploy
+```
+
+Si la base est vraiment neuve, ne supprimez pas et ne recréez pas les fichiers
+de migration : exécutez simplement :
+
+```bash
+npx prisma migrate deploy
+npx prisma db seed
+```
+
+Ne lancez pas `prisma migrate dev` contre Aiven et ne marquez pas une migration
+comme `--applied` si son SQL n'a pas réellement été exécuté. Si `P1001`
+apparaît, corrigez d'abord l'accès réseau ou l'état du service Aiven.
+
+1. Générez des secrets JWT forts et uniques (`openssl rand -base64 64`).
+2. Positionnez `NODE_ENV=production` et `COOKIE_SECURE=true` (nécessite HTTPS).
+3. Renseignez `CORS_ORIGINS` avec l'URL exacte de votre frontend déployé
+   (par exemple `https://lurevia.github.io`). Plusieurs origines sont séparées
+   par des virgules ; ajoutez votre domaine personnalisé si nécessaire.
+4. Committez le dossier `prisma/migrations` généré par `prisma migrate dev` avant le premier déploiement, puis utilisez `prisma migrate deploy` (déjà intégré dans `docker-compose.yml` et le `Dockerfile`) — jamais `migrate dev` en production.
+5. Placez l'API derrière un reverse proxy (Nginx, Caddy) ou une plateforme gérée (Railway, Render, Fly.io) assurant la terminaison TLS.
+6. Surveillez les logs structurés (JSON via Pino) avec votre solution d'observabilité habituelle.
+
+Le `Dockerfile` fourni est un build multi-étapes minimal (image Alpine, utilisateur non-root, healthcheck intégré).
+
+---
+
+## 10. Connexion avec le frontend
+
+Le frontend actuel stocke tout dans `localStorage` via des Context React (`AuthContext`, `CartContext`, `OrdersContext`, etc.). Pour le brancher sur cette API :
+
+- Remplacez les fonctions de chaque Context par des appels `fetch`/`axios` vers les endpoints correspondants, en conservant `credentials: "include"` pour que le cookie de refresh token soit transmis.
+- Stockez le token d'accès en mémoire (variable React/état global), jamais dans `localStorage`, pour limiter l'exposition XSS.
+- **Différence volontaire** : les lignes de commande (`order.items`) renvoient un instantané figé (`titleSnapshot`, `priceSnapshot`) plutôt qu'une référence complète au produit — cela garantit que l'historique d'une commande reste exact même si le produit change de prix ou est supprimé par la suite. Adaptez le composant d'affichage des commandes en conséquence.
+- Le statut favori d'un produit (`isFavorite`) n'est plus embarqué dans chaque objet produit : récupérez la liste des favoris séparément via `GET /favorites` et croisez côté client, ou demandez une extension de l'API si un champ combiné est nécessaire.
+
+---
+
+## 11. Limitations connues & pistes d'évolution
+
+Ces choix ont été faits pour rester simples et proportionnés au besoin actuel (voir les commentaires dans le code source aux endroits concernés) :
+
+- **Upload d'avatar** : l'API accepte une URL d'image déjà hébergée plutôt qu'un upload de fichier binaire. Ajouter un stockage (S3, Cloudinary...) est une extension naturelle.
+- **Paiement** : aucune intégration réelle avec un prestataire (Mobile Money, Stripe...) n'est câblée — le statut de transaction est simulé (`SUCCESS` immédiat pour carte/mobile money, `PENDING` pour le paiement à la livraison). À remplacer par de vrais webhooks de confirmation en production.
+- **Notifications** : les rappels "avis en attente" sont générés à la lecture (`GET /notifications`) plutôt que par une tâche planifiée — largement suffisant au volume actuel, mais une vraie tâche cron serait préférable à grande échelle.
+- **Métrique de popularité** : le tri "populaire" des produits utilise le nombre d'avis comme approximation, faute d'un système de tracking des vues/ventes dédié.
+- **Avis de démonstration** : les avis fictifs du catalogue mock (auteurs non rattachés à de vrais comptes) ne sont pas importés comme lignes `ProductReview` — seule la note moyenne agrégée est reprise, pour ne pas créer de fausses relations utilisateur.
+# Socle financier vendeur
+
+Le socle financier est interne et ne dépend d'aucun PSP. Un vendeur soumet un
+contrat via `POST /seller/contracts` (`PERCENTAGE`, valeur 0–100, ou
+`MONTHLY_FIXED`, valeur en MGA). Un administrateur authentifié peut consulter
+`/admin/financial/contracts`, puis approuver/refuser avec
+`POST /admin/financial/contracts/:id/review`. Les commandes créent un snapshot
+par vendeur (`/admin/financial/settlements`) et les écritures de transfert
+idempotentes sont consultables via `/admin/financial/transfers`; les statistiques
+sont disponibles sur `/admin/financial/stats`.
+
+## Mobile Money (configuration future)
+
+## Authentification Google et Facebook
+
+Le frontend utilise un flux OAuth popup et redirige vers :
+
+```text
+https://lurevia.github.io/auth/callback
+```
+
+Configurez cette URL exactement dans les consoles Google et Facebook, puis
+ajoutez uniquement les identifiants publics côté build frontend :
+
+```env
+VITE_GOOGLE_CLIENT_ID=...
+VITE_FACEBOOK_APP_ID=...
+```
+
+Le backend doit recevoir les mêmes paramètres dans Render :
+
+```env
+GOOGLE_CLIENT_ID=...
+FACEBOOK_APP_ID=...
+FACEBOOK_APP_SECRET=...
+```
+
+Pour Facebook, l'application doit être en mode Live pour les utilisateurs
+réels et la permission `email` doit être activée. Pour Google, ajoutez le
+domaine `lurevia.github.io` dans les origines JavaScript autorisées et l'URI
+de callback dans les URI de redirection autorisées. Les secrets restent
+uniquement dans Render et ne doivent jamais être placés dans le frontend.
+
+## Initialiser le compte administrateur
+
+Le seed ne contient plus de mot de passe de production par défaut. Sur Render,
+définissez temporairement ces variables avant d'exécuter `prisma db seed` :
+
+```env
+NODE_ENV=production
+INITIAL_ADMIN_EMAIL=admin@example.com
+INITIAL_ADMIN_PHONE=+261340000000
+INITIAL_ADMIN_PASSWORD=un-mot-de-passe-fort-de-12-caracteres-minimum
+```
+
+Le seed crée ou remet le compte au rôle `ADMIN`. Pour réinitialiser le mot de
+passe d'un compte existant, définissez temporairement :
+
+```env
+INITIAL_ADMIN_RESET_PASSWORD=true
+```
+
+Puis supprimez cette variable après l'exécution. La connexion admin utilise
+l'adresse email ou le numéro de téléphone exacts, sans espaces.
+
+Un administrateur déjà connecté peut créer un autre compte administrateur via
+`POST /api/v1/admin/admins` avec `fullName`, `email`, `phone` et `password`.
+Cette route exige les rôles `ADMIN` et n'est pas disponible depuis l'inscription
+publique. Le mot de passe est haché côté API et l'action est enregistrée dans
+le journal d'audit.
+
+Les comptes Google et Facebook sont créés sans `passwordHash` et sans numéro
+fictif. Après la connexion sociale, l'utilisateur doit renseigner un numéro
+malgache via `PATCH /api/v1/users/me/oauth-profile`, puis envoyer sa demande de
+validation. La migration `20260924162000_oauth_phone_nullable` supprime aussi
+les anciennes valeurs `NOT_PROVIDED`.
+
+Le checkout accepte encore `mobile-money`, mais aucune sortie d'argent vendeur
+ni appel MVola, Orange Money ou Airtel Money n'est activé. Pour activer un
+connecteur, il faudra fournir par variables d'environnement (sans les commiter)
+les identifiants, URL d'API, numéro marchand, secret de signature et mode
+sandbox de chaque opérateur, ajouter la vérification de signature des webhooks,
+une file de retry et un rapprochement avant de passer un `TransferLedger` à
+`COMPLETED`. Tant que ce travail n'est pas fait, les settlements sans contrat
+restent `PENDING_REVIEW` et aucun transfert automatique n'est effectué.

@@ -1,0 +1,9 @@
+{
+  "name": "Lurevia E-Commerce",
+  "description": "API backend pour Lurevia — e-commerce artisanal malgache avec enchères en direct",
+  "version": "1.0.0",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
