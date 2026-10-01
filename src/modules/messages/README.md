@@ -1,61 +1,55 @@
-# Module Messagerie
+# Module Messages
 
-## 📖 Présentation
 Système de messagerie privée entre acheteurs, vendeurs et support client.
 
----
+## Endpoints
 
-## 🏛️ Architecture & Packaging
+| Méthode | Route (relative au montage du router) | Auth | Handler |
+|---|---|---|---|
+| `GET` | `/` | ✅ | `list` |
+| `GET` | `/unread-count` | ✅ | `unreadCount` |
+| `POST` | `/read-all` | ✅ | `markAllRead` |
+| `GET` | `/:id` | ✅ | `getById` |
+| `POST` | `/:id/read` | ✅ | `markRead` |
 
-Le module suit l'architecture en couches de Lurevia pour garantir la séparation des responsabilités (Single Responsibility Principle) et l'encapsulation orientée objet :
-
-```
-src/modules/messages/
-├── dto/                    # Schémas de validation Zod et contrats DTO (Data Transfer Objects)
-│   └── index.ts            # Point d'entrée des DTOs et types du module
-├── messages.controller.ts     # Couche Contrôleur (gestion des requêtes HTTP et codes réponses)
-├── messages.service.ts        # Couche Service Métier (règles de gestion et logique applicative)
-├── messages.repository.ts     # Couche Accès aux données (requêtes Prisma & persistance)
-├── messages.routes.ts         # Définition des routes Express & middlewares de sécurité
-├── messages.validators.ts     # Règles Zod de validation des requêtes
-└── index.ts                # Façade publique du module centralisant tous les exports
-```
-
----
-
-## 🔄 Flux d'interaction
-
-```text
-[Requête Client]
-       │
-       ▼
-[Middlewares de sécurité & Auth]
-       │
-       ▼
-[messages.routes.ts] ──► Validation avec [dto/ / messages.validators.ts]
-       │
-       ▼
-[messages.controller.ts]
-       │
-       ▼
-[messages.service.ts] (Logique métier, transactions, calculs)
-       │
-       ▼
-[messages.repository.ts] (Requêtes Prisma ORM)
-       │
-       ▼
-[Base de données PostgreSQL]
+## Structure
+```bash
+messages/
+├── controller/ → Traduction HTTP ↔ métier
+├── dto/ → Contrats entrée/sortie (réexport des schémas Zod + types de sortie)
+├── lib/
+│   ├── constant/ → Constantes, includes/selects Prisma
+│   └── type/ → Types internes
+├── mapper/ → Entité interne → contrat de sortie
+├── repository/ → Accès Prisma
+├── routes/ → Routes Express
+├── services/ → Logique métier
+├── validator/ → Schémas Zod de validation
+├── index.ts → API publique du module
+└── README.md
 ```
 
----
+## Règles métier (erreurs levées par le service)
 
-## 🚀 Utilisation & Importation
+- Message introuvable.
+- Ce message ne vous appartient pas.
 
-Pour consommer les fonctionnalités de ce module dans d'autres parties de l'application :
+## Dépendances
 
-```typescript
-import {
-  messagesRouter,
-  // Services, DTOs et types exportés
-} from "./modules/messages";
-```
+- `@prisma/client`
+- `express`
+- `zod`
+- `errors/AppError`
+- `lib/prisma`
+- `middlewares/auth.middleware`
+- `middlewares/validate.middleware`
+- `utils/apiResponse`
+- `utils/asyncHandler`
+- `utils/pagination`
+
+## POO — Choix de design
+
+- **Classes** avec `this` et injection explicite du repository (service) ou du service (controller) par le constructeur
+- **Instances uniques** exportées (`messagesRepository`, `messagesService`, `messagesController` selon les fichiers présents)
+- **Mapper** sans état : une classe par transformation entité → DTO de sortie
+- **Types, constantes et helpers** rangés dans `lib/`, jamais dans les services

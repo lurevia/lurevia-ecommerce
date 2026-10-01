@@ -1,6 +1,11 @@
-export * from "./dto";
-export * from "./favorites.repository";
-export * from "./favorites.service";
-export * from "./favorites.controller";
-export * from "./favorites.routes";
-export { default as favoritesRouter } from "./favorites.routes";
+/**
+ * Module favorites — API publique.
+ *
+ * Expose uniquement le router, le(s) service(s) utilisables par les autres modules
+ * et les types de sortie. Le reste (repository, controller, mapper, constantes) est interne.
+ */
+
+export { default as favoritesRouter } from "./routes/favorites.routes";
+
+export { favoritesService } from "./services/favorites.service";
+export type { FavoritesService } from "./services/favorites.service";

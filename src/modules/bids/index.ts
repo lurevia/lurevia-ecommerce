@@ -1,6 +1,13 @@
-export * from "./dto";
-export * from "./bids.repository";
-export * from "./bids.service";
-export * from "./bids.controller";
-export * from "./bids.routes";
-export { default as bidsRouter } from "./bids.routes";
+/**
+ * Module bids — API publique.
+ *
+ * Expose uniquement le router, le(s) service(s) utilisables par les autres modules
+ * et les types de sortie. Le reste (repository, controller, mapper, constantes) est interne.
+ */
+
+export { default as bidsRouter } from "./routes/bids.routes";
+
+export { bidsService } from "./services/bids.service";
+export type { BidsService } from "./services/bids.service";
+
+export type { BidDto } from "./dto";

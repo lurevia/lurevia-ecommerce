@@ -1,60 +1,53 @@
-# Module Finances & Comptabilité
+# Module Financial
 
-## 📖 Présentation
 Gestion financière, calcul des commissions, chiffre d'affaires, rapports comptables et grands livres.
 
----
-
-## 🏛️ Architecture & Packaging
-
-Le module suit l'architecture en couches de Lurevia pour garantir la séparation des responsabilités (Single Responsibility Principle) et l'encapsulation orientée objet :
-
-```
-src/modules/financial/
-├── dto/                    # Schémas de validation Zod et contrats DTO (Data Transfer Objects)
-│   └── index.ts            # Point d'entrée des DTOs et types du module
-├── financial.controller.ts     # Couche Contrôleur (gestion des requêtes HTTP et codes réponses)
-├── financial.service.ts        # Couche Service Métier (règles de gestion et logique applicative)
-├── financial.repository.ts     # Couche Accès aux données (requêtes Prisma & persistance)
-├── financial.validators.ts     # Règles Zod de validation des requêtes
-└── index.ts                # Façade publique du module centralisant tous les exports
+## Structure
+```bash
+financial/
+├── controller/ → Traduction HTTP ↔ métier
+├── dto/ → Contrats entrée/sortie (réexport des schémas Zod + types de sortie)
+├── lib/
+│   ├── constant/ → Constantes, includes/selects Prisma
+│   └── helper/ → Fonctions utilitaires
+├── repository/ → Accès Prisma
+├── services/ → Logique métier
+├── validator/ → Schémas Zod de validation
+├── index.ts → API publique du module
+└── README.md
 ```
 
----
+## Règles métier (erreurs levées par le service)
 
-## 🔄 Flux d'interaction
+- Vendeur introuvable.
+- Cet utilisateur n'est pas un vendeur.
+- Ce vendeur est désactivé.
+- Un contrat en attente existe déjà pour ce vendeur.
+- Contrat introuvable.
+- Ce contrat a déjà été traité.
+- Settlement introuvable.
+- Ce settlement ne peut pas être transféré (statut actuel : …).
+- Cette clé d'idempotence est déjà utilisée pour un autre transfert.
 
-```text
-[Requête Client]
-       │
-       ▼
-[Middlewares de sécurité & Auth]
-       │
-       ▼
-[financial.routes.ts] ──► Validation avec [dto/ / financial.validators.ts]
-       │
-       ▼
-[financial.controller.ts]
-       │
-       ▼
-[financial.service.ts] (Logique métier, transactions, calculs)
-       │
-       ▼
-[financial.repository.ts] (Requêtes Prisma ORM)
-       │
-       ▼
-[Base de données PostgreSQL]
-```
+## Dépendances
 
----
+- `@prisma/client`
+- `express`
+- `zod`
+- `errors/AppError`
+- `lib/prisma`
+- `utils/apiResponse`
+- `utils/asyncHandler`
+- `utils/pagination`
 
-## 🚀 Utilisation & Importation
+## Consommateurs externes
 
-Pour consommer les fonctionnalités de ce module dans d'autres parties de l'application :
+- **admin**
+- **seller**
 
-```typescript
-import {
-  financialRouter,
-  // Services, DTOs et types exportés
-} from "./modules/financial";
-```
+## POO — Choix de design
+
+- **Classes** avec `this` et injection explicite du repository (service) ou du service (controller) par le constructeur
+- **Instances uniques** exportées (`financialRepository`, `financialService`, `financialController` selon les fichiers présents)
+- **Mapper** sans état : une classe par transformation entité → DTO de sortie
+- **Types, constantes et helpers** rangés dans `lib/`, jamais dans les services

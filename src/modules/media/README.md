@@ -1,60 +1,62 @@
-# Module Médias & Téléchargement
+# Module Media
 
-## 📖 Présentation
 Téléchargement sécurisé, validation des formats et métadonnées d'images et de fichiers multimédias.
 
----
+## Endpoints
 
-## 🏛️ Architecture & Packaging
+| Méthode | Route (relative au montage du router) | Auth | Handler |
+|---|---|---|---|
+| `GET` | `/` | ✅ | `list` |
+| `POST` | `/import` | ✅ | `import` |
+| `POST` | `/upload` | ✅ | `upload` |
+| `DELETE` | `/:id` | ✅ | `remove` |
 
-Le module suit l'architecture en couches de Lurevia pour garantir la séparation des responsabilités (Single Responsibility Principle) et l'encapsulation orientée objet :
-
-```
-src/modules/media/
-├── dto/                    # Schémas de validation Zod et contrats DTO (Data Transfer Objects)
-│   └── index.ts            # Point d'entrée des DTOs et types du module
-├── media.controller.ts     # Couche Contrôleur (gestion des requêtes HTTP et codes réponses)
-├── media.service.ts        # Couche Service Métier (règles de gestion et logique applicative)
-├── media.routes.ts         # Définition des routes Express & middlewares de sécurité
-├── media.validators.ts     # Règles Zod de validation des requêtes
-└── index.ts                # Façade publique du module centralisant tous les exports
-```
-
----
-
-## 🔄 Flux d'interaction
-
-```text
-[Requête Client]
-       │
-       ▼
-[Middlewares de sécurité & Auth]
-       │
-       ▼
-[media.routes.ts] ──► Validation avec [dto/ / media.validators.ts]
-       │
-       ▼
-[media.controller.ts]
-       │
-       ▼
-[media.service.ts] (Logique métier, transactions, calculs)
-       │
-       ▼
-[media.repository.ts] (Requêtes Prisma ORM)
-       │
-       ▼
-[Base de données PostgreSQL]
+## Structure
+```bash
+media/
+├── controller/ → Traduction HTTP ↔ métier
+├── dto/ → Contrats entrée/sortie (réexport des schémas Zod + types de sortie)
+├── lib/
+│   ├── media-security.ts
+│   ├── media-storage.ts
+├── routes/ → Routes Express
+├── services/ → Logique métier
+├── validator/ → Schémas Zod de validation
+├── index.ts → API publique du module
+└── README.md
 ```
 
----
+## Règles métier (erreurs levées par le service)
 
-## 🚀 Utilisation & Importation
+- Un data URL image valide est requis
+- La taille de l'image dépasse la limite autorisée
+- Le serveur source ne fournit pas un type image autorisé
+- Média introuvable.
+- Ce média ne vous appartient pas.
 
-Pour consommer les fonctionnalités de ce module dans d'autres parties de l'application :
+## Dépendances
 
-```typescript
-import {
-  mediaRouter,
-  // Services, DTOs et types exportés
-} from "./modules/media";
-```
+- `@prisma/client`
+- `axios`
+- `express`
+- `node:crypto`
+- `node:dns/promises`
+- `node:net`
+- `zod`
+- `config/env`
+- `errors/AppError`
+- `lib/logger`
+- `lib/prisma`
+- `middlewares/auth.middleware`
+- `middlewares/rateLimit.middleware`
+- `middlewares/validate.middleware`
+- `utils/apiResponse`
+- `utils/asyncHandler`
+- `utils/pagination`
+
+## POO — Choix de design
+
+- **Classes** avec `this` et injection explicite du repository (service) ou du service (controller) par le constructeur
+- **Instances uniques** exportées (`mediaRepository`, `mediaService`, `mediaController` selon les fichiers présents)
+- **Mapper** sans état : une classe par transformation entité → DTO de sortie
+- **Types, constantes et helpers** rangés dans `lib/`, jamais dans les services

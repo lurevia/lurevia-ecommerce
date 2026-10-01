@@ -1,2 +1,12 @@
-export * from "../delivery-tracking.validators";
-export * from "../tracking.dto";
+export {
+  pingSchema,
+  orderIdParamsSchema,
+  historyQuerySchema,
+  listMyDeliveriesQuerySchema,
+} from "../validator/delivery-tracking.validator";
+
+export type {
+  PingInput,
+  HistoryQuery,
+  ListMyDeliveriesQuery,
+} from "../validator/delivery-tracking.validator";

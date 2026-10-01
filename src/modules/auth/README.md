@@ -1,62 +1,78 @@
-# Module Authentification & Sécurité
+# Module Auth
 
-## 📖 Présentation
 Cycle de vie d'authentification utilisateur : inscription, connexion, rafraîchissement JWT, réinitialisation de mot de passe et OAuth2 (Google, Facebook).
 
----
+## Endpoints
 
-## 🏛️ Architecture & Packaging
+| Méthode | Route (relative au montage du router) | Auth | Handler |
+|---|---|---|---|
+| `POST` | `/login` | — | `login` |
+| `POST` | `/oauth/callback` | — | `oauthCallback` |
+| `POST` | `/refresh` | — | `refresh` |
+| `POST` | `/logout` | — | `logout` |
+| `GET` | `/me` | ✅ | `me` |
+| `POST` | `/verification/request` | ✅ | `requestVerification` |
+| `GET` | `/verification/status` | ✅ | `verificationStatus` |
 
-Le module suit l'architecture en couches de Lurevia pour garantir la séparation des responsabilités (Single Responsibility Principle) et l'encapsulation orientée objet :
-
-```
-src/modules/auth/
-├── dto/                    # Schémas de validation Zod et contrats DTO (Data Transfer Objects)
-│   └── index.ts            # Point d'entrée des DTOs et types du module
-├── auth.controller.ts     # Couche Contrôleur (gestion des requêtes HTTP et codes réponses)
-├── auth.service.ts        # Couche Service Métier (règles de gestion et logique applicative)
-├── auth.repository.ts     # Couche Accès aux données (requêtes Prisma & persistance)
-├── auth.routes.ts         # Définition des routes Express & middlewares de sécurité
-├── auth.validators.ts     # Règles Zod de validation des requêtes
-├── auth.mapper.ts         # Mappers et assainissement des données pour les réponses DTO
-└── index.ts                # Façade publique du module centralisant tous les exports
-```
-
----
-
-## 🔄 Flux d'interaction
-
-```text
-[Requête Client]
-       │
-       ▼
-[Middlewares de sécurité & Auth]
-       │
-       ▼
-[auth.routes.ts] ──► Validation avec [dto/ / auth.validators.ts]
-       │
-       ▼
-[auth.controller.ts]
-       │
-       ▼
-[auth.service.ts] (Logique métier, transactions, calculs)
-       │
-       ▼
-[auth.repository.ts] (Requêtes Prisma ORM)
-       │
-       ▼
-[Base de données PostgreSQL]
+## Structure
+```bash
+auth/
+├── controller/ → Traduction HTTP ↔ métier
+├── dto/ → Contrats entrée/sortie (réexport des schémas Zod + types de sortie)
+├── lib/
+│   ├── helper/ → Fonctions utilitaires
+│   └── type/ → Types internes
+├── mapper/ → Entité interne → contrat de sortie
+├── repository/ → Accès Prisma
+├── routes/ → Routes Express
+├── services/ → Logique métier
+├── validator/ → Schémas Zod de validation
+├── index.ts → API publique du module
+└── README.md
 ```
 
----
+## Règles métier (erreurs levées par le service)
 
-## 🚀 Utilisation & Importation
+- Identifiants ou mot de passe incorrect.
+- Ce compte n'a pas de mot de passe. Connectez-vous avec Google ou Facebook.
+- Session invalide, veuillez vous reconnecter.
+- Session expirée, veuillez vous reconnecter.
+- Utilisateur introuvable.
+- Votre compte est déjà vérifié.
+- Ajoutez votre numéro de téléphone avant de demander la validation.
+- Token Google invalide.
+- Token Facebook invalide.
+- Fournisseur OAuth non supporté.
 
-Pour consommer les fonctionnalités de ce module dans d'autres parties de l'application :
+## Dépendances
 
-```typescript
-import {
-  authRouter,
-  // Services, DTOs et types exportés
-} from "./modules/auth";
-```
+- `@prisma/client`
+- `axios`
+- `express`
+- `google-auth-library`
+- `zod`
+- `config/env`
+- `errors/AppError`
+- `lib/logger`
+- `lib/prisma`
+- `middlewares/auth.middleware`
+- `middlewares/rateLimit.middleware`
+- `middlewares/validate.middleware`
+- `utils/apiResponse`
+- `utils/asyncHandler`
+- `utils/cookies`
+- `utils/jwt`
+- `utils/password`
+- `utils/phone`
+- `utils/refreshToken`
+
+## Consommateurs externes
+
+- **users**
+
+## POO — Choix de design
+
+- **Classes** avec `this` et injection explicite du repository (service) ou du service (controller) par le constructeur
+- **Instances uniques** exportées (`authRepository`, `authService`, `authController` selon les fichiers présents)
+- **Mapper** sans état : une classe par transformation entité → DTO de sortie
+- **Types, constantes et helpers** rangés dans `lib/`, jamais dans les services

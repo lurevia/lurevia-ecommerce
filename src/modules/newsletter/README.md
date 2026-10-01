@@ -1,61 +1,53 @@
 # Module Newsletter
 
-## 📖 Présentation
 Abonnement, confirmation par email et désinscription à la newsletter de la plateforme.
 
----
+## Endpoints
 
-## 🏛️ Architecture & Packaging
+| Méthode | Route (relative au montage du router) | Auth | Handler |
+|---|---|---|---|
+| `POST` | `/subscribe` | — | `subscribe` |
+| `POST` | `/confirm` | — | `confirm` |
+| `POST` | `/unsubscribe` | — | `unsubscribe` |
+| `GET` | `/` | ✅ (ADMIN) | `list` |
 
-Le module suit l'architecture en couches de Lurevia pour garantir la séparation des responsabilités (Single Responsibility Principle) et l'encapsulation orientée objet :
-
-```
-src/modules/newsletter/
-├── dto/                    # Schémas de validation Zod et contrats DTO (Data Transfer Objects)
-│   └── index.ts            # Point d'entrée des DTOs et types du module
-├── newsletter.controller.ts     # Couche Contrôleur (gestion des requêtes HTTP et codes réponses)
-├── newsletter.service.ts        # Couche Service Métier (règles de gestion et logique applicative)
-├── newsletter.repository.ts     # Couche Accès aux données (requêtes Prisma & persistance)
-├── newsletter.routes.ts         # Définition des routes Express & middlewares de sécurité
-├── newsletter.validators.ts     # Règles Zod de validation des requêtes
-└── index.ts                # Façade publique du module centralisant tous les exports
-```
-
----
-
-## 🔄 Flux d'interaction
-
-```text
-[Requête Client]
-       │
-       ▼
-[Middlewares de sécurité & Auth]
-       │
-       ▼
-[newsletter.routes.ts] ──► Validation avec [dto/ / newsletter.validators.ts]
-       │
-       ▼
-[newsletter.controller.ts]
-       │
-       ▼
-[newsletter.service.ts] (Logique métier, transactions, calculs)
-       │
-       ▼
-[newsletter.repository.ts] (Requêtes Prisma ORM)
-       │
-       ▼
-[Base de données PostgreSQL]
+## Structure
+```bash
+newsletter/
+├── controller/ → Traduction HTTP ↔ métier
+├── dto/ → Contrats entrée/sortie (réexport des schémas Zod + types de sortie)
+├── lib/
+│   └── helper/ → Fonctions utilitaires
+├── repository/ → Accès Prisma
+├── routes/ → Routes Express
+├── services/ → Logique métier
+├── validator/ → Schémas Zod de validation
+├── index.ts → API publique du module
+└── README.md
 ```
 
----
+## Règles métier (erreurs levées par le service)
 
-## 🚀 Utilisation & Importation
+- Lien de confirmation introuvable.
 
-Pour consommer les fonctionnalités de ce module dans d'autres parties de l'application :
+## Dépendances
 
-```typescript
-import {
-  newsletterRouter,
-  // Services, DTOs et types exportés
-} from "./modules/newsletter";
-```
+- `express`
+- `node:crypto`
+- `zod`
+- `errors/AppError`
+- `lib/logger`
+- `lib/prisma`
+- `middlewares/auth.middleware`
+- `middlewares/validate.middleware`
+- `services/email.service`
+- `utils/apiResponse`
+- `utils/asyncHandler`
+- `utils/pagination`
+
+## POO — Choix de design
+
+- **Classes** avec `this` et injection explicite du repository (service) ou du service (controller) par le constructeur
+- **Instances uniques** exportées (`newsletterRepository`, `newsletterService`, `newsletterController` selon les fichiers présents)
+- **Mapper** sans état : une classe par transformation entité → DTO de sortie
+- **Types, constantes et helpers** rangés dans `lib/`, jamais dans les services

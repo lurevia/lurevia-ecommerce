@@ -38,7 +38,6 @@ export const errorMiddleware = (
     return;
   }
 
-  // ── Erreurs de validation Zod ──
   if (err instanceof ZodError) {
     res.status(422).json({
       error: {
@@ -50,7 +49,6 @@ export const errorMiddleware = (
     return;
   }
 
-  // ── ✅ JSON malformé (body-parser) ──
   if (err instanceof SyntaxError && "body" in err) {
     res.status(400).json({
       error: {
@@ -61,7 +59,6 @@ export const errorMiddleware = (
     return;
   }
 
-  // ── ✅ Erreurs Prisma : validation de schéma (query mal écrite) ──
   if (err instanceof Prisma.PrismaClientValidationError) {
     logger.error({ err, path: req.path }, "Prisma validation error");
     res.status(500).json({
@@ -73,10 +70,9 @@ export const errorMiddleware = (
     return;
   }
 
-  // ── Erreurs Prisma connues ──
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     switch (err.code) {
-      case "P2002": // Contrainte unique violée
+      case "P2002":
         res.status(409).json({
           error: {
             code: "CONFLICT",
@@ -86,13 +82,13 @@ export const errorMiddleware = (
         } satisfies ErrorResponseBody);
         return;
 
-      case "P2025": // Enregistrement introuvable
+      case "P2025":
         res.status(404).json({
           error: { code: "NOT_FOUND", message: "Ressource introuvable" },
         } satisfies ErrorResponseBody);
         return;
 
-      case "P2003": // Clé étrangère violée
+      case "P2003":
         res.status(400).json({
           error: {
             code: "FOREIGN_KEY_ERROR",
@@ -101,7 +97,7 @@ export const errorMiddleware = (
         } satisfies ErrorResponseBody);
         return;
 
-      case "P2000": // Valeur trop longue
+      case "P2000":
         res.status(400).json({
           error: {
             code: "VALUE_TOO_LONG",
@@ -119,7 +115,6 @@ export const errorMiddleware = (
     }
   }
 
-  // ── Bug non prévu ──
   logger.error({ err, path: req.path }, "Erreur non gérée");
   res.status(500).json({
     error: {

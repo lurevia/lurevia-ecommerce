@@ -1,5 +1,11 @@
-export * from "./dto";
-export * from "./media.service";
-export * from "./media.controller";
-export * from "./media.routes";
-export { default as mediaRouter } from "./media.routes";
+/**
+ * Module media — API publique.
+ *
+ * Expose uniquement le router, le(s) service(s) utilisables par les autres modules
+ * et les types de sortie. Le reste (repository, controller, mapper, constantes) est interne.
+ */
+
+export { default as mediaRouter } from "./routes/media.routes";
+
+export { mediaService } from "./services/media.service";
+export type { MediaService } from "./services/media.service";

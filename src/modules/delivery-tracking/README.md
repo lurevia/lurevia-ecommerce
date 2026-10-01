@@ -1,61 +1,60 @@
-# Module Suivi de Livraison
+# Module Delivery Tracking
 
-## 📖 Présentation
 Suivi en temps réel des colis et expéditions, géolocalisation des livreurs et synchronisation des statuts de livraison.
 
----
+## Endpoints
 
-## 🏛️ Architecture & Packaging
+| Méthode | Route (relative au montage du router) | Auth | Handler |
+|---|---|---|---|
+| `GET` | `/my-deliveries` | ✅ (SELLER, ADMIN) | `listMyDeliveries` |
+| `GET` | `/my-stats` | ✅ (SELLER, ADMIN) | `getMyStats` |
+| `POST` | `/:orderId/ping` | ✅ (SELLER, ADMIN) | `ping` |
+| `GET` | `/:orderId/latest` | ✅ | `getLatest` |
+| `GET` | `/:orderId/history` | ✅ | `getHistory` |
 
-Le module suit l'architecture en couches de Lurevia pour garantir la séparation des responsabilités (Single Responsibility Principle) et l'encapsulation orientée objet :
-
-```
-src/modules/delivery-tracking/
-├── dto/                    # Schémas de validation Zod et contrats DTO (Data Transfer Objects)
-│   └── index.ts            # Point d'entrée des DTOs et types du module
-├── delivery-tracking.controller.ts     # Couche Contrôleur (gestion des requêtes HTTP et codes réponses)
-├── delivery-tracking.service.ts        # Couche Service Métier (règles de gestion et logique applicative)
-├── delivery-tracking.repository.ts     # Couche Accès aux données (requêtes Prisma & persistance)
-├── delivery-tracking.routes.ts         # Définition des routes Express & middlewares de sécurité
-├── delivery-tracking.validators.ts     # Règles Zod de validation des requêtes
-└── index.ts                # Façade publique du module centralisant tous les exports
-```
-
----
-
-## 🔄 Flux d'interaction
-
-```text
-[Requête Client]
-       │
-       ▼
-[Middlewares de sécurité & Auth]
-       │
-       ▼
-[delivery-tracking.routes.ts] ──► Validation avec [dto/ / delivery-tracking.validators.ts]
-       │
-       ▼
-[delivery-tracking.controller.ts]
-       │
-       ▼
-[delivery-tracking.service.ts] (Logique métier, transactions, calculs)
-       │
-       ▼
-[delivery-tracking.repository.ts] (Requêtes Prisma ORM)
-       │
-       ▼
-[Base de données PostgreSQL]
+## Structure
+```bash
+delivery-tracking/
+├── controller/ → Traduction HTTP ↔ métier
+├── dto/ → Contrats entrée/sortie (réexport des schémas Zod + types de sortie)
+├── lib/
+│   ├── constant/ → Constantes, includes/selects Prisma
+│   └── type/ → Types internes
+├── mapper/ → Entité interne → contrat de sortie
+├── repository/ → Accès Prisma
+├── routes/ → Routes Express
+├── services/ → Logique métier
+├── validator/ → Schémas Zod de validation
+├── index.ts → API publique du module
+└── README.md
 ```
 
----
+## Règles métier (erreurs levées par le service)
 
-## 🚀 Utilisation & Importation
+- Commande introuvable.
+- Cette commande n'est pas en cours de livraison (statut : …).
+- Vous ne pouvez pas livrer votre propre commande.
+- Cette livraison est déjà assignée à un autre livreur.
+- Accès refusé.
 
-Pour consommer les fonctionnalités de ce module dans d'autres parties de l'application :
+## Dépendances
 
-```typescript
-import {
-  deliveryTrackingRouter,
-  // Services, DTOs et types exportés
-} from "./modules/delivery-tracking";
-```
+- `@prisma/client`
+- `express`
+- `zod`
+- `errors/AppError`
+- `lib/logger`
+- `lib/prisma`
+- `middlewares/auth.middleware`
+- `middlewares/validate.middleware`
+- `utils/apiResponse`
+- `utils/asyncHandler`
+- `utils/geo`
+- `utils/pagination`
+
+## POO — Choix de design
+
+- **Classes** avec `this` et injection explicite du repository (service) ou du service (controller) par le constructeur
+- **Instances uniques** exportées (`deliveryTrackingRepository`, `deliveryTrackingService`, `deliveryTrackingController` selon les fichiers présents)
+- **Mapper** sans état : une classe par transformation entité → DTO de sortie
+- **Types, constantes et helpers** rangés dans `lib/`, jamais dans les services

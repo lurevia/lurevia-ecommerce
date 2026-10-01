@@ -1,61 +1,70 @@
-# Module Enchères
+# Module Auctions
 
-## 📖 Présentation
 Gestion des enchères en direct (produits en vente aux enchères, chronomètres anti-sniping, socket temps réel, chat d'enchères et watchers).
 
----
+## Endpoints
 
-## 🏛️ Architecture & Packaging
+| Méthode | Route (relative au montage du router) | Auth | Handler |
+|---|---|---|---|
+| `GET` | `/` | — | `list` |
+| `GET` | `/:productId` | — | `getByProductId` |
+| `GET` | `/:productId/stats` | — | `getStats` |
+| `GET` | `/:productId/messages` | — | `listMessages` |
+| `GET` | `/:productId/watchers/count` | — | `watcherCount` |
+| `POST` | `/:productId/watch` | ✅ | `watch` |
+| `DELETE` | `/:productId/watch` | ✅ | `unwatch` |
+| `POST` | `/:productId/messages` | ✅ | `postMessage` |
+| `DELETE` | `/:productId/messages/:messageId` | ✅ | `deleteMessage` |
 
-Le module suit l'architecture en couches de Lurevia pour garantir la séparation des responsabilités (Single Responsibility Principle) et l'encapsulation orientée objet :
-
-```
-src/modules/auctions/
-├── dto/                    # Schémas de validation Zod et contrats DTO (Data Transfer Objects)
-│   └── index.ts            # Point d'entrée des DTOs et types du module
-├── auctions.controller.ts     # Couche Contrôleur (gestion des requêtes HTTP et codes réponses)
-├── auctions.service.ts        # Couche Service Métier (règles de gestion et logique applicative)
-├── auctions.repository.ts     # Couche Accès aux données (requêtes Prisma & persistance)
-├── auctions.routes.ts         # Définition des routes Express & middlewares de sécurité
-├── auctions.validators.ts     # Règles Zod de validation des requêtes
-└── index.ts                # Façade publique du module centralisant tous les exports
-```
-
----
-
-## 🔄 Flux d'interaction
-
-```text
-[Requête Client]
-       │
-       ▼
-[Middlewares de sécurité & Auth]
-       │
-       ▼
-[auctions.routes.ts] ──► Validation avec [dto/ / auctions.validators.ts]
-       │
-       ▼
-[auctions.controller.ts]
-       │
-       ▼
-[auctions.service.ts] (Logique métier, transactions, calculs)
-       │
-       ▼
-[auctions.repository.ts] (Requêtes Prisma ORM)
-       │
-       ▼
-[Base de données PostgreSQL]
+## Structure
+```bash
+auctions/
+├── controller/ → Traduction HTTP ↔ métier
+├── cron/ → Tâches planifiées
+├── dto/ → Contrats entrée/sortie (réexport des schémas Zod + types de sortie)
+├── lib/
+│   ├── constant/ → Constantes, includes/selects Prisma
+│   ├── helper/ → Fonctions utilitaires
+│   └── type/ → Types internes
+├── mapper/ → Entité interne → contrat de sortie
+├── repository/ → Accès Prisma
+├── routes/ → Routes Express
+├── services/ → Logique métier
+├── socket/ → Temps réel (Socket.IO)
+├── validator/ → Schémas Zod de validation
+├── index.ts → API publique du module
+└── README.md
 ```
 
----
+## Règles métier (erreurs levées par le service)
 
-## 🚀 Utilisation & Importation
+- Enchère introuvable.
+- Cette enchère est terminée.
+- Message introuvable.
+- Vous ne pouvez pas supprimer ce message.
 
-Pour consommer les fonctionnalités de ce module dans d'autres parties de l'application :
+## Dépendances
 
-```typescript
-import {
-  auctionsRouter,
-  // Services, DTOs et types exportés
-} from "./modules/auctions";
-```
+- `@prisma/client`
+- `express`
+- `node:http`
+- `socket.io`
+- `zod`
+- `config/env`
+- `errors/AppError`
+- `lib/logger`
+- `lib/prisma`
+- `middlewares/auth.middleware`
+- `middlewares/rateLimit.middleware`
+- `middlewares/validate.middleware`
+- `utils/apiResponse`
+- `utils/asyncHandler`
+- `utils/pagination`
+- module `notifications`
+
+## POO — Choix de design
+
+- **Classes** avec `this` et injection explicite du repository (service) ou du service (controller) par le constructeur
+- **Instances uniques** exportées (`auctionsRepository`, `auctionsService`, `auctionsController` selon les fichiers présents)
+- **Mapper** sans état : une classe par transformation entité → DTO de sortie
+- **Types, constantes et helpers** rangés dans `lib/`, jamais dans les services
