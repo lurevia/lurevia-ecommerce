@@ -3,10 +3,6 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { env } from "../config/env";
 import { logger } from "./logger";
 
-/**
- * Singleton OOP pour la connexion à la base de données Lurevia.
- * Évite les variables globales en encapsulant l'instance dans une classe.
- */
 const prismaLogConfig: Prisma.LogLevel[] = env.isDevelopment
 	? ["warn", "error"]
 	: ["error"];
@@ -78,19 +74,26 @@ function wrapWithSafeDbFallback(client: any): PrismaClient {
 					get(mTarget, mProp) {
 						const originalMethod = mTarget[mProp];
 						if (typeof originalMethod === "function") {
-							return async (...args: any[]) => {
-								try {
-									return await originalMethod.apply(mTarget, args);
-								} catch (err: any) {
-									logger.warn(
-										{ model: String(prop), method: String(mProp), error: err?.message || err },
-										"[AI Studio] DB offline — returning mock response"
-									);
-									if (typeof mProp === "string" && mProp in noOp) {
-										return await noOp[mProp](...args);
-									}
-									return null;
+							return (...args: any[]) => {
+								// On récupère la promesse ou l'objet de requête natif de Prisma
+								const promise = originalMethod.apply(mTarget, args);
+
+								// Si c'est une promesse (objet "thenable"), on attache le catch de sécurité
+								// sans encapsuler la fonction dans un bloc async global
+								if (promise && typeof promise.then === "function") {
+									return promise.catch(async (err: any) => {
+										logger.warn(
+											{ model: String(prop), method: String(mProp), error: err?.message || err },
+											"[AI Studio] DB offline — returning mock response"
+										);
+										if (typeof mProp === "string" && mProp in noOp) {
+											return await noOp[mProp](...args);
+										}
+										return null;
+									});
 								}
+
+								return promise;
 							};
 						}
 						return originalMethod;
@@ -129,7 +132,7 @@ function createPrismaClient(): PrismaClient {
 						duration: e.duration,
 						query: e.query.substring(0, 200),
 					},
-					"⚠️ Requête lente détectée"
+					"Requête lente détectée"
 				);
 			}
 		});
