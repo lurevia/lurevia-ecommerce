@@ -1,48 +1,65 @@
 import { Router } from "express";
-
 import { attachUserIfPresent } from "../middlewares/auth.middleware";
 
-import authRoutes from "../modules/auth/auth.routes";
-import usersRoutes from "../modules/users/users.routes";
-import identityVerificationsRoutes from "../modules/identity-verifications/identity-verifications.routes";
-import addressesRoutes from "../modules/addresses/addresses.routes";
-import categoriesRoutes from "../modules/categories/categories.routes";
-import productsRoutes from "../modules/products/products.routes";
-import { productReviewsRouter, reviewsRouter } from "../modules/reviews/reviews.routes";
-import bidsRoutes from "../modules/bids/bids.routes";
-import auctionsRoutes from "../modules/auctions/auctions.routes";
+// ─── Identité & compte ───
+import { authRouter } from "../modules/auth";
+import { usersRouter } from "../modules/users";
+import { identityVerificationsRouter } from "../modules/identity-verifications";
+import { addressesRouter } from "../modules/addresses";
 
-import cartRoutes from "../modules/cart/cart.routes";
-import favoritesRoutes from "../modules/favorites/favorites.routes";
+// ─── Catalogue ───
+import { categoriesRouter } from "../modules/categories";
+import { productsRouter } from "../modules/products";
+import { productReviewsRouter, reviewsRouter } from "../modules/reviews";
+import { bidsRouter } from "../modules/bids";
+import { auctionsRouter } from "../modules/auctions";
 
-import ordersRoutes from "../modules/orders/orders.routes";
-import paymentsRoutes from "../modules/payments/payments.routes";
-import deliveryTrackingRoutes from "../modules/delivery-tracking/delivery-tracking.routes";
+// ─── Panier & favoris ───
+import { cartRouter } from "../modules/cart";
+import { favoritesRouter } from "../modules/favorites";
 
-import pickupPointsRoutes from "../modules/pickup-points/pickup-points.routes";
-import shippingZonesRoutes from "../modules/shipping-zones/shipping-zones.routes";
-import placesRoutes from "../modules/places/places.routes";
-import feedbackRoutes from "../modules/feedback/feedback.routes";
+// ─── Commandes & paiements ───
+import { ordersRouter } from "../modules/orders";
+import { paymentsRouter } from "../modules/payments";
+import { deliveryTrackingRouter } from "../modules/delivery-tracking";
 
-import notificationsRoutes from "../modules/notifications/notifications.routes";
-import messagesRoutes from "../modules/messages/messages.routes";
-import newsletterRoutes from "../modules/newsletter/newsletter.routes";
+// ─── Logistique ───
+import { pickupPointsRouter } from "../modules/pickup-points";
+import { shippingZonesRouter } from "../modules/shipping-zones";
+import { placesRouter } from "../modules/places";
 
-import sellerRoutes from "../modules/seller/seller.routes";
-import sellerContractsRoutes from "../modules/seller-contracts/seller-contracts.routes";
-import settlementsRoutes from "../modules/settlements/settlements.routes";
-import transfersRoutes from "../modules/transfers/transfers.routes";
+// ─── Avis & feedback ───
+import { feedbackRouter } from "../modules/feedback";
 
-import mediaRoutes from "../modules/media/media.routes";
+// ─── Notifications & messages ───
+import { notificationsRouter } from "../modules/notifications";
+import { messagesRouter } from "../modules/messages";
+import { newsletterRouter } from "../modules/newsletter";
 
-import adminRoutes from "../modules/admin/admin.routes";
-import settingsRoutes from "../modules/settings/settings.routes";
-import exportRoutes from "../modules/export/export.routes";
+// ─── Business vendeur ───
+import { sellerRouter } from "../modules/seller";
+import { sellerContractsRouter } from "../modules/seller-contracts";
+import { settlementsRouter } from "../modules/settlements";
+import { transfersRouter } from "../modules/transfers";
+
+// ─── Média ───
+import { mediaRouter } from "../modules/media";
+
+// ─── Admin & config ───
+import { adminRouter } from "../modules/admin";
+import { settingsRouter } from "../modules/settings";
+import { exportRouter } from "../modules/export";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Router principal
+// ─────────────────────────────────────────────────────────────────────────────
 
 const router = Router();
 
+// Attache l'utilisateur (si connecté) à toutes les requêtes
 router.use(attachUserIfPresent);
 
+// ─── Santé ───
 router.get("/health", (_req, res) => {
   res.status(200).json({
     data: {
@@ -53,50 +70,54 @@ router.get("/health", (_req, res) => {
   });
 });
 
-router.use("/auth", authRoutes);
-router.use("/users", usersRoutes);
-router.use("/identity-verifications", identityVerificationsRoutes);
-router.use("/addresses", addressesRoutes);
+// ─── Identité ───
+router.use("/auth", authRouter);
+router.use("/users", usersRouter);
+router.use("/identity-verifications", identityVerificationsRouter);
+router.use("/addresses", addressesRouter);
 
+// ─── Catalogue ───
 router.use("/products/:productId/reviews", productReviewsRouter);
-
-router.use("/auctions", auctionsRoutes);
-
-router.use("/products", productsRoutes);
-
-router.use("/bids", bidsRoutes);
-
+router.use("/auctions", auctionsRouter);
+router.use("/products", productsRouter);
+router.use("/bids", bidsRouter);
 router.use("/reviews", reviewsRouter);
+router.use("/categories", categoriesRouter);
 
-router.use("/categories", categoriesRoutes);
+// ─── Panier & favoris ───
+router.use("/cart", cartRouter);
+router.use("/favorites", favoritesRouter);
 
-router.use("/cart", cartRoutes);
-router.use("/favorites", favoritesRoutes);
+// ─── Commandes & paiements ───
+router.use("/orders", ordersRouter);
+router.use("/payments", paymentsRouter);
+router.use("/delivery-tracking", deliveryTrackingRouter);
 
-router.use("/orders", ordersRoutes);
-router.use("/payments", paymentsRoutes);
-router.use("/delivery-tracking", deliveryTrackingRoutes);
+// ─── Logistique ───
+router.use("/pickup-points", pickupPointsRouter);
+router.use("/shipping-zones", shippingZonesRouter);
+router.use("/places", placesRouter);
 
-router.use("/pickup-points", pickupPointsRoutes);
-router.use("/shipping-zones", shippingZonesRoutes);
-router.use("/places", placesRoutes);
+// ─── Feedback ───
+router.use("/feedback", feedbackRouter);
 
-router.use("/feedback", feedbackRoutes);
+// ─── Notifications ───
+router.use("/notifications", notificationsRouter);
+router.use("/messages", messagesRouter);
+router.use("/newsletter", newsletterRouter);
 
-router.use("/notifications", notificationsRoutes);
-router.use("/messages", messagesRoutes);
-router.use("/newsletter", newsletterRoutes);
+// ─── Business vendeur ───
+router.use("/seller", sellerRouter);
+router.use("/seller-contracts", sellerContractsRouter);
+router.use("/settlements", settlementsRouter);
+router.use("/transfers", transfersRouter);
 
+// ─── Média ───
+router.use("/media", mediaRouter);
 
-router.use("/seller", sellerRoutes);
-router.use("/seller-contracts", sellerContractsRoutes);
-router.use("/settlements", settlementsRoutes);
-router.use("/transfers", transfersRoutes);
-
-router.use("/media", mediaRoutes);
-
-router.use("/admin", adminRoutes);
-router.use("/settings", settingsRoutes);
-router.use("/export", exportRoutes);
+// ─── Admin & config ───
+router.use("/admin", adminRouter);
+router.use("/settings", settingsRouter);
+router.use("/export", exportRouter);
 
 export default router;

@@ -10,19 +10,14 @@ import pinoHttp from "pino-http";
 import { env } from "./config/env";
 import { logger } from "./lib/logger";
 import apiRouter from "./routes";
-import { errorMiddleware, notFoundMiddleware } from "./middlewares/error.middleware";
+import {
+  errorMiddleware,
+  notFoundMiddleware,
+} from "./middlewares/error.middleware";
 import { globalRateLimiter } from "./middlewares/rateLimit.middleware";
 
-<<<<<<< HEAD
-export const createApp = (): Express => {
-  const app = express();
-=======
-/**
- * Classe Application (POO) pour la gestion et configuration du serveur Express.
- */
 export class Application {
   private readonly app: Express;
->>>>>>> ee458a5 (refactor: migrate core services to classes)
 
   constructor() {
     this.app = express();
@@ -51,7 +46,11 @@ export class Application {
     this.app.use(
       cors({
         origin: (origin, callback) => {
-          if (!origin || env.corsOrigins.includes("*") || env.corsOrigins.includes(origin)) {
+          if (
+            !origin ||
+            env.corsOrigins.includes("*") ||
+            env.corsOrigins.includes(origin)
+          ) {
             callback(null, true);
             return;
           }
@@ -60,7 +59,11 @@ export class Application {
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
-        exposedHeaders: ["X-Request-Id", "RateLimit-Limit", "RateLimit-Remaining"],
+        exposedHeaders: [
+          "X-Request-Id",
+          "RateLimit-Limit",
+          "RateLimit-Remaining",
+        ],
         maxAge: 86400,
       })
     );
@@ -73,51 +76,11 @@ export class Application {
     const mediaJsonParser = express.json({ limit: "15mb" });
     const mediaUploadPath = `${env.API_PREFIX}/media/upload`;
 
-<<<<<<< HEAD
-  app.use((req, res, next) => {
-    if (req.path === mediaUploadPath) {
-      return mediaJsonParser(req, res, next);
-    }
-    return defaultJsonParser(req, res, next);
-  });
-
-  app.use(express.urlencoded({ extended: true, limit: "1mb" }));
-  app.use(cookieParser());
-
-  app.use(hpp() as any);
-
-  app.use(
-    pinoHttp({
-      logger,
-      autoLogging: {
-        ignore: (req) => req.url === `${env.API_PREFIX}/health`,
-      },
-      serializers: {
-        req: (req) => ({
-          method: req.method,
-          url: req.url,
-        }),
-        res: (res) => ({ statusCode: res.statusCode }),
-      },
-    })
-  );
-
-  app.use(compression() as any);
-
-  app.get("/", (req, res) => {
-    res.json({
-      name: env.APP_NAME,
-      version: "1.0.0",
-      status: "running",
-      endpoints: `${env.API_PREFIX}`,
-      health: `${env.API_PREFIX}/health`,
-=======
     this.app.use((req, res, next) => {
       if (req.path === mediaUploadPath) {
         return mediaJsonParser(req, res, next);
       }
       return defaultJsonParser(req, res, next);
->>>>>>> ee458a5 (refactor: migrate core services to classes)
     });
 
     this.app.use(express.urlencoded({ extended: true, limit: "1mb" }));

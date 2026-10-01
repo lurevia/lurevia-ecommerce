@@ -1,8 +1,12 @@
 import type { Category } from "@prisma/client";
-import { type CategoryDto } from "../dto/categories_output.dto";
+import type { CategoryOutput } from "../dto/index";
+
+export type CategoryWithCount = Category & {
+  _count?: { products: number };
+};
 
 export class CategoriesMapper {
-  toOutput(category: Category & { _count?: { products: number; }; }): CategoryDto {
+  toOutput(category: CategoryWithCount): CategoryOutput {
     return {
       id: category.id,
       name: category.name,
@@ -18,8 +22,8 @@ export class CategoriesMapper {
     };
   }
 
-  toOutputList(items: Category & { _count?: { products: number; }; }[]) {
-    return items.map((item) => this.toOutput(item));
+  toOutputList(categories: CategoryWithCount[]): CategoryOutput[] {
+    return categories.map((category) => this.toOutput(category));
   }
 }
 

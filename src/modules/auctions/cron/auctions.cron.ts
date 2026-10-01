@@ -22,7 +22,6 @@ export async function closeExpiredAuctions() {
                 reservePrice === null || currentPrice >= reservePrice;
 
             if (winningBid && reserveMet) {
-                // SOLD
                 await auctionsRepository.closeAuction(product.id, {
                     status: "SOLD",
                     winnerId: winningBid.userId,

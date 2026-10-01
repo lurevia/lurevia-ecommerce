@@ -1,7 +1,5 @@
-/**
- * DTO de sortie : expose uniquement les champs publics + productCount.
- */
-export interface CategoryDto {
+
+export interface CategoryOutput {
   id: string;
   name: string;
   slug: string;

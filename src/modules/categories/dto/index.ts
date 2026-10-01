@@ -1,6 +1,4 @@
-export type {
-  CategoryDto,
-} from "./categories_output.dto";
+export type { CategoryOutput } from "./categories_output.dto";
 
 export {
   createCategorySchema,
