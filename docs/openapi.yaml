@@ -1,0 +1,3303 @@
+openapi: 3.0.3
+info:
+  title: Lurevia E-Commerce API
+  description: |
+    API REST complète pour **Lurevia** — Plateforme e-commerce artisanale malgache et enchères en direct.
+    
+    ### Fonctionnalités principales :
+    - **Authentification & Profils** : JWT (access token 15m, refresh token 30j en cookie HttpOnly), OAuth2 Google + Facebook, complétion profil post-OAuth, vérification d'identité CIN.
+    - **Catalogue artisanal** : Produits, catégories hiérarchiques, recherche texte/suggestions, gestion des stocks.
+    - **Enchères en direct (Auctions)** : Système d'enchères temps réel, anti-snipe 2 min, chat de salle d'enchères, suivi en direct.
+    - **Paniers & Favoris** : Gestion des articles, calcul des frais de livraison, calcul récapitulatif.
+    - **Commandes & Expéditions** : Cycle de commande (PENDING -> PAID -> SHIPPED -> DELIVERED), points relais (pickup points), zones tarifaires Madagascar.
+    - **Paiements Mobile Money Madagascar** : MVola (Telma), Orange Money, Airtel Money avec signature HMAC-SHA256 et webhooks sécurisés.
+    - **Suivi de livraison (Delivery Tracking)** : Numéro de suivi unique, journal d'événements géolocalisés.
+    - **Vendeurs & Artisans** : Tableaux de bord, contrats vendeurs, règlements (settlements), virements.
+    - **Cartes & Géolocalisation** : Intégration hybride SerpApi (Google Local) & OpenStreetMap (Nominatim).
+    - **Administration & Export** : Gestion RBAC (CUSTOMER, SELLER, ADMIN), métriques financières, exports Excel multi-onglets.
+  version: 1.0.0
+  contact:
+    name: Support Technique Lurevia
+    email: contact@lurevia.mg
+    url: https://lurevia-ecommerce.onrender.com
+  license:
+    name: Propriétaire - Tous droits réservés Lurevia Madagascar
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Serveur de Développement Local
+  - url: https://lurevia-ecommerce.onrender.com/api/v1
+    description: Serveur de Production (Render)
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Santé & Système
+  - name: Authentification
+  - name: Utilisateurs & Profils
+  - name: Vérification CIN
+  - name: Adresses
+  - name: Catégories
+  - name: Produits
+  - name: Avis & Notations
+  - name: Enchères (Auctions)
+  - name: Offres d'enchères (Bids)
+  - name: Panier
+  - name: Favoris
+  - name: Commandes
+  - name: Paiements (Mobile Money)
+  - name: Suivi de livraison
+  - name: Points Relais
+  - name: Zones de livraison
+  - name: Cartes & Lieux
+  - name: Retours & Réclamations
+  - name: Notifications
+  - name: Messagerie
+  - name: Newsletter
+  - name: Espace Vendeur
+  - name: Contrats Vendeurs
+  - name: Règlements & Virements
+  - name: Médias & Images
+  - name: Administration
+  - name: Paramètres
+  - name: Export Excel
+
+paths:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 1. Santé
+  # ═══════════════════════════════════════════════════════════════════════════
+  /health:
+    get:
+      tags: [Santé & Système]
+      summary: État de santé du service
+      security: []
+      responses:
+        "200":
+          description: Le serveur fonctionne normalement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: ok
+                      version:
+                        type: string
+                        example: 1.0.0
+                      timestamp:
+                        type: string
+                        format: date-time
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 2. Authentification
+  # ═══════════════════════════════════════════════════════════════════════════
+  /auth/login:
+    post:
+      tags: [Authentification]
+      summary: Connexion par email ou téléphone + mot de passe
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, password]
+              properties:
+                identifier:
+                  type: string
+                  description: Email OU numéro malgache (normalisé automatiquement)
+                  example: client@lurevia.mg
+                password:
+                  type: string
+                  format: password
+                  example: MotDePasse123!
+      responses:
+        "200":
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /auth/oauth/callback:
+    post:
+      tags: [Authentification]
+      summary: Inscription OU connexion via Google / Facebook
+      description: |
+        Route unique pour l'inscription ET la connexion sociale.
+        Si `needsProfileCompletion: true`, le client doit rediriger l'utilisateur
+        vers la complétion de profil (`PATCH /users/me/oauth-profile`).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, token]
+              properties:
+                provider:
+                  type: string
+                  enum: [GOOGLE, FACEBOOK]
+                  example: GOOGLE
+                token:
+                  type: string
+                  description: ID token Google ou access token Facebook
+                  example: eyJhbGciOiJSUzI1NiIsImtpZCI6...
+      responses:
+        "200":
+          description: Connexion OAuth réussie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/refresh:
+    post:
+      tags: [Authentification]
+      summary: Rafraîchir la paire de jetons JWT
+      description: Utilise le refresh token fourni dans le cookie HttpOnly.
+      security: []
+      responses:
+        "200":
+          description: Nouveaux jetons émis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /auth/logout:
+    post:
+      tags: [Authentification]
+      summary: Déconnexion utilisateur
+      responses:
+        "204":
+          description: Déconnexion réussie (cookie supprimé)
+
+  /auth/me:
+    get:
+      tags: [Authentification]
+      summary: Informations du compte connecté
+      responses:
+        "200":
+          description: Profil utilisateur courant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+
+  /auth/verification/request:
+    post:
+      tags: [Authentification]
+      summary: Demander la vérification du compte (admin valide manuellement)
+      responses:
+        "201":
+          description: Demande enregistrée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      alreadyPending:
+                        type: boolean
+                      requestId:
+                        type: string
+
+  /auth/verification/status:
+    get:
+      tags: [Authentification]
+      summary: Statut de vérification de l'utilisateur
+      responses:
+        "200":
+          description: État des vérifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      isVerified:
+                        type: boolean
+                      request:
+                        type: object
+                        nullable: true
+                        properties:
+                          id:
+                            type: string
+                          status:
+                            type: string
+                            enum: [PENDING, APPROVED, REJECTED, USED, EXPIRED]
+                          requestedAt:
+                            type: string
+                            format: date-time
+                          reason:
+                            type: string
+                            nullable: true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 3. Utilisateurs & Profils
+  # ═══════════════════════════════════════════════════════════════════════════
+  /users/me:
+    patch:
+      tags: [Utilisateurs & Profils]
+      summary: Mise à jour du profil (avatar immédiat, autres champs via demande admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                avatarUrl:
+                  type: string
+                  format: uri
+                  nullable: true
+      responses:
+        "200":
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: "#/components/schemas/User"
+                      pendingChange:
+                        type: object
+                        nullable: true
+                        properties:
+                          id:
+                            type: string
+                          status:
+                            type: string
+                            example: PENDING
+
+  /users/me/oauth-profile:
+    patch:
+      tags: [Utilisateurs & Profils]
+      summary: Compléter le profil après inscription Google/Facebook
+      description: |
+        Obligatoire pour les comptes OAuth. Fournit téléphone, mot de passe et CIN.
+        Une demande de vérification est automatiquement créée.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password, cinNumber]
+              properties:
+                fullName:
+                  type: string
+                phone:
+                  type: string
+                  example: "0341234567"
+                password:
+                  type: string
+                  format: password
+                  description: Min 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre
+                  example: MotDePasse123!
+                cinNumber:
+                  type: string
+                  description: 12 chiffres
+                  example: "101234567890"
+      responses:
+        "200":
+          description: Profil complété, demande de vérification créée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+        "409":
+          description: Téléphone ou CIN déjà utilisé
+
+  /users/me/change-password:
+    post:
+      tags: [Utilisateurs & Profils]
+      summary: Changer le mot de passe
+      description: Révoque automatiquement toutes les sessions actives.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                newPassword:
+                  type: string
+                  format: password
+                  example: NouveauMotDePasse123!
+      responses:
+        "204":
+          description: Mot de passe changé, sessions révoquées
+        "401":
+          description: Mot de passe actuel incorrect
+
+  /users/me/deletion-request:
+    post:
+      tags: [Utilisateurs & Profils]
+      summary: Demander la suppression de son compte
+      description: |
+        La suppression est validée manuellement par un admin
+        (protection contre les piratages de compte).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 1000
+      responses:
+        "201":
+          description: Demande enregistrée
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 4. Vérification CIN
+  # ═══════════════════════════════════════════════════════════════════════════
+  /identity-verifications:
+    get:
+      tags: [Vérification CIN]
+      summary: Lister les demandes de vérification (Admin)
+      responses:
+        "200":
+          description: Liste des vérifications
+    post:
+      tags: [Vérification CIN]
+      summary: Soumettre une pièce d'identité (CIN personnelle ou tuteur)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isGuardianVerification]
+              properties:
+                isGuardianVerification:
+                  type: boolean
+                  description: |
+                    `false` = vérification personnelle (CIN)
+                    `true` = vérification par tuteur (pour mineurs)
+                documentType:
+                  type: string
+                  enum: [CIN, PASSPORT, DRIVER_LICENSE, RESIDENCE_PERMIT]
+                documentNumber:
+                  type: string
+                documentUrl:
+                  type: string
+                  format: uri
+                documentUrlBack:
+                  type: string
+                  format: uri
+                selfieUrl:
+                  type: string
+                  format: uri
+                cinNumber:
+                  type: string
+                  description: 12 chiffres
+                guardianFullName:
+                  type: string
+                guardianCinNumber:
+                  type: string
+                guardianRelation:
+                  type: string
+                  enum: [FATHER, MOTHER, TUTOR, LEGAL_GUARDIAN, OTHER]
+                guardianCinDocumentUrl:
+                  type: string
+                  format: uri
+                guardianPhone:
+                  type: string
+                guardianConsentProofUrl:
+                  type: string
+                  format: uri
+      responses:
+        "201":
+          description: Demande de vérification enregistrée
+
+  /identity-verifications/me:
+    get:
+      tags: [Vérification CIN]
+      summary: État de sa propre vérification CIN
+      responses:
+        "200":
+          description: Statut (PENDING, APPROVED, REJECTED)
+
+  /identity-verifications/status:
+    get:
+      tags: [Vérification CIN]
+      summary: Résumé du statut de vérification pour l'utilisateur connecté
+      responses:
+        "200":
+          description: Statut global
+
+  /identity-verifications/{id}:
+    delete:
+      tags: [Vérification CIN]
+      summary: Annuler une demande PENDING
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Demande annulée
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 5. Adresses
+  # ═══════════════════════════════════════════════════════════════════════════
+  /addresses:
+    get:
+      tags: [Adresses]
+      summary: Liste des adresses de livraison
+      responses:
+        "200":
+          description: Adresses de l'utilisateur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      addresses:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Address"
+    post:
+      tags: [Adresses]
+      summary: Ajouter une adresse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressInput"
+      responses:
+        "201":
+          description: Adresse créée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      address:
+                        $ref: "#/components/schemas/Address"
+
+  /addresses/{id}:
+    get:
+      tags: [Adresses]
+      summary: Détail d'une adresse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détails de l'adresse
+    patch:
+      tags: [Adresses]
+      summary: Modifier une adresse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressInput"
+      responses:
+        "200":
+          description: Adresse modifiée
+    delete:
+      tags: [Adresses]
+      summary: Supprimer une adresse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Adresse supprimée
+
+  /addresses/{id}/default:
+    post:
+      tags: [Adresses]
+      summary: Définir comme adresse par défaut
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Adresse définie par défaut
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 6. Catégories
+  # ═══════════════════════════════════════════════════════════════════════════
+  /categories:
+    get:
+      tags: [Catégories]
+      summary: Lister les catégories
+      security: []
+      responses:
+        "200":
+          description: Liste des catégories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      categories:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Category"
+    post:
+      tags: [Catégories]
+      summary: Créer une catégorie (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, description, imageUrl, bannerUrl]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                imageUrl:
+                  type: string
+                  format: uri
+                bannerUrl:
+                  type: string
+                  format: uri
+                iconName:
+                  type: string
+                  default: ShoppingBag
+                position:
+                  type: integer
+                  default: 0
+      responses:
+        "201":
+          description: Catégorie créée
+
+  /categories/reorder:
+    patch:
+      tags: [Catégories]
+      summary: Réordonner les catégories (Admin, drag & drop)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, position]
+                    properties:
+                      id:
+                        type: string
+                      position:
+                        type: integer
+                        minimum: 0
+      responses:
+        "200":
+          description: Catégories réordonnées
+
+  /categories/slug/{slug}:
+    get:
+      tags: [Catégories]
+      summary: Obtenir une catégorie par slug
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détails de la catégorie
+
+  /categories/id/{id}:
+    get:
+      tags: [Catégories]
+      summary: Obtenir une catégorie par ID (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Catégorie trouvée
+
+  /categories/{id}:
+    patch:
+      tags: [Catégories]
+      summary: Modifier une catégorie (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Catégorie modifiée
+    delete:
+      tags: [Catégories]
+      summary: Supprimer une catégorie (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Catégorie supprimée
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 7. Produits
+  # ═══════════════════════════════════════════════════════════════════════════
+  /products:
+    get:
+      tags: [Produits]
+      summary: Rechercher et filtrer les produits
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+            maximum: 100
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: categories
+          in: query
+          schema:
+            type: string
+            description: Slugs séparés par virgules
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+        - name: priceMin
+          in: query
+          schema:
+            type: integer
+        - name: priceMax
+          in: query
+          schema:
+            type: integer
+        - name: pricingMode
+          in: query
+          schema:
+            type: string
+            enum: [FIXED, NEGOTIABLE, AUCTION, ON_REQUEST]
+        - name: availability
+          in: query
+          schema:
+            type: string
+            enum: [all, in-stock, out-of-stock]
+            default: all
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [newest, price-asc, price-desc, rating-desc, popular]
+            default: newest
+      responses:
+        "200":
+          description: Liste paginée de produits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedProducts"
+    post:
+      tags: [Produits]
+      summary: Créer un produit (Vendeur Vérifié / Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "201":
+          description: Produit créé
+
+  /products/search/suggestions:
+    get:
+      tags: [Produits]
+      summary: Suggestions d'autocomplétion
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 6
+            maximum: 20
+      responses:
+        "200":
+          description: Suggestions
+
+  /products/slug/{slug}:
+    get:
+      tags: [Produits]
+      summary: Obtenir un produit par slug
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Fiche produit
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /products/{id}:
+    get:
+      tags: [Produits]
+      summary: Obtenir un produit par ID
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Fiche produit
+    patch:
+      tags: [Produits]
+      summary: Mettre à jour un produit (propriétaire / Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "200":
+          description: Produit mis à jour
+    delete:
+      tags: [Produits]
+      summary: Supprimer un produit (propriétaire / Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Produit supprimé
+
+  /products/{id}/related:
+    get:
+      tags: [Produits]
+      summary: Produits liés
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 4
+      responses:
+        "200":
+          description: Produits associés
+
+  /products/seller/mine:
+    get:
+      tags: [Produits]
+      summary: Produits du vendeur connecté
+      responses:
+        "200":
+          description: Liste des produits
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 8. Avis & Notations
+  # ═══════════════════════════════════════════════════════════════════════════
+  /products/{productId}/reviews:
+    get:
+      tags: [Avis & Notations]
+      summary: Lister les avis sur un produit
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Liste des avis vérifiés
+    post:
+      tags: [Avis & Notations]
+      summary: Publier un avis après commande livrée
+      description: Nécessite un achat vérifié et 5 jours après livraison.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating, comment]
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                title:
+                  type: string
+                  maxLength: 120
+                comment:
+                  type: string
+                  maxLength: 2000
+      responses:
+        "201":
+          description: Avis publié
+
+  /products/{productId}/reviews/rating:
+    get:
+      tags: [Avis & Notations]
+      summary: Distribution des notes
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Moyenne + distribution
+
+  /products/{productId}/reviews/eligibility:
+    get:
+      tags: [Avis & Notations]
+      summary: Vérifier si l'utilisateur peut laisser un avis
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Statut d'éligibilité
+
+  /products/{productId}/reviews/me:
+    get:
+      tags: [Avis & Notations]
+      summary: Mon avis sur ce produit
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Mon avis ou null
+
+  /reviews/{id}:
+    patch:
+      tags: [Avis & Notations]
+      summary: Modifier son avis (repasse en modération)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Avis modifié
+    delete:
+      tags: [Avis & Notations]
+      summary: Supprimer son avis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Avis supprimé
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 9. Enchères (Auctions)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /auctions:
+    get:
+      tags: [Enchères (Auctions)]
+      summary: Lister les enchères
+      security: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [SCHEDULED, ACTIVE, ENDED, CANCELLED, SOLD, UNSOLD]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [ending-soon, newest, most-bids, price-desc]
+            default: ending-soon
+      responses:
+        "200":
+          description: Liste des enchères
+
+  /auctions/{productId}:
+    get:
+      tags: [Enchères (Auctions)]
+      summary: Détails de l'enchère
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détails de l'enchère
+
+  /auctions/{productId}/stats:
+    get:
+      tags: [Enchères (Auctions)]
+      summary: Statistiques live (offres, spectateurs, messages)
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Statistiques
+
+  /auctions/{productId}/watchers/count:
+    get:
+      tags: [Enchères (Auctions)]
+      summary: Nombre de spectateurs actifs
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Compteur de spectateurs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      watcherCount:
+                        type: integer
+
+  /auctions/{productId}/messages:
+    get:
+      tags: [Enchères (Auctions)]
+      summary: Messages du chat
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Flux des messages
+    post:
+      tags: [Enchères (Auctions)]
+      summary: Envoyer un message dans le chat
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  maxLength: 500
+      responses:
+        "201":
+          description: Message diffusé
+
+  /auctions/{productId}/messages/{messageId}:
+    delete:
+      tags: [Enchères (Auctions)]
+      summary: Supprimer un message (auteur ou admin)
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Message supprimé
+
+  /auctions/{productId}/watch:
+    post:
+      tags: [Enchères (Auctions)]
+      summary: S'abonner au suivi d'une enchère
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Enchère suivie
+    delete:
+      tags: [Enchères (Auctions)]
+      summary: Se désabonner
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Suivi arrêté
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 10. Offres d'enchères (Bids)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /bids:
+    post:
+      tags: [Offres d'enchères (Bids)]
+      summary: Placer une offre (enchère ou négociation)
+      description: |
+        Pour AUCTION : vérifie l'incrément minimum et prolonge de 2 min si offre
+        dans les dernières 2 minutes (anti-snipe).
+        Pour NEGOTIABLE : simple proposition en attente d'acceptation vendeur.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, proposedPrice]
+              properties:
+                productId:
+                  type: string
+                proposedPrice:
+                  type: integer
+                  description: En Ariary (MGA)
+                  example: 125000
+                comment:
+                  type: string
+                  maxLength: 500
+      responses:
+        "201":
+          description: Offre enregistrée
+        "409":
+          description: Offre trop basse ou produit non éligible
+
+  /bids/me:
+    get:
+      tags: [Offres d'enchères (Bids)]
+      summary: Historique de mes offres
+      responses:
+        "200":
+          description: Liste de mes offres
+
+  /bids/product/{productId}:
+    get:
+      tags: [Offres d'enchères (Bids)]
+      summary: Historique complet des offres (Vendeur/Admin)
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste ordonnée des offres
+
+  /bids/{id}/status:
+    patch:
+      tags: [Offres d'enchères (Bids)]
+      summary: Accepter ou refuser une offre (Vendeur propriétaire / Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [ACCEPTED, REJECTED, CANCELLED]
+      responses:
+        "200":
+          description: Statut mis à jour
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 11. Panier (Cart)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /cart:
+    get:
+      tags: [Panier]
+      summary: Contenu du panier
+      responses:
+        "200":
+          description: Panier avec totaux
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartResponse"
+    delete:
+      tags: [Panier]
+      summary: Vider le panier
+      responses:
+        "200":
+          description: Panier vidé
+
+  /cart/items:
+    post:
+      tags: [Panier]
+      summary: Ajouter un article au panier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity]
+              properties:
+                productId:
+                  type: string
+                quantity:
+                  type: integer
+                  minimum: 1
+                  maximum: 99
+                colorId:
+                  type: string
+                  nullable: true
+                sizeId:
+                  type: string
+                  nullable: true
+      responses:
+        "201":
+          description: Article ajouté
+
+  /cart/items/{productId}:
+    patch:
+      tags: [Panier]
+      summary: Modifier la quantité d'un article
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: colorId
+          in: query
+          schema:
+            type: string
+        - name: sizeId
+          in: query
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 0
+                  maximum: 99
+      responses:
+        "200":
+          description: Quantité mise à jour
+    delete:
+      tags: [Panier]
+      summary: Retirer un article du panier
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: colorId
+          in: query
+          schema:
+            type: string
+        - name: sizeId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Article retiré
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 12. Favoris (Favorites)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /favorites:
+    get:
+      tags: [Favoris]
+      summary: Liste des favoris
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Liste des favoris
+
+  /favorites/{productId}/toggle:
+    post:
+      tags: [Favoris]
+      summary: Ajouter ou retirer des favoris (toggle)
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Statut du favori
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      isFavorite:
+                        type: boolean
+                      productId:
+                        type: string
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 13. Commandes (Orders)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /orders:
+    get:
+      tags: [Commandes]
+      summary: Historique des commandes
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Liste des commandes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Order"
+    post:
+      tags: [Commandes]
+      summary: Créer une commande (checkout)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderInput"
+      responses:
+        "201":
+          description: Commande créée en PENDING
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      order:
+                        $ref: "#/components/schemas/Order"
+
+  /orders/{id}:
+    get:
+      tags: [Commandes]
+      summary: Détail d'une commande
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Fiche commande
+
+  /orders/{id}/cancel:
+    post:
+      tags: [Commandes]
+      summary: Annuler une commande (si non expédiée)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Commande annulée
+
+  /orders/{id}/status:
+    patch:
+      tags: [Commandes]
+      summary: Mettre à jour le statut (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PENDING, PAID, SHIPPED, DELIVERED, CANCELLED, COD_PENDING, COD_FAILED, REFUNDED, PAYMENT_FAILED]
+      responses:
+        "200":
+          description: Statut mis à jour
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 14. Paiements (Mobile Money Madagascar)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /payments/initiate:
+    post:
+      tags: [Paiements (Mobile Money)]
+      summary: Initier un paiement Mobile Money
+      description: |
+        Déclenche une notification Push USSD vers le téléphone de l'acheteur.
+        En dev, fonctionne sans clés sandbox configurées (stub).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, provider, phoneNumber]
+              properties:
+                orderId:
+                  type: string
+                provider:
+                  type: string
+                  enum: [MVOLA, ORANGE_MONEY, AIRTEL_MONEY]
+                phoneNumber:
+                  type: string
+                  description: Numéro malgache (ex 0341234567)
+      responses:
+        "201":
+          description: Paiement initié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      transaction:
+                        $ref: "#/components/schemas/PaymentTransaction"
+        "409":
+          description: Opérateur indisponible ou statut commande invalide
+
+  /payments:
+    get:
+      tags: [Paiements (Mobile Money)]
+      summary: Historique de mes transactions
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [INITIATED, PENDING, SUCCESS, FAILED, CANCELLED, REFUNDED]
+        - name: provider
+          in: query
+          schema:
+            type: string
+            enum: [MVOLA, ORANGE_MONEY, AIRTEL_MONEY]
+      responses:
+        "200":
+          description: Liste des transactions
+
+  /payments/{transactionId}:
+    get:
+      tags: [Paiements (Mobile Money)]
+      summary: Statut d'une transaction
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détails de la transaction
+
+  /payments/{transactionId}/refund:
+    post:
+      tags: [Paiements (Mobile Money)]
+      summary: Rembourser une transaction (Admin)
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Remboursement effectué
+
+  /payments/webhooks/{provider}:
+    post:
+      tags: [Paiements (Mobile Money)]
+      summary: Webhook opérateur (signé HMAC-SHA256)
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [MVOLA, ORANGE_MONEY, AIRTEL_MONEY]
+        - name: x-signature
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Notification traitée
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 15. Suivi de livraison (Delivery Tracking)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /delivery-tracking/my-deliveries:
+    get:
+      tags: [Suivi de livraison]
+      summary: Livraisons actives du livreur connecté
+      responses:
+        "200":
+          description: Liste des livraisons
+
+  /delivery-tracking/my-stats:
+    get:
+      tags: [Suivi de livraison]
+      summary: Statistiques du livreur connecté
+      responses:
+        "200":
+          description: Stats du livreur
+
+  /delivery-tracking/{orderId}/ping:
+    post:
+      tags: [Suivi de livraison]
+      summary: Envoyer une position GPS (Livreur)
+      description: Le premier ping assigne le livreur et passe la commande en SHIPPED.
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [latitude, longitude]
+              properties:
+                latitude:
+                  type: number
+                  example: -18.9083
+                longitude:
+                  type: number
+                  example: 47.5244
+                accuracy:
+                  type: number
+                speed:
+                  type: number
+                heading:
+                  type: number
+      responses:
+        "201":
+          description: Ping enregistré
+
+  /delivery-tracking/{orderId}/latest:
+    get:
+      tags: [Suivi de livraison]
+      summary: Dernière position du livreur
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Position actuelle
+
+  /delivery-tracking/{orderId}/history:
+    get:
+      tags: [Suivi de livraison]
+      summary: Historique complet du trajet
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+      responses:
+        "200":
+          description: Historique
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 16. Points Relais (Pickup Points)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /pickup-points/public:
+    get:
+      tags: [Points Relais]
+      summary: Points relais actifs (public)
+      security: []
+      parameters:
+        - name: province
+          in: query
+          schema:
+            type: string
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: city
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste des points relais
+
+  /pickup-points/public/by-region:
+    get:
+      tags: [Points Relais]
+      summary: Points relais d'une région (checkout)
+      security: []
+      parameters:
+        - name: region
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste
+
+  /pickup-points/admin:
+    get:
+      tags: [Points Relais]
+      summary: Liste admin des points relais
+      responses:
+        "200":
+          description: Liste paginée
+    post:
+      tags: [Points Relais]
+      summary: Créer un point relais (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PickupPointInput"
+      responses:
+        "201":
+          description: Point relais créé
+
+  /pickup-points/admin/{id}:
+    get:
+      tags: [Points Relais]
+      summary: Détail d'un point relais
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Point relais trouvé
+    patch:
+      tags: [Points Relais]
+      summary: Modifier un point relais (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Point relais mis à jour
+    delete:
+      tags: [Points Relais]
+      summary: Supprimer un point relais (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Point relais supprimé
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 17. Zones de livraison (Shipping Zones)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /shipping-zones/public:
+    get:
+      tags: [Zones de livraison]
+      summary: Zones actives (public)
+      security: []
+      responses:
+        "200":
+          description: Liste des zones
+
+  /shipping-zones/admin:
+    get:
+      tags: [Zones de livraison]
+      summary: Liste admin des zones
+      responses:
+        "200":
+          description: Liste paginée
+    post:
+      tags: [Zones de livraison]
+      summary: Créer une zone (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, regions, basePrice]
+              properties:
+                name:
+                  type: string
+                province:
+                  type: string
+                regions:
+                  type: array
+                  items:
+                    type: string
+                basePrice:
+                  type: integer
+                pricePerKg:
+                  type: integer
+                estimatedDays:
+                  type: integer
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        "201":
+          description: Zone créée
+
+  /shipping-zones/admin/{id}:
+    get:
+      tags: [Zones de livraison]
+      summary: Détail d'une zone
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Zone trouvée
+    patch:
+      tags: [Zones de livraison]
+      summary: Modifier une zone (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Zone mise à jour
+    delete:
+      tags: [Zones de livraison]
+      summary: Supprimer une zone (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Zone supprimée
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 18. Cartes & Lieux (Places Service)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /places/search:
+    get:
+      tags: [Cartes & Lieux]
+      summary: Recherche de lieux (SerpApi & OpenStreetMap)
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Analakely Antananarivo
+        - name: location
+          in: query
+          schema:
+            type: string
+            default: Madagascar
+      responses:
+        "200":
+          description: Résultats géographiques
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PlaceResult"
+
+  /places/status:
+    get:
+      tags: [Cartes & Lieux]
+      summary: Fournisseur actif
+      security: []
+      responses:
+        "200":
+          description: Configuration actuelle
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 19. Retours & Réclamations (Feedback)
+  # ═══════════════════════════════════════════════════════════════════════════
+  /feedback:
+    get:
+      tags: [Retours & Réclamations]
+      summary: Liste des retours (public filtré)
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Liste des feedbacks
+    post:
+      tags: [Retours & Réclamations]
+      summary: Soumettre un ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [overallRating, category, comment]
+              properties:
+                overallRating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                category:
+                  type: string
+                  enum: [delivery, payment, support, website, other]
+                comment:
+                  type: string
+                criteria:
+                  type: object
+                orderId:
+                  type: string
+                productId:
+                  type: string
+      responses:
+        "201":
+          description: Ticket enregistré
+
+  /feedback/stats:
+    get:
+      tags: [Retours & Réclamations]
+      summary: Statistiques globales
+      security: []
+      responses:
+        "200":
+          description: Moyenne et compteur
+
+  /feedback/me:
+    get:
+      tags: [Retours & Réclamations]
+      summary: Mes feedbacks
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Liste
+
+  /feedback/{id}:
+    patch:
+      tags: [Retours & Réclamations]
+      summary: Modifier son feedback
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Modifié
+    delete:
+      tags: [Retours & Réclamations]
+      summary: Supprimer son feedback
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Supprimé
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 20. Notifications
+  # ═══════════════════════════════════════════════════════════════════════════
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Flux des notifications
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        "200":
+          description: Notifications
+    delete:
+      tags: [Notifications]
+      summary: Supprimer toutes ses notifications
+      responses:
+        "204":
+          description: Supprimées
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Compteur non lues
+      responses:
+        "200":
+          description: Compteur
+
+  /notifications/{id}/read:
+    post:
+      tags: [Notifications]
+      summary: Marquer comme lue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Marquée
+
+  /notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Tout marquer comme lu
+      responses:
+        "204":
+          description: Tout marqué
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 21. Messagerie
+  # ═══════════════════════════════════════════════════════════════════════════
+  /messages:
+    get:
+      tags: [Messagerie]
+      summary: Liste des messages reçus
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Liste
+
+  /messages/unread-count:
+    get:
+      tags: [Messagerie]
+      summary: Nombre de messages non lus
+      responses:
+        "200":
+          description: Compteur
+
+  /messages/{id}:
+    get:
+      tags: [Messagerie]
+      summary: Détail d'un message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Message
+
+  /messages/{id}/read:
+    post:
+      tags: [Messagerie]
+      summary: Marquer un message comme lu
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Marqué
+
+  /messages/read-all:
+    post:
+      tags: [Messagerie]
+      summary: Tout marquer comme lu
+      responses:
+        "204":
+          description: Tout marqué
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 22. Newsletter
+  # ═══════════════════════════════════════════════════════════════════════════
+  /newsletter/subscribe:
+    post:
+      tags: [Newsletter]
+      summary: S'abonner
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Inscription enregistrée
+
+  /newsletter/unsubscribe:
+    post:
+      tags: [Newsletter]
+      summary: Se désabonner
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Désabonnement effectué
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 23. Espace Vendeur
+  # ═══════════════════════════════════════════════════════════════════════════
+  /seller/apply:
+    post:
+      tags: [Espace Vendeur]
+      summary: Candidater pour devenir vendeur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, value]
+              properties:
+                type:
+                  type: string
+                  enum: [PERCENTAGE, MONTHLY_FIXED]
+                value:
+                  type: integer
+      responses:
+        "201":
+          description: Candidature enregistrée
+
+  /seller/stats:
+    get:
+      tags: [Espace Vendeur]
+      summary: Statistiques vendeur
+      responses:
+        "200":
+          description: Métriques
+
+  /seller/products:
+    get:
+      tags: [Espace Vendeur]
+      summary: Mes produits
+      responses:
+        "200":
+          description: Liste
+    post:
+      tags: [Espace Vendeur]
+      summary: Créer un produit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "201":
+          description: Créé
+
+  /seller/products/{id}:
+    patch:
+      tags: [Espace Vendeur]
+      summary: Modifier un produit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Modifié
+    delete:
+      tags: [Espace Vendeur]
+      summary: Supprimer un produit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Supprimé
+
+  /seller/orders:
+    get:
+      tags: [Espace Vendeur]
+      summary: Commandes reçues
+      responses:
+        "200":
+          description: Liste
+
+  /seller/orders/{id}:
+    get:
+      tags: [Espace Vendeur]
+      summary: Détail commande
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détail
+
+  /seller/orders/{id}/status:
+    patch:
+      tags: [Espace Vendeur]
+      summary: Modifier statut commande
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Modifié
+
+  /seller/feedback:
+    get:
+      tags: [Espace Vendeur]
+      summary: Feedbacks reçus
+      responses:
+        "200":
+          description: Liste
+
+  /seller/contracts:
+    post:
+      tags: [Espace Vendeur]
+      summary: Créer un contrat vendeur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, value]
+              properties:
+                type:
+                  type: string
+                  enum: [PERCENTAGE, MONTHLY_FIXED]
+                value:
+                  type: integer
+      responses:
+        "201":
+          description: Contrat créé
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 24. Contrats Vendeurs
+  # ═══════════════════════════════════════════════════════════════════════════
+  /seller-contracts:
+    get:
+      tags: [Contrats Vendeurs]
+      summary: Mes contrats
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED]
+      responses:
+        "200":
+          description: Liste
+
+  /seller-contracts/active:
+    get:
+      tags: [Contrats Vendeurs]
+      summary: Contrat actif
+      responses:
+        "200":
+          description: Contrat actif ou null
+
+  /seller-contracts/{id}:
+    get:
+      tags: [Contrats Vendeurs]
+      summary: Détail d'un contrat
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détail
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 25. Règlements & Virements
+  # ═══════════════════════════════════════════════════════════════════════════
+  /settlements:
+    get:
+      tags: [Règlements & Virements]
+      summary: Mes règlements
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste
+
+  /settlements/summary:
+    get:
+      tags: [Règlements & Virements]
+      summary: Résumé financier
+      responses:
+        "200":
+          description: Total, en attente, payé
+
+  /settlements/{id}:
+    get:
+      tags: [Règlements & Virements]
+      summary: Détail règlement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détail
+
+  /transfers:
+    get:
+      tags: [Règlements & Virements]
+      summary: Mes virements
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste
+
+  /transfers/summary:
+    get:
+      tags: [Règlements & Virements]
+      summary: Résumé des virements
+      responses:
+        "200":
+          description: En attente, complétés, échoués
+
+  /transfers/{id}:
+    get:
+      tags: [Règlements & Virements]
+      summary: Détail virement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détail
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 26. Médias & Images
+  # ═══════════════════════════════════════════════════════════════════════════
+  /media:
+    get:
+      tags: [Médias & Images]
+      summary: Liste de mes médias
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Liste
+
+  /media/import:
+    post:
+      tags: [Médias & Images]
+      summary: Importer une image depuis une URL publique
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+      responses:
+        "201":
+          description: Image importée
+
+  /media/upload:
+    post:
+      tags: [Médias & Images]
+      summary: Téléverser une image en base64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dataUrl]
+              properties:
+                dataUrl:
+                  type: string
+                  description: data:image/jpeg;base64,/9j/4AAQ...
+      responses:
+        "201":
+          description: Image téléversée
+
+  /media/{id}:
+    delete:
+      tags: [Médias & Images]
+      summary: Supprimer un média
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Supprimé
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 27. Administration
+  # ═══════════════════════════════════════════════════════════════════════════
+  /admin/stats:
+    get:
+      tags: [Administration]
+      summary: Tableau de bord (Admin)
+      responses:
+        "200":
+          description: Métriques
+
+  /admin/users:
+    get:
+      tags: [Administration]
+      summary: Liste utilisateurs (Admin)
+      responses:
+        "200":
+          description: Liste paginée
+
+  /admin/users/{id}:
+    get:
+      tags: [Administration]
+      summary: Détail utilisateur
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détail
+    delete:
+      tags: [Administration]
+      summary: Supprimer un utilisateur
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Supprimé
+
+  /admin/users/{id}/role:
+    patch:
+      tags: [Administration]
+      summary: Modifier rôle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [CUSTOMER, SELLER, ADMIN]
+      responses:
+        "200":
+          description: Modifié
+
+  /admin/sellers:
+    get:
+      tags: [Administration]
+      summary: Liste vendeurs
+      responses:
+        "200":
+          description: Liste
+
+  /admin/orders:
+    get:
+      tags: [Administration]
+      summary: Liste toutes commandes
+      responses:
+        "200":
+          description: Liste
+
+  /admin/identity-verifications:
+    get:
+      tags: [Administration]
+      summary: Demandes CIN en attente
+      responses:
+        "200":
+          description: Liste
+
+  /admin/identity-verifications/{id}/approve:
+    post:
+      tags: [Administration]
+      summary: Approuver CIN
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approuvé
+
+  /admin/identity-verifications/{id}/reject:
+    post:
+      tags: [Administration]
+      summary: Rejeter CIN
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rejeté
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 28. Paramètres de plateforme
+  # ═══════════════════════════════════════════════════════════════════════════
+  /settings/public:
+    get:
+      tags: [Paramètres]
+      summary: Paramètres publics
+      security: []
+      responses:
+        "200":
+          description: Config publique
+
+  /settings/admin:
+    get:
+      tags: [Paramètres]
+      summary: Tous les paramètres (Admin)
+      responses:
+        "200":
+          description: Config complète
+    patch:
+      tags: [Paramètres]
+      summary: Mettre à jour (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Enregistré
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 29. Export Excel
+  # ═══════════════════════════════════════════════════════════════════════════
+  /export/me:
+    get:
+      tags: [Export Excel]
+      summary: Exporter ses données personnelles (RGPD)
+      responses:
+        "200":
+          description: Fichier Excel
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+# ═════════════════════════════════════════════════════════════════════════════
+# COMPOSANTS & SCHÉMAS DE DONNÉES
+# ═════════════════════════════════════════════════════════════════════════════
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: refreshToken
+
+  responses:
+    UnauthorizedError:
+      description: Non authentifié ou jeton invalide
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ForbiddenError:
+      description: Accès refusé
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFoundError:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: UNAUTHORIZED
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+
+    AuthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+            accessToken:
+              type: string
+              description: JWT d'accès (15 min)
+            needsProfileCompletion:
+              type: boolean
+              description: Présent uniquement après OAuth
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          format: uri
+        age:
+          type: integer
+          nullable: true
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+          nullable: true
+        role:
+          type: string
+          enum: [CUSTOMER, SELLER, ADMIN]
+        isVerified:
+          type: boolean
+        emailVerified:
+          type: boolean
+        phoneVerified:
+          type: boolean
+        primaryProvider:
+          type: string
+          enum: [LOCAL, GOOGLE, FACEBOOK]
+        identityVerificationStatus:
+          type: string
+          enum: [NOT_SUBMITTED, PENDING, APPROVED, REJECTED, EXPIRED]
+        isMinor:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        fullName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          nullable: true
+        province:
+          type: string
+          enum: [ANTANANARIVO, ANTSIRANANA, MAHAJANGA, TOAMASINA, FIANARANTSOA, TOLIARA]
+        region:
+          type: string
+        city:
+          type: string
+        neighborhood:
+          type: string
+          nullable: true
+        address:
+          type: string
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        isDefault:
+          type: boolean
+        pickupPoint:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            provider:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AddressInput:
+      type: object
+      required: [label, fullName, phone, province, region, city, address]
+      properties:
+        label:
+          type: string
+          maxLength: 60
+        fullName:
+          type: string
+          maxLength: 120
+        phone:
+          type: string
+          example: "0341234567"
+        email:
+          type: string
+          format: email
+        province:
+          type: string
+          enum: [ANTANANARIVO, ANTSIRANANA, MAHAJANGA, TOAMASINA, FIANARANTSOA, TOLIARA]
+        region:
+          type: string
+        city:
+          type: string
+        neighborhood:
+          type: string
+        address:
+          type: string
+          maxLength: 255
+        latitude:
+          type: number
+        longitude:
+          type: number
+        notes:
+          type: string
+          maxLength: 500
+        isDefault:
+          type: boolean
+          default: false
+        pickupPointId:
+          type: string
+          format: uuid
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        bannerUrl:
+          type: string
+        iconName:
+          type: string
+        position:
+          type: integer
+        productCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: string
+        description:
+          type: string
+          nullable: true
+        pricingMode:
+          type: string
+          enum: [FIXED, NEGOTIABLE, AUCTION, ON_REQUEST]
+        price:
+          type: integer
+          nullable: true
+        originalPrice:
+          type: integer
+          nullable: true
+        stock:
+          type: integer
+        isActive:
+          type: boolean
+        isNew:
+          type: boolean
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+        ownerId:
+          type: string
+          nullable: true
+
+    ProductInput:
+      type: object
+      required: [title, sku, categoryIds, images]
+      properties:
+        title:
+          type: string
+        sku:
+          type: string
+        description:
+          type: string
+        longDescription:
+          type: string
+        pricingMode:
+          type: string
+          enum: [FIXED, NEGOTIABLE, AUCTION, ON_REQUEST]
+          default: FIXED
+        price:
+          type: integer
+        originalPrice:
+          type: integer
+        stock:
+          type: integer
+          default: 0
+        categoryIds:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    PaginatedProducts:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            totalItems:
+              type: integer
+            totalPages:
+              type: integer
+
+    CartResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+            totalItems:
+              type: integer
+            totalPrice:
+              type: integer
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        orderNumber:
+          type: string
+          example: LUR-2026-A1B2C3
+        status:
+          type: string
+          enum: [PENDING, PAID, SHIPPED, DELIVERED, CANCELLED, COD_PENDING, COD_FAILED, REFUNDED, PAYMENT_FAILED]
+        paymentMethod:
+          type: string
+          enum: [mobile-money, card, cash, bank-transfer]
+        deliveryMode:
+          type: string
+          enum: [home-delivery, pickup-point]
+        subtotal:
+          type: integer
+        shippingCost:
+          type: integer
+        total:
+          type: integer
+        shipping:
+          type: object
+          properties:
+            fullName:
+              type: string
+            phone:
+              type: string
+            province:
+              type: string
+            region:
+              type: string
+            city:
+              type: string
+            address:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateOrderInput:
+      type: object
+      required: [deliveryMode, paymentMethod]
+      properties:
+        addressId:
+          type: string
+        shipping:
+          type: object
+        deliveryMode:
+          type: string
+          enum: [HOME_DELIVERY, PICKUP_POINT]
+        pickupPointId:
+          type: string
+        deliveryLatitude:
+          type: number
+        deliveryLongitude:
+          type: number
+        paymentMethod:
+          type: string
+          enum: [mobile-money, card, cash, bank-transfer]
+        mobileMoney:
+          type: object
+          properties:
+            provider:
+              type: string
+              enum: [mvola, orange-money, airtel-money]
+            phoneNumber:
+              type: string
+        paymentToken:
+          type: string
+
+    PaymentTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        provider:
+          type: string
+          enum: [MVOLA, ORANGE_MONEY, AIRTEL_MONEY]
+        amount:
+          type: integer
+        currency:
+          type: string
+          example: MGA
+        status:
+          type: string
+          enum: [INITIATED, PENDING, SUCCESS, FAILED, CANCELLED, REFUNDED]
+        externalId:
+          type: string
+          nullable: true
+
+    PickupPoint:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        province:
+          type: string
+        region:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        isActive:
+          type: boolean
+
+    PickupPointInput:
+      type: object
+      required: [name, provider, province, region, city, address]
+      properties:
+        name:
+          type: string
+        provider:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        province:
+          type: string
+        region:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        shippingZoneId:
+          type: string
+        isActive:
+          type: boolean
+          default: true
+
+    PlaceResult:
+      type: object
+      properties:
+        title:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        phone:
+          type: string
+          nullable: true
+        provider:
+          type: string
+          enum: [serpapi, openstreetmap, fallback]
