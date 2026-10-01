@@ -60,6 +60,7 @@ tags:
   - name: Médias & Images
   - name: Administration
   - name: Paramètres
+  - name: Pages du site
   - name: Export Excel
 
 paths:
@@ -2768,6 +2769,107 @@ paths:
         "200":
           description: Enregistré
 
+  # Gestion publique et administration des pages éditoriales
+  /pages/public:
+    get:
+      tags: [Pages du site]
+      summary: Lister les pages publiées
+      security: []
+      responses:
+        "200":
+          description: Pages publiques, y compris les documents légaux configurés
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SitePage"
+
+  /pages/public/{slug}:
+    get:
+      tags: [Pages du site]
+      summary: Obtenir une page publiée par son adresse
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Page publique
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SitePage"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /pages/admin:
+    get:
+      tags: [Pages du site]
+      summary: Lister les pages, y compris les brouillons (Admin)
+      responses:
+        "200":
+          description: Pages éditoriales
+    post:
+      tags: [Pages du site]
+      summary: Créer une page (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SitePageInput"
+      responses:
+        "201":
+          description: Page créée
+        "422":
+          description: Contenu invalide ou adresse réservée
+
+  /pages/admin/{id}:
+    patch:
+      tags: [Pages du site]
+      summary: Modifier une page (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SitePageUpdateInput"
+      responses:
+        "200":
+          description: Page modifiée
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+    delete:
+      tags: [Pages du site]
+      summary: Supprimer une page (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Page supprimée
+
   # ═══════════════════════════════════════════════════════════════════════════
   # 29. Export Excel
   # ═══════════════════════════════════════════════════════════════════════════
@@ -2848,6 +2950,84 @@ components:
             needsProfileCompletion:
               type: boolean
               description: Présent uniquement après OAuth
+
+    SitePage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        content:
+          type: string
+        showInFooter:
+          type: boolean
+        footerSection:
+          type: string
+          nullable: true
+          enum: [NAVIGATION, SERVICES, INFORMATION]
+        updatedAt:
+          type: string
+          format: date-time
+
+    SitePageInput:
+      type: object
+      required: [slug, title]
+      properties:
+        slug:
+          type: string
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          maxLength: 80
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        summary:
+          type: string
+          maxLength: 5000
+        content:
+          type: string
+          maxLength: 50000
+        published:
+          type: boolean
+        showInFooter:
+          type: boolean
+        footerSection:
+          type: string
+          nullable: true
+          enum: [NAVIGATION, SERVICES, INFORMATION]
+
+    SitePageUpdateInput:
+      type: object
+      minProperties: 1
+      properties:
+        slug:
+          type: string
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          maxLength: 80
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        summary:
+          type: string
+          maxLength: 5000
+        content:
+          type: string
+          maxLength: 50000
+        published:
+          type: boolean
+        showInFooter:
+          type: boolean
+        footerSection:
+          type: string
+          nullable: true
+          enum: [NAVIGATION, SERVICES, INFORMATION]
 
     User:
       type: object

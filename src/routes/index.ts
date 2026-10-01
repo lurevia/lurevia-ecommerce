@@ -49,6 +49,7 @@ import { mediaRouter } from "../modules/media";
 import { adminRouter } from "../modules/admin";
 import { settingsRouter } from "../modules/settings";
 import { exportRouter } from "../modules/export";
+import sitePagesRouter from "../modules/site-pages/routes/site-pages.routes";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Router principal
@@ -118,6 +119,7 @@ router.use("/media", mediaRouter);
 // ─── Admin & config ───
 router.use("/admin", adminRouter);
 router.use("/settings", settingsRouter);
+router.use("/pages", sitePagesRouter);
 router.use("/export", exportRouter);
 
 export default router;

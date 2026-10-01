@@ -1332,3 +1332,20 @@ model PlatformSettings {
   updatedAt DateTime @updatedAt
   updatedBy String?  @db.Uuid
 }
+
+model SitePage {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug         String   @unique @db.VarChar(80)
+  title        String   @db.VarChar(200)
+  summary      String   @default("") @db.Text
+  content      String   @default("") @db.Text
+  published    Boolean  @default(false)
+  showInFooter Boolean  @default(false)
+  footerSection String? @db.VarChar(20)
+  updatedBy    String?  @db.Uuid
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([published, showInFooter])
+  @@map("site_pages")
+}
