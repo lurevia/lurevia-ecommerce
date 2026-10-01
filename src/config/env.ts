@@ -91,6 +91,7 @@ const envSchema = z.object({
     .default(10 * 1024 * 1024),
 
   GOOGLE_MAPS_API_KEY: nullableString(),
+  GOOGLE_CLIENT_ID: nullableString(),
   SERPAPI_API_KEY: nullableString(),
   MAPS_PROVIDER: z.enum(["openstreetmap", "google", "serpapi"]).default("openstreetmap"),
 

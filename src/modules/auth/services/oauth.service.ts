@@ -7,6 +7,7 @@ import { UnauthorizedError } from "../../../errors/AppError";
 import { issueTokenPair } from "../lib/helper/auth.helper";
 import { authMapper } from "../mapper/auth.mapper";
 import { type OAuthProfile, type AuthResult } from "../lib/type/auth.type";
+import { googleOAuthService } from "./google-oauth.service";
 
 export class OAuthService {
     public async verifyFacebookToken(token: string): Promise<OAuthProfile> {
@@ -36,14 +37,21 @@ export class OAuthService {
         }
     }
 
+    public async verifyGoogleToken(token: string): Promise<OAuthProfile> {
+        return googleOAuthService.verifyToken(token);
+    }
+
     public async verifyProviderToken(
         provider: AuthProvider,
         token: string
     ): Promise<OAuthProfile> {
-        if (provider !== "FACEBOOK") {
-            throw new UnauthorizedError("Seule la connexion Facebook est prise en charge.");
+        if (provider === "FACEBOOK") {
+            return this.verifyFacebookToken(token);
         }
-        return this.verifyFacebookToken(token);
+        if (provider === "GOOGLE") {
+            return this.verifyGoogleToken(token);
+        }
+        throw new UnauthorizedError("Fournisseur de connexion non pris en charge.");
     }
 
     /**
@@ -127,6 +135,7 @@ export class OAuthService {
             data: {
                 fullName: profile.fullName,
                 email: profile.email,
+                emailVerified: profile.emailVerified ?? false,
                 phone: profile.phone,
                 avatarUrl: profile.avatarUrl,
                 isVerified: false,

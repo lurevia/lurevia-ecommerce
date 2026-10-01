@@ -36,6 +36,7 @@ export interface OAuthProfile {
   fullName: string;
   avatarUrl: string;
   phone: string | null;
+  emailVerified?: boolean;
 }
 
 export interface AuthResult {

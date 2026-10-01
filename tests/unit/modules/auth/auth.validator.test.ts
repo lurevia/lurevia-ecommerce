@@ -21,10 +21,12 @@ describe("auth validators", () => {
       .toThrow();
   });
 
-  it("accepts Facebook OAuth and rejects other providers", () => {
+  it("accepts Facebook and Google OAuth, and rejects other providers", () => {
     expect(oauthCallbackSchema.parse({ provider: "FACEBOOK", token: "token" }).provider)
       .toBe("FACEBOOK");
-    expect(() => oauthCallbackSchema.parse({ provider: "GOOGLE", token: "token" }))
+    expect(oauthCallbackSchema.parse({ provider: "GOOGLE", token: "token" }).provider)
+      .toBe("GOOGLE");
+    expect(() => oauthCallbackSchema.parse({ provider: "LOCAL", token: "token" }))
       .toThrow();
   });
 });

@@ -31,7 +31,7 @@ export const registerSchema = z.object({
 }).strict();
 
 export const oauthCallbackSchema = z.object({
-    provider: z.literal("FACEBOOK"),
+    provider: z.enum(["FACEBOOK", "GOOGLE"]),
     token: z.string().min(1, "Token requis"),
 }).strict();
 

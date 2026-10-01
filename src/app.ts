@@ -2,7 +2,6 @@ import express, { type Express, type RequestHandler } from "express";
 import path from "node:path";
 import fs from "node:fs";
 import helmet from "helmet";
-import cors from "cors";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import hpp from "hpp";
@@ -15,6 +14,7 @@ import {
   notFoundMiddleware,
 } from "./middlewares/error.middleware";
 import { globalRateLimiter } from "./middlewares/rateLimit.middleware";
+import { corsMiddleware } from "./middlewares/cors.middleware";
 
 export class Application {
   private readonly app: Express;
@@ -43,30 +43,7 @@ export class Application {
       })
     );
 
-    this.app.use(
-      cors({
-        origin: (origin, callback) => {
-          if (
-            !origin ||
-            env.corsOrigins.includes("*") ||
-            env.corsOrigins.includes(origin)
-          ) {
-            callback(null, true);
-            return;
-          }
-          callback(null, false);
-        },
-        credentials: true,
-        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
-        exposedHeaders: [
-          "X-Request-Id",
-          "RateLimit-Limit",
-          "RateLimit-Remaining",
-        ],
-        maxAge: 86400,
-      })
-    );
+    this.app.use(corsMiddleware);
 
     this.app.use(globalRateLimiter);
   }
