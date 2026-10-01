@@ -7,6 +7,14 @@ const prismaLogConfig: Prisma.LogLevel[] = env.isDevelopment
 	? ["warn", "error"]
 	: ["error"];
 
+/**
+ * Le mode « démo » (réponses factices quand la base est injoignable) est réservé
+ * au développement. En production, une erreur de base doit remonter telle quelle :
+ * sinon un `create` renverrait un faux `mock-id` sans rien écrire, et un
+ * `$transaction` serait rejoué hors transaction (risque de doublons / d'incohérences).
+ */
+const MOCK_FALLBACK_ENABLED = !env.isProduction && !env.isTest;
+
 const noOp: Record<string, (...args: any[]) => any> = {
 	findMany: async () => [],
 	findFirst: async () => null,
@@ -23,7 +31,46 @@ const noOp: Record<string, (...args: any[]) => any> = {
 	deleteMany: async () => ({ count: 0 }),
 };
 
+/**
+ * Enveloppe une PrismaPromise sans la dénaturer : `$transaction([...])` exige des
+ * PrismaPromise natives (`Symbol.toStringTag === "PrismaPromise"`). Un simple
+ * `.catch()` les transformait en `Promise` classiques et faisait échouer toutes les
+ * transactions en tableau. Ici seule la résolution (`then`) est interceptée ; le
+ * reste (dont le tag et `requestTransaction`) est délégué à l'objet d'origine.
+ */
+function withMockFallback(promise: any, model: string, method: string, args: any[]): any {
+	const fallback = async (err: any) => {
+		logger.warn(
+			{ model, method, error: err?.message || err },
+			"DB indisponible (dev) — réponse factice"
+		);
+		return method in noOp ? await noOp[method](...args) : null;
+	};
+	const safeThen = (onFulfilled?: any, onRejected?: any) =>
+		promise.then((value: unknown) => value, fallback).then(onFulfilled, onRejected);
+
+	return new Proxy(promise, {
+		get(target, prop) {
+			if (prop === "then") return safeThen;
+			if (prop === "catch") return (onRejected?: any) => safeThen(undefined, onRejected);
+			if (prop === "finally") {
+				return (onFinally?: any) =>
+					safeThen(
+						(v: unknown) => Promise.resolve(onFinally?.()).then(() => v),
+						(e: unknown) =>
+							Promise.resolve(onFinally?.()).then(() => {
+								throw e;
+							})
+					);
+			}
+			return Reflect.get(target, prop, target);
+		},
+	});
+}
+
 function wrapWithSafeDbFallback(client: any): PrismaClient {
+	if (!MOCK_FALLBACK_ENABLED) return client as PrismaClient;
+
 	return new Proxy(client, {
 		get(target, prop, receiver) {
 			if (prop === "$connect") {
@@ -31,7 +78,7 @@ function wrapWithSafeDbFallback(client: any): PrismaClient {
 					try {
 						return await target.$connect();
 					} catch (err) {
-						logger.warn({ err }, "[AI Studio] Base de données inaccessible — mode démo actif");
+						logger.warn({ err }, "Base de données inaccessible — mode démo actif");
 					}
 				};
 			}
@@ -56,7 +103,7 @@ function wrapWithSafeDbFallback(client: any): PrismaClient {
 					try {
 						return await target.$transaction(arg, options);
 					} catch (err) {
-						logger.warn({ err }, "[AI Studio] $transaction DB inaccessible — fallback mock");
+						logger.warn({ err }, "$transaction DB inaccessible — fallback mock");
 						if (typeof arg === "function") {
 							return await arg(receiver);
 						}
@@ -75,24 +122,10 @@ function wrapWithSafeDbFallback(client: any): PrismaClient {
 						const originalMethod = mTarget[mProp];
 						if (typeof originalMethod === "function") {
 							return (...args: any[]) => {
-								// On récupère la promesse ou l'objet de requête natif de Prisma
 								const promise = originalMethod.apply(mTarget, args);
-
-								// Si c'est une promesse (objet "thenable"), on attache le catch de sécurité
-								// sans encapsuler la fonction dans un bloc async global
 								if (promise && typeof promise.then === "function") {
-									return promise.catch(async (err: any) => {
-										logger.warn(
-											{ model: String(prop), method: String(mProp), error: err?.message || err },
-											"[AI Studio] DB offline — returning mock response"
-										);
-										if (typeof mProp === "string" && mProp in noOp) {
-											return await noOp[mProp](...args);
-										}
-										return null;
-									});
+									return withMockFallback(promise, String(prop), String(mProp), args);
 								}
-
 								return promise;
 							};
 						}
