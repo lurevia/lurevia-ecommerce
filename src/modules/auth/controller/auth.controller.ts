@@ -13,8 +13,18 @@ export class AuthController {
     ) { }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // LOGIN LOCAL (email/téléphone + mot de passe)
+    // Inscription et connexion par email
     // ═════════════════════════════════════════════════════════════════════════
+
+    register = asyncHandler(async (req: Request, res: Response) => {
+        const { user, tokens } = await this.authService.register(req.body, req.ip);
+        setRefreshTokenCookie(
+            res,
+            tokens.refreshToken,
+            tokens.refreshTokenExpiresAt
+        );
+        sendCreated(res, { user, accessToken: tokens.accessToken });
+    });
 
     login = asyncHandler(async (req: Request, res: Response) => {
         const { user, tokens } = await this.authService.login(req.body, req.ip);
@@ -56,7 +66,7 @@ export class AuthController {
     });
 
     // ═════════════════════════════════════════════════════════════════════════
-    // OAUTH (Google OU Facebook)
+    // Connexion Facebook
     // ═════════════════════════════════════════════════════════════════════════
 
     oauthCallback = asyncHandler(async (req: Request, res: Response) => {
@@ -77,15 +87,6 @@ export class AuthController {
         });
     });
 
-    requestVerification = asyncHandler(async (req: Request, res: Response) => {
-        const result = await this.authService.requestVerification(req.user!.id);
-        sendCreated(res, result);
-    });
-
-    verificationStatus = asyncHandler(async (req: Request, res: Response) => {
-        const status = await this.authService.getVerificationStatus(req.user!.id);
-        sendSuccess(res, status);
-    });
 }
 
 export const authController = new AuthController(authService, oauthService);

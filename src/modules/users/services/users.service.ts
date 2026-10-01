@@ -32,9 +32,7 @@ export class UsersService {
         const updated = await this.repository.update(userId, {
             fullName: input.fullName ?? user.fullName,
             phone: input.phone,
-            ...(input.password
-                ? { passwordHash: await hashPassword(input.password) }
-                : {}),
+            passwordHash: await hashPassword(input.password),
             // ✅ Ne PAS remettre isVerified à false si l'utilisateur était déjà vérifié.
             //    On le remet à false UNIQUEMENT si un nouveau téléphone est fourni
             //    (donc à vérifier).

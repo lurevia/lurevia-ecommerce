@@ -1,10 +1,9 @@
 import { authRepository, type AuthRepository } from "../repository/auth.repository";
-import { verifyPassword } from "../../../utils/password";
+import { hashPassword, verifyPassword } from "../../../utils/password";
 import { hashToken } from "../../../utils/refreshToken";
 import { ConflictError, UnauthorizedError } from "../../../errors/AppError";
-import type { LoginInput } from "../dto";
+import type { LoginInput, RegisterInput } from "../dto";
 import { logger } from "../../../lib/logger";
-import { prisma } from "../../../lib/prisma";
 import { authMapper } from "../mapper/auth.mapper";
 import { issueTokenPair } from "../lib/helper/auth.helper";
 
@@ -13,8 +12,30 @@ export class AuthService {
         private readonly repository: AuthRepository
     ) { }
 
+    async register(input: RegisterInput, createdByIp?: string) {
+        if (await this.repository.findByEmail(input.email)) {
+            throw new ConflictError("Cette adresse email est déjà utilisée.");
+        }
+        if (await this.repository.findByPhone(input.phone)) {
+            throw new ConflictError("Ce numéro de téléphone est déjà utilisé.");
+        }
+
+        const user = await this.repository.createUser({
+            fullName: input.fullName,
+            email: input.email,
+            phone: input.phone,
+            passwordHash: await hashPassword(input.password),
+            primaryIdentifier: "EMAIL",
+            primaryProvider: "LOCAL",
+        });
+        const tokens = await issueTokenPair(user.id, user.role, createdByIp);
+
+        logger.info({ userId: user.id }, "Inscription par email réussie; vérification d'identité requise");
+        return { user: authMapper.toOutput(user), tokens };
+    }
+
     async login(input: LoginInput, createdByIp?: string) {
-        const user = await this.repository.findUserByEmailOrPhone(input.identifier);
+        const user = await this.repository.findByEmail(input.email);
 
         if (!user) {
             throw new UnauthorizedError("Identifiants ou mot de passe incorrect.");
@@ -22,7 +43,7 @@ export class AuthService {
 
         if (!user.passwordHash) {
             throw new UnauthorizedError(
-                "Ce compte n'a pas de mot de passe. Connectez-vous avec Google ou Facebook."
+                "Ce compte n'a pas de mot de passe. Connectez-vous avec Facebook puis complétez votre compte."
             );
         }
 
@@ -101,74 +122,6 @@ export class AuthService {
         return authMapper.toOutput(user);
     }
 
-    async requestVerification(userId: string) {
-        const user = await this.repository.findUserById(userId);
-        if (!user) throw new UnauthorizedError("Utilisateur introuvable.");
-        if (user.isVerified) {
-            throw new ConflictError("Votre compte est déjà vérifié.");
-        }
-        if (!user.phone) {
-            throw new ConflictError(
-                "Ajoutez votre numéro de téléphone avant de demander la validation."
-            );
-        }
-
-        const pending = await prisma.verificationRequest.findFirst({
-            where: { userId, status: "PENDING" },
-        });
-
-        if (pending) {
-            return { alreadyPending: true, requestId: pending.id };
-        }
-
-        const request = await prisma.verificationRequest.create({
-            data: { userId, status: "PENDING" },
-        });
-
-        await prisma.adminNotification.create({
-            data: {
-                type: "CIN_VERIFICATION_REQUEST",
-                title: "Nouvelle demande de vérification",
-                message: `${user.fullName} (${user.email}) demande la vérification.`,
-                entityType: "VerificationRequest",
-                entityId: request.id,
-                actorUserId: userId,
-            },
-        });
-
-        logger.info({ userId, requestId: request.id }, "Demande de vérification");
-        return { alreadyPending: false, requestId: request.id };
-    }
-
-    async getVerificationStatus(userId: string) {
-        const user = await this.repository.findUserById(userId);
-        if (!user) throw new UnauthorizedError("Utilisateur introuvable.");
-
-        const request = await prisma.verificationRequest.findFirst({
-            where: { userId },
-            orderBy: { createdAt: "desc" },
-            select: {
-                id: true,
-                status: true,
-                createdAt: true,
-                expiresAt: true,
-                reason: true,
-            },
-        });
-
-        return {
-            isVerified: user.isVerified,
-            request: request
-                ? {
-                    id: request.id,
-                    status: request.status,
-                    requestedAt: request.createdAt,
-                    expiresAt: request.expiresAt,
-                    reason: request.reason,
-                }
-                : null,
-        };
-    }
 }
 
 export const authService = new AuthService(authRepository);

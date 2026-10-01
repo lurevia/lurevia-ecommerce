@@ -1,18 +1,17 @@
 # Module Auth
 
-Cycle de vie d'authentification utilisateur : inscription, connexion, rafraîchissement JWT, réinitialisation de mot de passe et OAuth2 (Google, Facebook).
+Cycle de vie d'authentification utilisateur : inscription et connexion par email/mot de passe, connexion Facebook et rafraîchissement JWT.
 
 ## Endpoints
 
 | Méthode | Route (relative au montage du router) | Auth | Handler |
 |---|---|---|---|
+| `POST` | `/register` | — | `register` |
 | `POST` | `/login` | — | `login` |
-| `POST` | `/oauth/callback` | — | `oauthCallback` |
+| `POST` | `/oauth/callback` | — | `oauthCallback` (Facebook uniquement) |
 | `POST` | `/refresh` | — | `refresh` |
 | `POST` | `/logout` | — | `logout` |
 | `GET` | `/me` | ✅ | `me` |
-| `POST` | `/verification/request` | ✅ | `requestVerification` |
-| `GET` | `/verification/status` | ✅ | `verificationStatus` |
 
 ## Structure
 ```bash
@@ -34,22 +33,18 @@ auth/
 ## Règles métier (erreurs levées par le service)
 
 - Identifiants ou mot de passe incorrect.
-- Ce compte n'a pas de mot de passe. Connectez-vous avec Google ou Facebook.
+- Ce compte n'a pas de mot de passe. Connectez-vous avec Facebook puis complétez votre compte.
 - Session invalide, veuillez vous reconnecter.
 - Session expirée, veuillez vous reconnecter.
 - Utilisateur introuvable.
-- Votre compte est déjà vérifié.
-- Ajoutez votre numéro de téléphone avant de demander la validation.
-- Token Google invalide.
 - Token Facebook invalide.
-- Fournisseur OAuth non supporté.
+- Une adresse email ou un numéro de téléphone est déjà utilisé.
 
 ## Dépendances
 
 - `@prisma/client`
 - `axios`
 - `express`
-- `google-auth-library`
 - `zod`
 - `config/env`
 - `errors/AppError`

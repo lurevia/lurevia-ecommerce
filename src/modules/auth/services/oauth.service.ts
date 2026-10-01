@@ -1,47 +1,14 @@
-import { OAuth2Client } from "google-auth-library";
 import axios from "axios";
 import { authRepository } from "../repository/auth.repository";
 import { logger } from "../../../lib/logger";
 import { prisma } from "../../../lib/prisma";
 import { AuthProvider } from "@prisma/client";
 import { UnauthorizedError } from "../../../errors/AppError";
-import { env } from "../../../config/env";
 import { issueTokenPair } from "../lib/helper/auth.helper";
 import { authMapper } from "../mapper/auth.mapper";
 import { type OAuthProfile, type AuthResult } from "../lib/type/auth.type";
 
 export class OAuthService {
-    private readonly googleClient: OAuth2Client;
-
-    constructor() {
-        this.googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID || undefined);
-    }
-
-    public async verifyGoogleToken(token: string): Promise<OAuthProfile> {
-        try {
-            const ticket = await this.googleClient.verifyIdToken({
-                idToken: token,
-                audience: env.GOOGLE_CLIENT_ID || undefined,
-            });
-            const payload = ticket.getPayload();
-
-            if (!payload || !payload.sub || !payload.email) {
-                throw new Error("Profil Google incomplet");
-            }
-
-            return {
-                providerUserId: payload.sub,
-                email: payload.email,
-                fullName: payload.name || "Utilisateur Google",
-                avatarUrl: payload.picture || "",
-                phone: null,
-            };
-        } catch (error) {
-            logger.error({ error }, "Erreur de vérification du token Google");
-            throw new UnauthorizedError("Token Google invalide.");
-        }
-    }
-
     public async verifyFacebookToken(token: string): Promise<OAuthProfile> {
         try {
             const response = await axios.get("https://graph.facebook.com/me", {
@@ -59,7 +26,7 @@ export class OAuthService {
             return {
                 providerUserId: data.id,
                 email: data.email,
-                fullName: data.name,
+                fullName: data.name || "Utilisateur Facebook",
                 avatarUrl: data.picture?.data?.url || "",
                 phone: data.phone ?? null,
             };
@@ -73,18 +40,14 @@ export class OAuthService {
         provider: AuthProvider,
         token: string
     ): Promise<OAuthProfile> {
-        switch (provider) {
-            case "GOOGLE":
-                return this.verifyGoogleToken(token);
-            case "FACEBOOK":
-                return this.verifyFacebookToken(token);
-            default:
-                throw new UnauthorizedError("Fournisseur OAuth non supporté.");
+        if (provider !== "FACEBOOK") {
+            throw new UnauthorizedError("Seule la connexion Facebook est prise en charge.");
         }
+        return this.verifyFacebookToken(token);
     }
 
     /**
-     * Inscription OU connexion via OAuth (Google/Facebook).
+     * Inscription ou connexion via Facebook.
      *
      * Flux :
      *  1. Vérifie le token OAuth → profil (email + nom + avatar + tel)

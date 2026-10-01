@@ -3,6 +3,9 @@ export {
   sellerListSchema,
   sellerStatusSchema,
   applySellerSchema,
+  updateSellerProfileSchema,
+  publicSellerListSchema,
+  publicSellerIdSchema,
   createProductSchema,
   updateProductSchema,
 } from "../validator/seller.validator";

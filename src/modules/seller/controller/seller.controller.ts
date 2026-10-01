@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../../../utils/asyncHandler";
 import { sellerService, type SellerService } from "../services/seller.service";
+import { sendSuccess } from "../../../utils/apiResponse";
+import { publicSellerListSchema } from "../dto";
 
 export class SellerController {
     constructor(
@@ -8,6 +10,23 @@ export class SellerController {
     ) { }
 
     apply = asyncHandler(async (req: Request, res: Response) => res.status(201).json({ data: await this.service.apply(req.user!.id, req.body) }));
+
+    publicProfiles = asyncHandler(async (req: Request, res: Response) => {
+        const query = publicSellerListSchema.parse(req.query);
+        sendSuccess(res, await this.service.listPublicProfiles(query));
+    });
+
+    publicProfile = asyncHandler(async (req: Request, res: Response) => {
+        sendSuccess(res, await this.service.getPublicProfile(req.params.id));
+    });
+
+    updateProfile = asyncHandler(async (req: Request, res: Response) => {
+        sendSuccess(res, { profile: await this.service.updateProfile(req.user!.id, req.body) });
+    });
+
+    myProfile = asyncHandler(async (req: Request, res: Response) => {
+        sendSuccess(res, { profile: await this.service.getMyProfile(req.user!.id) });
+    });
 
     products = asyncHandler(async (req: Request, res: Response) => res.json({ data: { products: await this.service.listProducts(req.user!.id, Number(req.query.page), Number(req.query.limit)) } }));
 

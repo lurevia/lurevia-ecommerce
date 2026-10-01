@@ -14,12 +14,6 @@ export class AuthRepository {
         return prisma.user.findUnique({ where: { id } });
     }
 
-    findUserByEmailOrPhone(identifier: string) {
-        return prisma.user.findFirst({
-            where: { OR: [{ email: identifier }, { phone: identifier }] },
-        });
-    }
-
     createUser(data: Prisma.UserCreateInput) {
         return prisma.user.create({ data });
     }

@@ -7,6 +7,10 @@ Espace vendeur : candidature, gestion de ses produits, commandes, retours client
 | Méthode | Route (relative au montage du router) | Auth | Handler |
 |---|---|---|---|
 | `POST` | `/apply` | ✅ Compte vérifié | `apply` |
+| `GET` | `/public` | Non | Répertoire des boutiques vérifiées, filtrable par recherche |
+| `GET` | `/public/:id` | Non | Boutique publique et produits actifs |
+| `GET` | `/profile` | ✅ Vendeur vérifié | Profil de sa boutique |
+| `PATCH` | `/profile` | ✅ Vendeur vérifié | Modification des champs publics de la boutique |
 | `POST` | `/contracts` | ✅ | `createContract` |
 | `GET` | `/stats` | ✅ | `stats` |
 | `GET` | `/feedback` | ✅ | `feedback` |

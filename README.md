@@ -345,35 +345,39 @@ sont disponibles sur `/admin/financial/stats`.
 
 ## Mobile Money (configuration future)
 
-## Authentification Google et Facebook
+## Authentification Facebook et email
 
-Le frontend utilise un flux OAuth popup et redirige vers :
+L'inscription et la connexion classiques utilisent l'adresse email et un mot
+de passe. La connexion Facebook peut créer un compte incomplet; l'utilisateur
+doit alors fournir son numéro de téléphone et définir un mot de passe via
+`PATCH /api/v1/users/me/oauth-profile`. Après inscription, il soumet son CIN
+pour examen manuel par un administrateur. Tant que cet examen est en attente,
+la boutique maintient la session sur la page de vérification; l'approbation
+redirige automatiquement vers le profil.
+
+Le frontend utilise un flux Facebook OAuth popup et redirige vers :
 
 ```text
 https://lurevia.github.io/auth/callback
 ```
 
-Configurez cette URL exactement dans les consoles Google et Facebook, puis
-ajoutez uniquement les identifiants publics côté build frontend :
+Configurez cette URL exactement dans la console Meta, puis ajoutez
+l'identifiant public côté build frontend :
 
 ```env
-VITE_GOOGLE_CLIENT_ID=...
 VITE_FACEBOOK_APP_ID=...
 ```
 
 Le backend doit recevoir les mêmes paramètres dans Render :
 
 ```env
-GOOGLE_CLIENT_ID=...
 FACEBOOK_APP_ID=...
 FACEBOOK_APP_SECRET=...
 ```
 
-Pour Facebook, l'application doit être en mode Live pour les utilisateurs
-réels et la permission `email` doit être activée. Pour Google, ajoutez le
-domaine `lurevia.github.io` dans les origines JavaScript autorisées et l'URI
-de callback dans les URI de redirection autorisées. Les secrets restent
-uniquement dans Render et ne doivent jamais être placés dans le frontend.
+L'application Facebook doit être en mode Live pour les utilisateurs réels et
+la permission `email` doit être activée. Les secrets restent uniquement dans
+Render et ne doivent jamais être placés dans le frontend.
 
 ## Initialiser le compte administrateur
 
@@ -395,7 +399,7 @@ INITIAL_ADMIN_RESET_PASSWORD=true
 ```
 
 Puis supprimez cette variable après l'exécution. La connexion admin utilise
-l'adresse email ou le numéro de téléphone exacts, sans espaces.
+l'adresse email exacte et le mot de passe.
 
 Un administrateur déjà connecté peut créer un autre compte administrateur via
 `POST /api/v1/admin/admins` avec `fullName`, `email`, `phone` et `password`.
@@ -403,11 +407,19 @@ Cette route exige les rôles `ADMIN` et n'est pas disponible depuis l'inscriptio
 publique. Le mot de passe est haché côté API et l'action est enregistrée dans
 le journal d'audit.
 
-Les comptes Google et Facebook sont créés sans `passwordHash` et sans numéro
-fictif. Après la connexion sociale, l'utilisateur doit renseigner un numéro
-malgache via `PATCH /api/v1/users/me/oauth-profile`, puis envoyer sa demande de
-validation. La migration `20260924162000_oauth_phone_nullable` supprime aussi
-les anciennes valeurs `NOT_PROVIDED`.
+Les comptes Facebook sont créés sans `passwordHash` ni numéro fictif. Après la
+connexion sociale, l'utilisateur doit fournir un numéro malgache et un mot de
+passe via `PATCH /api/v1/users/me/oauth-profile`, puis soumettre son CIN pour
+examen manuel. La migration `20260924162000_oauth_phone_nullable` supprime
+aussi les anciennes valeurs `NOT_PROVIDED`.
+
+## Profils publics vendeurs
+
+`GET /api/v1/seller/public` retourne les boutiques de vendeurs vérifiés et
+actifs, avec recherche sur leur nom et leur présentation. Chaque profil public
+(`GET /api/v1/seller/public/:id`) ne contient que le nom de boutique, la
+présentation, le logo et les produits actifs. Les données personnelles,
+notamment le CIN, l'email, le téléphone et le nom civil, ne sont pas exposées.
 
 Le checkout accepte encore `mobile-money`, mais aucune sortie d'argent vendeur
 ni appel MVola, Orange Money ou Airtel Money n'est activé. Pour activer un

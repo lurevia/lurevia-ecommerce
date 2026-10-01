@@ -1,7 +1,64 @@
 import { prisma } from "../../../lib/prisma";
 import { productDetailInclude } from "../../products/lib/constant/products.constant";
+import type { Prisma } from "@prisma/client";
 
 export class SellerRepository {
+    publicProfiles(search: string | undefined, skip: number, take: number) {
+        const where: Prisma.UserWhereInput = {
+            role: "SELLER",
+            isVerified: true,
+            isActive: true,
+            deletedAt: null,
+            publicStoreName: { not: null },
+            ...(search ? {
+                OR: [
+                    { publicStoreName: { contains: search, mode: "insensitive" } },
+                    { publicStoreDescription: { contains: search, mode: "insensitive" } },
+                ],
+            } : {}),
+        };
+        return prisma.$transaction([
+            prisma.user.findMany({
+                where,
+                select: {
+                    id: true,
+                    publicStoreName: true,
+                    publicStoreDescription: true,
+                    publicStoreLogoUrl: true,
+                    _count: { select: { ownedProducts: { where: { isActive: true } } } },
+                },
+                orderBy: { publicStoreName: "asc" },
+                skip,
+                take,
+            }),
+            prisma.user.count({ where }),
+        ]);
+    }
+
+    publicProfile(id: string) {
+        return prisma.user.findFirst({
+            where: {
+                id,
+                role: "SELLER",
+                isVerified: true,
+                isActive: true,
+                deletedAt: null,
+                publicStoreName: { not: null },
+            },
+            select: {
+                id: true,
+                publicStoreName: true,
+                publicStoreDescription: true,
+                publicStoreLogoUrl: true,
+                ownedProducts: {
+                    where: { isActive: true },
+                    orderBy: { createdAt: "desc" },
+                    include: productDetailInclude,
+                },
+            },
+        });
+    }
+
     products(ownerId: string, skip: number, take: number) {
         return prisma.$transaction([
             prisma.product.findMany({ where: { ownerId }, include: productDetailInclude, orderBy: { createdAt: "desc" }, skip, take }),

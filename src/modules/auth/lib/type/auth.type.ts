@@ -4,6 +4,7 @@ export type PublicUser = {
   id: string;
   fullName: string;
   email: string;
+  hasPassword: boolean;
   phone: string | null;
   avatarUrl: string | null;
   age: number | null;

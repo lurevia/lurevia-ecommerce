@@ -7,6 +7,7 @@ export class AuthMapper {
       id: user.id,
       fullName: user.fullName,
       email: user.email,
+      hasPassword: Boolean(user.passwordHash),
       phone: user.phone,
       avatarUrl: user.avatarUrl,
       age: user.age,

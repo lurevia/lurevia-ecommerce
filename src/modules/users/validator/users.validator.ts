@@ -58,7 +58,7 @@ export const completeOAuthProfileSchema = z
     .object({
         fullName: z.string().trim().min(2).max(120).optional(),
         phone: phoneSchema,
-        password: passwordSchema.optional(),
+        password: passwordSchema,
     })
     .strict();
 

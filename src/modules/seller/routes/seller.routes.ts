@@ -2,13 +2,17 @@ import { Router } from "express";
 import { requireAuth, requireRole, requireVerified } from "../../../middlewares/auth.middleware";
 import { validate } from "../../../middlewares/validate.middleware";
 import { sellerController } from "../controller/seller.controller";
-import { applySellerSchema, createProductSchema, sellerListSchema, sellerProductIdSchema, sellerStatusSchema, updateProductSchema } from "../dto";
+import { applySellerSchema, createProductSchema, publicSellerIdSchema, publicSellerListSchema, sellerListSchema, sellerProductIdSchema, sellerStatusSchema, updateProductSchema, updateSellerProfileSchema } from "../dto";
 import { financialController } from "../../financial/controller/financial.controller";
 import { createContractSchema } from "../../financial/validator/financial.validator";
 
 const router = Router();
+router.get("/public", validate({ query: publicSellerListSchema }), sellerController.publicProfiles);
+router.get("/public/:id", validate({ params: publicSellerIdSchema }), sellerController.publicProfile);
 router.post("/apply", requireAuth, requireVerified, validate({ body: applySellerSchema }), sellerController.apply);
 router.use(requireAuth, requireRole("SELLER"), requireVerified);
+router.get("/profile", sellerController.myProfile);
+router.patch("/profile", validate({ body: updateSellerProfileSchema }), sellerController.updateProfile);
 router.post("/contracts", validate({ body: createContractSchema }), financialController.createContract);
 router.get("/stats", sellerController.stats);
 router.get("/feedback", sellerController.feedback);

@@ -79,9 +79,6 @@ const envSchema = z.object({
     .default(24),
   AUCTION_MIN_INCREMENT: z.coerce.number().int().positive().default(1000),
 
-  GOOGLE_CLIENT_ID: nullableString(),
-  GOOGLE_CLIENT_SECRET: nullableString(),
-
   GITHUB_MEDIA_TOKEN: nullableString(),
   GITHUB_MEDIA_OWNER: z.string().default("lurevia"),
   GITHUB_MEDIA_REPO: z.string().default("lurevia-media"),
