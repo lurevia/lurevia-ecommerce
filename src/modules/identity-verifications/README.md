@@ -1,6 +1,8 @@
 # Module Identity Verifications
 
-Vérification des cartes d'identité (CIN), statut des mineurs avec vérification de tuteur légal et conformité légale.
+Vérification d'identité par soumission d'un numéro CIN uniquement. Aucune
+photo de document n'est collectée; faute d'API officielle vérifiable accessible,
+un administrateur examine la demande manuellement.
 
 ## Endpoints
 
@@ -32,6 +34,8 @@ identity-verifications/
 - Votre identité est déjà vérifiée.
 - Vous avez déjà une demande de vérification en cours de traitement.
 - Ce numéro CIN est déjà associé à un autre compte.
+- Une demande utilisant ce numéro CIN est déjà en cours.
+- Les pièces jointes ne sont pas acceptées.
 - Vérification introuvable.
 - Cette vérification ne vous appartient pas.
 - Seule une demande en attente peut être annulée.

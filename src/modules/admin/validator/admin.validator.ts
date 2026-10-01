@@ -35,6 +35,8 @@ export const listUsersQuerySchema = listQuerySchema.extend({
     role: z.enum(["CUSTOMER", "SELLER", "ADMIN"]).optional(),
     gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
     age: z.enum(["18-25", "26-35", "36-50", "51-99", "unknown"]).optional(),
+    sortField: z.enum(["createdAt", "fullName", "ordersCount"]).optional(),
+    sortOrder: z.enum(["ASC", "DESC"]).optional(),
 });
 
 export const listReviewsQuerySchema = listQuerySchema.extend({
@@ -92,7 +94,7 @@ export const verificationRejectSchema = z.object({
 });
 
 // ✅ NOUVEAU — Workflow CIN (IdentityVerification)
-export const identityVerificationStatusQuerySchema = z.object({
+export const identityVerificationStatusQuerySchema = listQuerySchema.extend({
     status: z
         .enum(["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED", "EXPIRED"])
         .optional(),

@@ -36,9 +36,37 @@ export class IdentityVerificationsRepository {
         });
     }
 
+    findLatestForUser(userId: string) {
+        return prisma.identityVerification.findFirst({
+            where: { userId },
+            orderBy: { submittedAt: "desc" },
+        });
+    }
+
+    findPendingByCin(cinNumber: string, excludeUserId: string) {
+        return prisma.identityVerification.findFirst({
+            where: {
+                status: "PENDING",
+                userId: { not: excludeUserId },
+                OR: [
+                    { cinNumber },
+                    { guardianCinNumber: cinNumber },
+                ],
+            },
+            select: { id: true },
+        });
+    }
+
     // ─── Création ───
     create(data: Prisma.IdentityVerificationCreateInput) {
-        return prisma.identityVerification.create({ data });
+        return prisma.$transaction(async (tx) => {
+            const verification = await tx.identityVerification.create({ data });
+            await tx.user.update({
+                where: { id: verification.userId },
+                data: { identityVerificationStatus: "PENDING" },
+            });
+            return verification;
+        });
     }
 
     // ─── Suppression (annulation avant traitement) ───

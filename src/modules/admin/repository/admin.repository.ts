@@ -1,5 +1,6 @@
 import { prisma } from "../../../lib/prisma";
-import type { DeletionRequestStatus, FeedbackCategory, OrderStatus, PaymentMethod } from "@prisma/client";
+import type { DeletionRequestStatus, FeedbackCategory, OrderStatus, PaymentMethod, Role } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { orderDetailInclude } from "../../orders/lib/constant/orders.constant";
 
 export class AdminRepository {
@@ -105,7 +106,16 @@ export class AdminRepository {
         role?: "CUSTOMER" | "SELLER" | "ADMIN";
         gender?: "MALE" | "FEMALE" | "OTHER";
         age?: string;
+        sortField: "createdAt" | "fullName" | "ordersCount";
+        sortOrder: "ASC" | "DESC";
     }) {
+        const direction = params.sortOrder === "ASC" ? "asc" : "desc";
+        const primaryOrder: Prisma.UserOrderByWithRelationInput =
+            params.sortField === "ordersCount"
+                ? { orders: { _count: direction } }
+                : params.sortField === "fullName"
+                    ? { fullName: direction }
+                    : { createdAt: direction };
         const where = {
             ...(params.role ? { role: params.role } : {}),
             ...(params.gender ? { gender: params.gender } : {}),
@@ -132,7 +142,7 @@ export class AdminRepository {
         return prisma.$transaction([
             prisma.user.findMany({
                 where,
-                orderBy: { createdAt: "desc" },
+                orderBy: [primaryOrder, { id: "asc" }],
                 skip: params.skip,
                 take: params.take,
                 select: {
@@ -176,7 +186,7 @@ export class AdminRepository {
         });
     }
 
-    updateUserRole(id: string, role: "CUSTOMER" | "SELLER" | "ADMIN") {
+    updateUserRole(id: string, role: Role) {
         return prisma.user.update({ where: { id }, data: { role } });
     }
 

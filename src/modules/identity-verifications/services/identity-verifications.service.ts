@@ -39,17 +39,30 @@ export class IdentityVerificationsService {
             );
         }
 
-        // Vérifie que le CIN n'est pas déjà utilisé par un autre compte
-        if (!input.isGuardianVerification && input.cinNumber) {
+        const submittedCin = input.isGuardianVerification
+            ? input.guardianCinNumber
+            : input.cinNumber;
+
+        if (submittedCin) {
             const existing = await prisma.user.findFirst({
                 where: {
-                    cinNumber: input.cinNumber,
                     id: { not: userId },
+                    OR: [
+                        { cinNumber: submittedCin },
+                        { guardianCinNumber: submittedCin },
+                    ],
                 },
                 select: { id: true },
             });
             if (existing) {
-                throw new ConflictError("Ce numéro CIN est déjà associé à un autre compte.");
+                throw new ConflictError("Ce numéro CIN est déjà associé à un autre compte vérifié.");
+            }
+            const pendingRequest = await this.repository.findPendingByCin(
+                submittedCin,
+                userId
+            );
+            if (pendingRequest) {
+                throw new ConflictError("Une demande utilisant ce numéro CIN est déjà en cours.");
             }
         }
 
@@ -57,21 +70,12 @@ export class IdentityVerificationsService {
             user: { connect: { id: userId } },
             isGuardianVerification: input.isGuardianVerification,
 
-            // Personnel
-            documentType: input.documentType,
-            documentNumber: input.documentNumber,
-            documentUrl: input.documentUrl,
-            documentUrlBack: input.documentUrlBack,
-            selfieUrl: input.selfieUrl,
             cinNumber: input.cinNumber,
 
-            // Tuteur
             guardianFullName: input.guardianFullName,
             guardianCinNumber: input.guardianCinNumber,
             guardianRelation: input.guardianRelation,
-            guardianCinDocumentUrl: input.guardianCinDocumentUrl,
             guardianPhone: input.guardianPhone,
-            guardianConsentProofUrl: input.guardianConsentProofUrl,
         });
 
         // Notifie les admins
@@ -164,6 +168,7 @@ export class IdentityVerificationsService {
         if (!user) throw new NotFoundError("Utilisateur");
 
         const pending = await this.repository.findPendingForUser(userId);
+        const latestRequest = await this.repository.findLatestForUser(userId);
 
         return {
             isVerified: user.isVerified,
@@ -173,6 +178,13 @@ export class IdentityVerificationsService {
             guardianCinVerifiedAt: user.guardianCinVerifiedAt,
             pendingRequest: pending
                 ? { id: pending.id, submittedAt: pending.submittedAt }
+                : null,
+            latestRequest: latestRequest
+                ? {
+                    status: latestRequest.status,
+                    submittedAt: latestRequest.submittedAt,
+                    rejectionReason: latestRequest.rejectionReason,
+                }
                 : null,
         };
     }

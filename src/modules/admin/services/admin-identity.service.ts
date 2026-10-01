@@ -14,34 +14,18 @@ export class AdminIdentityService {
                 : {}),
             ...(query.search
                 ? {
-                    user: {
-                        OR: [
-                            {
-                                fullName: {
-                                    contains: query.search,
-                                    mode: "insensitive" as const,
-                                },
+                    OR: [
+                        {
+                            user: {
+                                OR: [
+                                    { fullName: { contains: query.search, mode: "insensitive" as const } },
+                                    { email: { contains: query.search, mode: "insensitive" as const } },
+                                ],
                             },
-                            {
-                                email: {
-                                    contains: query.search,
-                                    mode: "insensitive" as const,
-                                },
-                            },
-                            {
-                                cinNumber: {
-                                    contains: query.search,
-                                    mode: "insensitive" as const,
-                                },
-                            },
-                            {
-                                guardianCinNumber: {
-                                    contains: query.search,
-                                    mode: "insensitive" as const,
-                                },
-                            },
-                        ],
-                    },
+                        },
+                        { cinNumber: { contains: query.search, mode: "insensitive" as const } },
+                        { guardianCinNumber: { contains: query.search, mode: "insensitive" as const } },
+                    ],
                 }
                 : {}),
         };
@@ -71,21 +55,23 @@ export class AdminIdentityService {
         const mapped = items.map((item) => ({
             id: item.id,
             userId: item.userId,
-            userName: item.user.fullName,
-            userEmail: item.user.email,
-            userPhone: item.user.phone,
+            user: {
+                id: item.user.id,
+                fullName: item.user.fullName,
+                email: item.user.email,
+                phone: item.user.phone,
+                avatarUrl: item.user.avatarUrl,
+            },
             status: item.status,
             isGuardian: item.isGuardianVerification,
-            documentType: item.documentType,
-            documentNumber: item.documentNumber,
             cinNumber: item.cinNumber,
             guardianFullName: item.guardianFullName,
             guardianCinNumber: item.guardianCinNumber,
             guardianRelation: item.guardianRelation,
             guardianPhone: item.guardianPhone,
-            submittedAt: item.submittedAt.toISOString(),
+            createdAt: item.submittedAt.toISOString(),
             reviewedAt: item.reviewedAt?.toISOString(),
-            rejectionReason: item.rejectionReason,
+            reason: item.rejectionReason,
         }));
 
         return buildPaginatedResult(mapped, totalItems, pagination);
@@ -100,6 +86,12 @@ export class AdminIdentityService {
         if (!request) throw new NotFoundError("Demande de vérification");
         if (request.status !== "PENDING") {
             throw new ConflictError("Cette demande a déjà été traitée.");
+        }
+        const cinNumber = request.isGuardianVerification
+            ? request.guardianCinNumber
+            : request.cinNumber;
+        if (!cinNumber) {
+            throw new ConflictError("Cette demande ne contient pas de numéro CIN à vérifier.");
         }
 
         return prisma.$transaction(async (tx) => {
@@ -118,7 +110,12 @@ export class AdminIdentityService {
                     data: {
                         isVerified: true,
                         isMinor: true,
+                        guardianCinNumber: request.guardianCinNumber,
+                        guardianFullName: request.guardianFullName,
+                        guardianRelation: request.guardianRelation,
+                        guardianPhone: request.guardianPhone,
                         guardianCinVerifiedAt: new Date(),
+                        identityVerificationStatus: "APPROVED",
                     },
                 });
             } else {
@@ -126,12 +123,20 @@ export class AdminIdentityService {
                     where: { id: request.userId },
                     data: {
                         isVerified: true,
+                        cinNumber: request.cinNumber,
                         cinVerifiedAt: new Date(),
                         identityVerifiedAt: new Date(),
                         identityVerificationStatus: "APPROVED",
                     },
                 });
             }
+            await tx.identityVerification.update({
+                where: { id: requestId },
+                data: {
+                    cinNumber: null,
+                    guardianCinNumber: null,
+                },
+            });
 
             await tx.notification.create({
                 data: {
@@ -146,7 +151,7 @@ export class AdminIdentityService {
                 },
             });
 
-            return updated;
+            return { ...updated, cinNumber: null, guardianCinNumber: null };
         });
     }
 
@@ -168,6 +173,8 @@ export class AdminIdentityService {
                     reviewedAt: new Date(),
                     reviewedBy: adminId,
                     rejectionReason: reason,
+                    cinNumber: null,
+                    guardianCinNumber: null,
                 },
             }),
             prisma.user.update({

@@ -8,7 +8,7 @@ import { createContractSchema } from "../../financial/validator/financial.valida
 
 const router = Router();
 router.post("/apply", requireAuth, requireVerified, validate({ body: applySellerSchema }), sellerController.apply);
-router.use(requireAuth, requireRole("SELLER"));
+router.use(requireAuth, requireRole("SELLER"), requireVerified);
 router.post("/contracts", validate({ body: createContractSchema }), financialController.createContract);
 router.get("/stats", sellerController.stats);
 router.get("/feedback", sellerController.feedback);

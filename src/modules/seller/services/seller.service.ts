@@ -22,8 +22,18 @@ export class SellerService {
                 where: { id: userId },
                 data: { role: "SELLER" },
             });
+            const latestContract = await tx.sellerContract.findFirst({
+                where: { sellerId: userId },
+                orderBy: { version: "desc" },
+                select: { version: true },
+            });
             const contract = await tx.sellerContract.create({
-                data: { sellerId: userId, version: 1, type: input.type, value: input.value },
+                data: {
+                    sellerId: userId,
+                    version: (latestContract?.version ?? 0) + 1,
+                    type: input.type,
+                    value: input.value,
+                },
             });
             return { user: updatedUser, contract };
         });

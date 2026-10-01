@@ -151,6 +151,13 @@ Les demandes de vérification approuvées par un administrateur déclenchent l'e
 du code par SMTP. Le code n'est jamais renvoyé dans la réponse HTTP admin ; si
 l'envoi échoue, la demande reste en attente et l'API renvoie une erreur explicite.
 
+La vérification d'identité CIN est distincte de la vérification par code. Elle
+ne collecte aucun scan ni photo. Aucune API officielle malgache de consultation
+du registre CIN n'ayant pu être confirmée publiquement, les numéros soumis sont
+examinés manuellement par l'administration. Le numéro CIN est supprimé de la
+demande après approbation ou rejet; les comptes approuvés le conservent pour
+éviter qu'un même numéro soit réutilisé.
+
 ---
 
 ## 4. Comptes de démonstration
@@ -193,7 +200,7 @@ tests/                  Tests unitaires et d'intégration (Vitest)
 
 Architecture en couches **Route → Controller → Service → Repository → Prisma**, cohérente sur l'ensemble des modules. Les deux anciens backends sont remplacés par cette seule application et ce seul singleton Prisma.
 
-La matrice complète des accès est disponible dans [docs/access-matrix.md](docs/access-matrix.md).
+Les règles d'accès sont documentées dans les guides des modules, notamment [admin](src/modules/admin/README.md) et [seller](src/modules/seller/README.md).
 
 ---
 
@@ -215,6 +222,13 @@ Toutes les routes sont préfixées par `/api/v1` (configurable via `API_PREFIX`)
 | **Feedback service** | `GET /feedback`, `GET /feedback/stats`, `POST /feedback`, `PATCH/DELETE /feedback/:id` |
 | **Notifications** | `GET /notifications`, `POST /notifications/:id/read`, `POST /notifications/read-all`, `DELETE /notifications` |
 | **Newsletter** | `POST /newsletter/subscribe` |
+| **Vérification d'identité** | `/identity-verifications` (soumission du CIN uniquement; examen manuel par l'administration) |
+| **Enchères** | `/auctions`, `/bids` |
+| **Paiements** | `/payments` |
+| **Livraison** | `/delivery-tracking`, `/shipping-zones`, `/pickup-points`, `/places` |
+| **Vendeur** | `/seller` (candidature vérifiée, produits, commandes, contrats) |
+| **Finances vendeur** | `/seller-contracts`, `/settlements`, `/transfers` |
+| **Administration** | `/admin` (utilisateurs, commandes, modération, demandes et configuration) |
 | **Santé** | `GET /health` |
 
 Toutes les réponses suivent le format `{ "data": ... }` en succès et `{ "error": { "code", "message", "details?" } }` en erreur.

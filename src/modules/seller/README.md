@@ -6,7 +6,7 @@ Espace vendeur : candidature, gestion de ses produits, commandes, retours client
 
 | Méthode | Route (relative au montage du router) | Auth | Handler |
 |---|---|---|---|
-| `POST` | `/apply` | ✅ | `apply` |
+| `POST` | `/apply` | ✅ Compte vérifié | `apply` |
 | `POST` | `/contracts` | ✅ | `createContract` |
 | `GET` | `/stats` | ✅ | `stats` |
 | `GET` | `/feedback` | ✅ | `feedback` |
@@ -17,6 +17,8 @@ Espace vendeur : candidature, gestion de ses produits, commandes, retours client
 | `GET` | `/orders` | ✅ | `orders` |
 | `GET` | `/orders/:id` | ✅ | `order` |
 | `PATCH` | `/orders/:id/status` | ✅ | `status` |
+
+Toutes les autres routes vendeur exigent un compte authentifié, vérifié et ayant le rôle `SELLER`.
 
 ## Structure
 ```bash

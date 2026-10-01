@@ -14,7 +14,7 @@ Tableau de bord et fonctionnalités d'administration générale (statistiques, g
 | `GET` | `/financial/transfers` | ✅ | `transfers` |
 | `POST` | `/financial/settlements/:id/transfer` | ✅ | `createTransfer` |
 | `GET` | `/stats` | ✅ | `stats` |
-| `GET` | `/users` | ✅ | `listUsers` |
+| `GET` | `/users` | ✅ | `listUsers` (`page`, `limit`, `search`, `role`, `gender`, `age`, `sortField`, `sortOrder`) |
 | `GET` | `/users/:id` | ✅ | `getUser` |
 | `PATCH` | `/users/:id/role` | ✅ | `updateUserRole` |
 | `DELETE` | `/users/:id` | ✅ | `removeUser` |
@@ -35,7 +35,7 @@ Tableau de bord et fonctionnalités d'administration générale (statistiques, g
 | `GET` | `/verifications` | ✅ | `listVerifications` |
 | `POST` | `/verifications/:id/approve` | ✅ | `approveVerification` |
 | `POST` | `/verifications/:id/reject` | ✅ | `rejectVerification` |
-| `GET` | `/identity-verifications` | ✅ | `listIdentityVerifications` |
+| `GET` | `/identity-verifications` | ✅ | `listIdentityVerifications` (CIN à valider manuellement) |
 | `POST` | `/identity-verifications/:id/approve` | ✅ | `approveIdentityVerification` |
 | `POST` | `/identity-verifications/:id/reject` | ✅ | `rejectIdentityVerification` |
 | `GET` | `/profile-change-requests` | ✅ | `listProfileChanges` |
@@ -71,6 +71,8 @@ admin/
 - L'adresse e-mail ou le téléphone est déjà utilisé.
 - Destinataire introuvable.
 - Utilisateur introuvable.
+- Un compte doit être vérifié avant de devenir vendeur.
+- Un compte lié à des commandes ne peut pas être supprimé directement ; sa demande de suppression/anonymisation doit être traitée.
 - Demande de vérification introuvable.
 - Avis introuvable.
 - Cet avis a déjà été rejeté.

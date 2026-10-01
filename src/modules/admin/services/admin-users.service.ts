@@ -1,4 +1,5 @@
 import { prisma } from "../../../lib/prisma";
+import type { Role } from "@prisma/client";
 import { adminRepository, type AdminRepository } from "../repository/admin.repository";
 import { buildPaginatedResult, normalizePagination } from "../../../utils/pagination";
 import { ConflictError, ForbiddenError, NotFoundError } from "../../../errors/AppError";
@@ -20,6 +21,8 @@ export class AdminUsersService {
             role: query.role,
             gender: query.gender,
             age: query.age,
+            sortField: query.sortField ?? "createdAt",
+            sortOrder: query.sortOrder ?? "DESC",
         });
         return buildPaginatedResult(adminUserMapper.toOutputList(users), totalItems, pagination);
     }
@@ -87,9 +90,12 @@ export class AdminUsersService {
         return buildPaginatedResult(items, totalItems, pagination);
     }
 
-    async updateUserRole(id: string, role: "CUSTOMER" | "SELLER" | "ADMIN") {
+    async updateUserRole(id: string, role: Role) {
         const user = await this.repository.findUserById(id);
         if (!user) throw new NotFoundError("Utilisateur");
+        if (role === "SELLER" && !user.isVerified) {
+            throw new ForbiddenError("Un compte doit être vérifié avant de devenir vendeur.");
+        }
         await this.repository.updateUserRole(id, role);
         const updated = await this.repository.findUserById(id);
         return adminUserMapper.toOutput(updated!);
@@ -103,7 +109,16 @@ export class AdminUsersService {
         }
         const user = await this.repository.findUserById(id);
         if (!user) throw new NotFoundError("Utilisateur");
-        await this.repository.deleteUser(id);
+        try {
+            await this.repository.deleteUser(id);
+        } catch (error) {
+            if (hasErrorCode(error, "P2003")) {
+                throw new ConflictError(
+                    "Ce compte est lié à des commandes ou à des données historiques. Traitez sa demande de suppression/anonymisation à la place."
+                );
+            }
+            throw error;
+        }
     }
 
     async createAdmin(
@@ -176,5 +191,11 @@ export class AdminUsersService {
         }
     }
 }
+
+const hasErrorCode = (error: unknown, code: string): boolean =>
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === code;
 
 export const adminUsersService = new AdminUsersService(adminRepository);
