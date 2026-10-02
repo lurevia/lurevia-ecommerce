@@ -16,6 +16,7 @@ export class CreateAddressDto implements CreateAddressInput {
     address!: string;
     latitude?: number;
     longitude?: number;
+    accuracyMeters?: number;
     notes?: string;
     isDefault!: boolean;
     pickupPointId?: string;
@@ -37,6 +38,7 @@ export class UpdateAddressDto implements UpdateAddressInput {
     address?: string;
     latitude?: number;
     longitude?: number;
+    accuracyMeters?: number;
     notes?: string;
     isDefault?: boolean;
     pickupPointId?: string;

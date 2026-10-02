@@ -17,7 +17,7 @@ export class SellerService {
         private readonly repository: SellerRepository
     ) { }
 
-    async apply(userId: string, input: { type: "PERCENTAGE" | "MONTHLY_FIXED"; value: number; storeName: string; storeDescription: string; storeCategoryId: string; storeLogoUrl?: string; }) {
+    async apply(userId: string, input: { type: "PERCENTAGE" | "MONTHLY_FIXED"; value: number; storeName: string; storeDescription: string; storeCategoryId: string; storeLogoUrl?: string; storeCoverUrl?: string; }) {
         return prisma.$transaction(async (tx) => {
             const category = await tx.category.findUnique({ where: { id: input.storeCategoryId }, select: { id: true } });
             if (!category) throw new NotFoundError("Catégorie de boutique");
@@ -34,6 +34,7 @@ export class SellerService {
                     publicStoreName: input.storeName,
                     publicStoreDescription: input.storeDescription,
                     publicStoreLogoUrl: input.storeLogoUrl,
+                    publicStoreCoverUrl: input.storeCoverUrl,
                     storeCategoryId: category.id,
                 },
             });
@@ -66,6 +67,7 @@ export class SellerService {
             storeName: seller.publicStoreName!,
             description: seller.publicStoreDescription,
             logoUrl: seller.publicStoreLogoUrl,
+            coverUrl: seller.publicStoreCoverUrl,
             storeCategoryId: seller.storeCategoryId,
             storeCategory: seller.storeCategory,
             productCount: seller._count.ownedProducts,
@@ -81,6 +83,7 @@ export class SellerService {
             storeName: seller.publicStoreName!,
             description: seller.publicStoreDescription,
             logoUrl: seller.publicStoreLogoUrl,
+            coverUrl: seller.publicStoreCoverUrl,
             storeCategoryId: seller.storeCategoryId,
             storeCategory: seller.storeCategory,
             products: productsMapper.toOutputList(seller.ownedProducts),
@@ -109,6 +112,7 @@ export class SellerService {
                 publicStoreName: input.storeName,
                 publicStoreDescription: input.storeDescription,
                 publicStoreLogoUrl: input.storeLogoUrl,
+                ...(input.storeCoverUrl !== undefined ? { publicStoreCoverUrl: input.storeCoverUrl } : {}),
                 ...(input.storeCategoryId ? { storeCategoryId: input.storeCategoryId } : {}),
             },
             select: {
@@ -117,6 +121,7 @@ export class SellerService {
                 publicStoreName: true,
                 publicStoreDescription: true,
                 publicStoreLogoUrl: true,
+                publicStoreCoverUrl: true,
                 storeCategory: { select: { id: true, name: true, slug: true } },
                 _count: { select: { ownedProducts: true } },
             },
@@ -126,6 +131,7 @@ export class SellerService {
             storeName: updated.publicStoreName,
             description: updated.publicStoreDescription,
             logoUrl: updated.publicStoreLogoUrl,
+            coverUrl: updated.publicStoreCoverUrl,
             storeCategoryId: updated.storeCategoryId,
             storeCategory: updated.storeCategory,
             productCount: updated._count.ownedProducts,
@@ -142,6 +148,7 @@ export class SellerService {
                 publicStoreName: true,
                 publicStoreDescription: true,
                 publicStoreLogoUrl: true,
+                publicStoreCoverUrl: true,
                 storeCategory: { select: { id: true, name: true, slug: true } },
                 _count: { select: { ownedProducts: true } },
             },
@@ -155,6 +162,7 @@ export class SellerService {
             storeName: seller.publicStoreName ?? "",
             description: seller.publicStoreDescription ?? "",
             logoUrl: seller.publicStoreLogoUrl,
+            coverUrl: seller.publicStoreCoverUrl,
             storeCategoryId: seller.storeCategoryId,
             storeCategory: seller.storeCategory,
             productCount: seller._count.ownedProducts,

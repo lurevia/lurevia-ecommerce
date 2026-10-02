@@ -296,6 +296,7 @@ model User {
   publicStoreName        String?
   publicStoreDescription String? @db.Text
   publicStoreLogoUrl     String?
+  publicStoreCoverUrl    String?  @db.Text
   isPrimaryAdmin         Boolean  @default(false)
   storeCategoryId        String?  @db.Uuid
   storeCategory          Category? @relation("SellerStoreCategory", fields: [storeCategoryId], references: [id], onDelete: SetNull)
@@ -546,6 +547,7 @@ model Address {
   address      String
   latitude     Float?
   longitude    Float?
+  accuracyMeters Float?
   notes        String?
   isDefault    Boolean            @default(false)
 

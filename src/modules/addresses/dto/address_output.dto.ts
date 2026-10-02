@@ -16,6 +16,7 @@ export type AddressOutput = {
     address: string;
     latitude: number | null;
     longitude: number | null;
+    accuracyMeters: number | null;
     notes: string | null;
     isDefault: boolean;
     pickupPoint: {

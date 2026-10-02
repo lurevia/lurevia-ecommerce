@@ -45,6 +45,87 @@ export class AdminRepository {
             prisma.adminNotification.count({ where: { read: false } }),
         ]);
 
+            const completedOrderStatuses: OrderStatus[] = ["PAID", "SHIPPED", "DELIVERED"];
+            const [ordersByStatusRows, chartItems, topProductGroups, paymentMethodRows, newCustomers, totalReviews] = await Promise.all([
+                prisma.order.groupBy({ by: ["status"], _count: { _all: true } }),
+                prisma.orderItem.findMany({
+                    where: {
+                        order: { status: { in: completedOrderStatuses }, createdAt: { gte: since30d } },
+                    },
+                    select: {
+                        quantity: true,
+                        priceSnapshot: true,
+                        order: { select: { createdAt: true } },
+                        product: {
+                            select: {
+                                categories: { select: { category: { select: { name: true } } } },
+                            },
+                        },
+                    },
+                }),
+                prisma.orderItem.groupBy({
+                    by: ["productId"],
+                    where: { order: { status: { in: completedOrderStatuses } } },
+                    _sum: { quantity: true },
+                    orderBy: { _sum: { quantity: "desc" } },
+                    take: 5,
+                }),
+                prisma.transaction.groupBy({
+                    by: ["method"],
+                    where: { status: "SUCCESS" },
+                    _count: { _all: true },
+                }),
+                prisma.user.findMany({
+                    where: { role: "CUSTOMER", createdAt: { gte: since7d } },
+                    select: { createdAt: true },
+                }),
+                prisma.productReview.count(),
+            ]);
+
+            const startOfToday = new Date();
+            startOfToday.setUTCHours(0, 0, 0, 0);
+            const formatChartDate = (date: Date) =>
+                new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(date);
+            const revenueByDate = new Map<string, number>();
+            for (let dayOffset = 29; dayOffset >= 0; dayOffset -= 1) {
+                const date = new Date(startOfToday);
+                date.setUTCDate(date.getUTCDate() - dayOffset);
+                revenueByDate.set(formatChartDate(date), 0);
+            }
+            const salesByCategoryMap = new Map<string, number>();
+            for (const item of chartItems) {
+                const dateLabel = formatChartDate(item.order.createdAt);
+                if (revenueByDate.has(dateLabel)) {
+                    revenueByDate.set(
+                        dateLabel,
+                        (revenueByDate.get(dateLabel) ?? 0) + item.quantity * item.priceSnapshot
+                    );
+                }
+                const categoryName = item.product.categories[0]?.category.name ?? "Sans catégorie";
+                salesByCategoryMap.set(
+                    categoryName,
+                    (salesByCategoryMap.get(categoryName) ?? 0) + item.quantity * item.priceSnapshot
+                );
+            }
+
+            const topProductRecords = await prisma.product.findMany({
+                where: { id: { in: topProductGroups.map((item) => item.productId) } },
+                select: { id: true, title: true },
+            });
+            const topProductNames = new Map(topProductRecords.map((product) => [product.id, product.title]));
+            const userGrowthMap = new Map<string, number>();
+            for (let dayOffset = 6; dayOffset >= 0; dayOffset -= 1) {
+                const date = new Date(startOfToday);
+                date.setUTCDate(date.getUTCDate() - dayOffset);
+                userGrowthMap.set(formatChartDate(date), 0);
+            }
+            for (const customer of newCustomers) {
+                const dateLabel = formatChartDate(customer.createdAt);
+                if (userGrowthMap.has(dateLabel)) {
+                    userGrowthMap.set(dateLabel, (userGrowthMap.get(dateLabel) ?? 0) + 1);
+                }
+            }
+
         return {
             totalUsers,
             newUsers7d,
@@ -57,6 +138,22 @@ export class AdminRepository {
             pendingIdentityVerifications,
             pendingDeletionRequests,
             unreadAdminNotifications,
+                totalReviews,
+                revenueSeries: Array.from(revenueByDate, ([date, revenue]) => ({ date, revenue })),
+                ordersByStatus: ordersByStatusRows.map((item) => ({
+                    status: item.status,
+                    count: item._count._all,
+                })),
+                topProducts: topProductGroups.flatMap((item) => {
+                    const name = topProductNames.get(item.productId);
+                    return name ? [{ name, sales: item._sum.quantity ?? 0 }] : [];
+                }),
+                salesByCategory: Array.from(salesByCategoryMap, ([name, value]) => ({ name, value })),
+                paymentMethods: paymentMethodRows.map((item) => ({
+                    name: item.method.replaceAll("_", " "),
+                    value: item._count._all,
+                })),
+                userGrowth: Array.from(userGrowthMap, ([date, users]) => ({ date, users })),
         };
     }
 

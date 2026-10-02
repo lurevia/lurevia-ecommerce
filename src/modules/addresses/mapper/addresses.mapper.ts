@@ -22,6 +22,7 @@ export class AddressMapper {
       address: address.address,
       latitude: address.latitude,
       longitude: address.longitude,
+      accuracyMeters: address.accuracyMeters,
       notes: address.notes,
       isDefault: address.isDefault,
       pickupPoint: address.pickupPoint

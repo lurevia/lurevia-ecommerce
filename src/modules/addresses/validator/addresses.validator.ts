@@ -45,6 +45,7 @@ export const addressLineSchema = z
 
 export const latitudeSchema = z.number().min(-90).max(90).optional();
 export const longitudeSchema = z.number().min(-180).max(180).optional();
+export const accuracyMetersSchema = z.number().positive().max(100_000).optional();
 
 export const notesSchema = z
     .string()
@@ -82,6 +83,7 @@ export const baseAddressSchema = z.object({
     address: addressLineSchema,
     latitude: latitudeSchema,
     longitude: longitudeSchema,
+    accuracyMeters: accuracyMetersSchema,
     notes: notesSchema,
     isDefault: isDefaultSchema,
     pickupPointId: pickupPointIdSchema,
