@@ -162,14 +162,30 @@ demande après approbation ou rejet; les comptes approuvés le conservent pour
 
 ## 4. Comptes de démonstration
 
-Créés par `npm run seed` :
+En environnement non-production, exécutez d’abord la migration puis le seed :
+
+```bash
+npm run prisma:migrate:dev
+npm run seed
+```
+
+Le seed crée un admin principal, 100 vendeurs vérifiés, 10 000 clients vérifiés,
+des produits par boutique et 1 200 commandes/payements de démonstration pour
+alimenter les graphiques. Les données synthétiques sont idempotentes et ne sont
+pas créées lorsque `NODE_ENV=production`. Définissez `SEED_DEMO_DATA=false` pour
+les omettre dans un environnement de développement.
+
+Comptes de connexion locaux :
 
 | Rôle       | Identifiant           | Mot de passe   |
 |------------|------------------------|----------------|
-| Admin      | `admin@lurevia.mg`     | `Admin1234!`   |
-| Client     | `client@lurevia.mg`    | `Client1234!`  |
+| Admin principal | `admin@lurevia.mg` | `Admin12345!` |
+| Client démo | `demo.client.00001@lurevia.test` | `Client1234!` |
+| Vendeur démo | `rakoto.artisan@lurevia.mg` | `Seller1234!` |
 
-**Changez ces mots de passe (ou supprimez ces comptes) avant toute mise en production réelle.**
+Les 100 comptes vendeurs partagent le mot de passe local `Seller1234!`.
+Les adresses supplémentaires suivent `demo.vendeur.006` à `demo.vendeur.100`.
+Les mots de passe de démonstration ne doivent jamais être utilisés en production.
 
 ---
 

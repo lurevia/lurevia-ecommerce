@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { categoriesController } from "../controller/categories.controller";
-import { requireAuth, requirePrimaryAdmin } from "../../../middlewares/auth.middleware";
+import { requireAuth, requirePrimaryAdmin, requireRole } from "../../../middlewares/auth.middleware";
 import { validate } from "../../../middlewares/validate.middleware";
 import { categoryIdParamsSchema, categorySlugParamsSchema, createCategorySchema, reorderCategoriesSchema, updateCategorySchema } from "../dto";
 
@@ -30,7 +30,7 @@ router.post(
 router.patch(
     "/reorder",
     requireAuth,
-    requirePrimaryAdmin,
+    requireRole("ADMIN"),
     validate({ body: reorderCategoriesSchema }),
     categoriesController.reorder
 );
@@ -38,7 +38,7 @@ router.patch(
 router.get(
     "/id/:id",
     requireAuth,
-    requirePrimaryAdmin,
+    requireRole("ADMIN"),
     validate({ params: categoryIdParamsSchema }),
     categoriesController.getById
 );
@@ -46,7 +46,7 @@ router.get(
 router.patch(
     "/:id",
     requireAuth,
-    requirePrimaryAdmin,
+    requireRole("ADMIN"),
     validate({ params: categoryIdParamsSchema, body: updateCategorySchema }),
     categoriesController.update
 );
@@ -54,7 +54,7 @@ router.patch(
 router.delete(
     "/:id",
     requireAuth,
-    requirePrimaryAdmin,
+    requireRole("ADMIN"),
     validate({ params: categoryIdParamsSchema }),
     categoriesController.remove
 );

@@ -66,6 +66,7 @@ export class SellerService {
             storeName: seller.publicStoreName!,
             description: seller.publicStoreDescription,
             logoUrl: seller.publicStoreLogoUrl,
+            storeCategoryId: seller.storeCategoryId,
             storeCategory: seller.storeCategory,
             productCount: seller._count.ownedProducts,
         }));
@@ -80,6 +81,7 @@ export class SellerService {
             storeName: seller.publicStoreName!,
             description: seller.publicStoreDescription,
             logoUrl: seller.publicStoreLogoUrl,
+            storeCategoryId: seller.storeCategoryId,
             storeCategory: seller.storeCategory,
             products: productsMapper.toOutputList(seller.ownedProducts),
         };
@@ -174,19 +176,11 @@ export class SellerService {
     }
 
     async createProduct(userId: string, input: CreateProductInput) {
-        const categoryId = await this.requireStoreCategory(userId);
-        this.assertProductCategory(input.categoryIds, categoryId);
-        return productsService.create({ ...input, categoryIds: [categoryId] }, userId);
+        return productsService.create(input, userId, "SELLER");
     }
 
     async updateProduct(userId: string, id: string, input: UpdateProductInput) {
-        const categoryId = await this.requireStoreCategory(userId);
-        if (input.categoryIds) this.assertProductCategory(input.categoryIds, categoryId);
-        return productsService.update(
-            id,
-            { ...input, ...(input.categoryIds ? { categoryIds: [categoryId] } : {}) },
-            userId
-        );
+        return productsService.update(id, input, userId, "SELLER");
     }
 
     removeProduct(userId: string, id: string) {
@@ -221,21 +215,6 @@ export class SellerService {
         return this.repository.stats(userId);
     }
 
-    private async requireStoreCategory(userId: string) {
-        const seller = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { role: true, storeCategoryId: true },
-        });
-        if (!seller || seller.role !== "SELLER") throw new ForbiddenError("Compte vendeur requis.");
-        if (!seller.storeCategoryId) throw new ConflictError("Choisissez d’abord la catégorie de votre boutique.");
-        return seller.storeCategoryId;
-    }
-
-    private assertProductCategory(categoryIds: string[], storeCategoryId: string) {
-        if (categoryIds.some((categoryId) => categoryId !== storeCategoryId)) {
-            throw new ForbiddenError("Tous les produits doivent utiliser la catégorie de votre boutique.");
-        }
-    }
 }
 
 export const sellerService = new SellerService(sellerRepository);

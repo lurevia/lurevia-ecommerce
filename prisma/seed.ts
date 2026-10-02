@@ -13,6 +13,7 @@ import {
   RegionMadagascar,
 } from "@prisma/client";
 import { hashPassword } from "../src/utils/password";
+import { seedDemoData } from "./seed/demo-data";
 
 const prisma = new PrismaClient();
 
@@ -64,6 +65,7 @@ interface SeedSeller {
   contractValue: number;
   province: ProvinceMadagascar;
   region: RegionMadagascar;
+  storeCategorySlug: string;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -98,12 +100,13 @@ function sellerLogo(email: string): string {
 const REALISTIC_STOCK = () => Math.floor(Math.random() * 40) + 5;
 const REALISTIC_RATING = () => Math.round((4 + Math.random()) * 10) / 10;
 const REALISTIC_REVIEWS = () => Math.floor(Math.random() * 80) + 3;
+const SEED_DEMO_DATA = process.env.NODE_ENV !== "production" && process.env.SEED_DEMO_DATA !== "false";
 
 // ═════════════════════════════════════════════════════════════════════════════
 // DONNÉES : VENDEURS
 // ═════════════════════════════════════════════════════════════════════════════
 
-const SELLERS: SeedSeller[] = [
+const SELLER_TEMPLATES: SeedSeller[] = [
   {
     email: "rakoto.artisan@lurevia.mg",
     phone: "+261341000001",
@@ -117,6 +120,7 @@ const SELLERS: SeedSeller[] = [
     contractValue: 10,
     province: ProvinceMadagascar.ANTANANARIVO,
     region: RegionMadagascar.ANALAMANGA,
+    storeCategorySlug: "artisanat-decoration",
   },
   {
     email: "soa.beaute@lurevia.mg",
@@ -131,6 +135,7 @@ const SELLERS: SeedSeller[] = [
     contractValue: 12,
     province: ProvinceMadagascar.ANTANANARIVO,
     region: RegionMadagascar.ITASY,
+    storeCategorySlug: "beaute-soins",
   },
   {
     email: "tiana.mode@lurevia.mg",
@@ -145,6 +150,7 @@ const SELLERS: SeedSeller[] = [
     contractValue: 15,
     province: ProvinceMadagascar.ANTANANARIVO,
     region: RegionMadagascar.ANALAMANGA,
+    storeCategorySlug: "mode-vetements",
   },
   {
     email: "hery.epicerie@lurevia.mg",
@@ -159,6 +165,7 @@ const SELLERS: SeedSeller[] = [
     contractValue: 50000,
     province: ProvinceMadagascar.TOAMASINA,
     region: RegionMadagascar.ATSINANANA,
+    storeCategorySlug: "epicerie-fine",
   },
   {
     email: "naina.maison@lurevia.mg",
@@ -173,7 +180,24 @@ const SELLERS: SeedSeller[] = [
     contractValue: 12,
     province: ProvinceMadagascar.FIANARANTSOA,
     region: RegionMadagascar.HAUTE_MATSIATRA,
+    storeCategorySlug: "sacs-maroquinerie",
   },
+];
+
+const SELLERS: SeedSeller[] = [
+  ...SELLER_TEMPLATES,
+  ...Array.from({ length: 95 }, (_, index) => {
+    const sellerNumber = index + 6;
+    const template = SELLER_TEMPLATES[index % SELLER_TEMPLATES.length];
+    return {
+      ...template,
+      email: `demo.vendeur.${String(sellerNumber).padStart(3, "0")}@lurevia.mg`,
+      phone: `+26132${String(sellerNumber).padStart(7, "0")}`,
+      fullName: `${template.fullName} ${sellerNumber}`,
+      cinNumber: String(800_000_000_000 + sellerNumber),
+      storeName: `${template.storeName} ${sellerNumber}`,
+    };
+  }),
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1100,6 +1124,7 @@ async function seedAdmin() {
     where: { email: adminEmail },
     update: {
       role: Role.ADMIN,
+      isPrimaryAdmin: true,
       isVerified: true,
       emailVerified: true,
       phoneVerified: true,
@@ -1112,6 +1137,7 @@ async function seedAdmin() {
       primaryIdentifier: AuthIdentifier.EMAIL,
       primaryProvider: AuthProvider.LOCAL,
       role: Role.ADMIN,
+      isPrimaryAdmin: true,
       emailVerified: true,
       phoneVerified: true,
       isVerified: true,
@@ -1126,14 +1152,26 @@ async function seedAdmin() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 async function seedSellers(adminId: string) {
-  console.log("\n🏪 Vendeurs…");
+  const sellersToSeed = SEED_DEMO_DATA ? SELLERS : SELLER_TEMPLATES;
+  console.log(`\n🏪 ${sellersToSeed.length} vendeurs vérifiés…`);
+  const passwordHash = await hashPassword(SELLER_TEMPLATES[0].password);
+  const categories = await prisma.category.findMany({ select: { id: true, slug: true } });
+  const categoryIds = new Map(categories.map((category) => [category.slug, category.id]));
 
-  for (const s of SELLERS) {
-    const passwordHash = await hashPassword(s.password);
+  for (const s of sellersToSeed) {
+    const storeCategoryId = categoryIds.get(s.storeCategorySlug);
+    if (!storeCategoryId) throw new Error(`Catégorie introuvable : ${s.storeCategorySlug}`);
 
     const seller = await prisma.user.upsert({
       where: { email: s.email },
-      update: {},
+      update: {
+        role: Role.SELLER,
+        isVerified: true,
+        emailVerified: true,
+        phoneVerified: true,
+        isPrimaryAdmin: false,
+        storeCategoryId,
+      },
       create: {
         fullName: s.fullName,
         email: s.email,
@@ -1145,6 +1183,8 @@ async function seedSellers(adminId: string) {
         emailVerified: true,
         phoneVerified: true,
         isVerified: true,
+        isPrimaryAdmin: false,
+        storeCategoryId,
         publicStoreName: s.storeName,
         publicStoreDescription: s.storeDescription,
         publicStoreLogoUrl: sellerLogo(s.email),
@@ -1234,25 +1274,20 @@ async function seedCategories() {
 async function seedProducts() {
   console.log("\n📦 Produits…\n");
 
-  // Cache des users et catégories
+  // Chaque produit suit la catégorie de la boutique de son vendeur.
   const users = await prisma.user.findMany({
     where: { email: { in: SELLERS.map((s) => s.email) } },
-    select: { id: true, email: true },
+    select: { id: true, email: true, storeCategoryId: true },
   });
-  const userMap = new Map(users.map((u) => [u.email, u.id]));
-
-  const categories = await prisma.category.findMany({
-    where: { slug: { in: CATEGORIES.map((c) => c.slug) } },
-    select: { id: true, slug: true },
-  });
-  const categoryMap = new Map(categories.map((c) => [c.slug, c.id]));
+  const userMap = new Map(users.map((user) => [user.email, user]));
 
   let created = 0;
   let skipped = 0;
 
   for (const p of PRODUCTS) {
-    const ownerId = userMap.get(p.ownerEmail);
-    const categoryId = categoryMap.get(p.categorySlug);
+    const owner = userMap.get(p.ownerEmail);
+    const ownerId = owner?.id;
+    const categoryId = owner?.storeCategoryId;
 
     if (!ownerId || !categoryId) {
       console.warn(
@@ -1310,6 +1345,45 @@ async function seedProducts() {
     created += 1;
   }
 
+  if (SEED_DEMO_DATA) {
+    for (const [sellerIndex, seller] of SELLERS.entries()) {
+      const owner = userMap.get(seller.email);
+      if (!owner?.storeCategoryId || sellerIndex < SELLER_TEMPLATES.length) continue;
+
+      for (let productIndex = 1; productIndex <= 2; productIndex += 1) {
+        const sku = `DEMO-${String(sellerIndex + 1).padStart(3, "0")}-${productIndex}`;
+        const title = `${seller.storeName} — Création ${productIndex}`;
+        const existing = await prisma.product.findUnique({ where: { sku } });
+        if (existing) {
+          skipped += 1;
+          continue;
+        }
+        await prisma.product.create({
+          data: {
+            ownerId: owner.id,
+            title,
+            slug: slugify(title),
+            sku,
+            description: `Création artisanale proposée par ${seller.storeName}.`,
+            longDescription: seller.storeDescription,
+            price: 20_000 + ((sellerIndex * 7_919 + productIndex * 3_107) % 280_000),
+            stock: REALISTIC_STOCK(),
+            isActive: true,
+            isNew: productIndex === 1,
+            tags: [seller.storeCategorySlug, "fabrication locale"],
+            ratingCache: REALISTIC_RATING(),
+            reviewCountCache: REALISTIC_REVIEWS(),
+            images: {
+              create: productImages(sku, 3).map((url, position) => ({ url, position })),
+            },
+            categories: { create: [{ categoryId: owner.storeCategoryId }] },
+          },
+        });
+        created += 1;
+      }
+    }
+  }
+
   console.log(
     `\n   📊 ${created} produits créés, ${skipped} déjà présents.`
   );
@@ -1324,6 +1398,12 @@ async function main() {
   const start = Date.now();
 
   await seedPlatformSettings();
+  await seedAdmin();
+  if (process.env.NODE_ENV === "production") {
+    console.log("Seed de démonstration désactivé en production.");
+    return;
+  }
+  await seedCategories();
   const admin = await prisma.user.findUniqueOrThrow({
     where: {
       email: (
@@ -1333,8 +1413,8 @@ async function main() {
     select: { id: true },
   });
   await seedSellers(admin.id);
-  await seedCategories();
   await seedProducts();
+  if (SEED_DEMO_DATA) await seedDemoData(prisma);
 
   const duration = ((Date.now() - start) / 1000).toFixed(1);
   console.log(`\n🌱 Seed terminé avec succès en ${duration}s.\n`);
@@ -1342,9 +1422,13 @@ async function main() {
   console.log(
     `   Admin   : ${process.env.INITIAL_ADMIN_EMAIL || "admin@lurevia.mg"} / ${process.env.INITIAL_ADMIN_PASSWORD || "Admin12345!"}`
   );
-  console.log("\n   Vendeurs (mot de passe commun : Seller1234!) :");
-  for (const s of SELLERS) {
+  console.log("\n   Vendeurs de démonstration (mot de passe commun : Seller1234!) :");
+  for (const s of SELLER_TEMPLATES) {
     console.log(`   - ${s.storeName.padEnd(28)} → ${s.email}`);
+  }
+  if (SEED_DEMO_DATA) {
+    console.log("   - 95 comptes vendeurs supplémentaires : demo.vendeur.006 à demo.vendeur.100@lurevia.mg");
+    console.log("   - Comptes clients : demo.client.00001 à demo.client.10000@lurevia.test");
   }
   console.log(
     "\n💡 Inscris-toi comme client via POST /api/v1/auth/oauth/callback (Google)\n"

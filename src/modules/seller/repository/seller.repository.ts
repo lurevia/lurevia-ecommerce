@@ -1,3 +1,4 @@
+import { OrderStatus } from "@prisma/client";
 import { prisma } from "../../../lib/prisma";
 import { productDetailInclude } from "../../products/lib/constant/products.constant";
 import type { Prisma } from "@prisma/client";
@@ -25,6 +26,7 @@ export class SellerRepository {
                     publicStoreName: true,
                     publicStoreDescription: true,
                     publicStoreLogoUrl: true,
+                    storeCategoryId: true,
                     storeCategory: { select: { id: true, name: true, slug: true } },
                     _count: { select: { ownedProducts: { where: { isActive: true } } } },
                 },
@@ -51,6 +53,7 @@ export class SellerRepository {
                 publicStoreName: true,
                 publicStoreDescription: true,
                 publicStoreLogoUrl: true,
+                storeCategoryId: true,
                 storeCategory: { select: { id: true, name: true, slug: true } },
                 ownedProducts: {
                     where: { isActive: true },
@@ -88,13 +91,97 @@ export class SellerRepository {
     }
 
     async stats(ownerId: string) {
-        const [products, grouped, feedback, reviews] = await Promise.all([
+        const eligibleStatuses: OrderStatus[] = ["PAID", "SHIPPED", "DELIVERED"];
+        const startDate = new Date();
+        startDate.setUTCHours(0, 0, 0, 0);
+        startDate.setUTCDate(startDate.getUTCDate() - 29);
+
+        const [products, grouped, feedback, reviews, dailyOrders, pendingOrders, topProductGroups] = await Promise.all([
             prisma.product.count({ where: { ownerId } }),
-            prisma.orderItem.findMany({ where: { product: { ownerId }, order: { status: { not: "CANCELLED" } } }, select: { quantity: true, priceSnapshot: true } }),
+            prisma.orderItem.findMany({
+                where: { product: { ownerId }, order: { status: { in: eligibleStatuses } } },
+                select: { quantity: true, priceSnapshot: true },
+            }),
             prisma.serviceFeedback.aggregate({ where: { OR: [{ product: { ownerId } }, { order: { items: { some: { product: { ownerId } } } } }] }, _avg: { overallRating: true }, _count: true }),
             prisma.productReview.aggregate({ where: { product: { ownerId } }, _avg: { rating: true }, _count: true }),
+            prisma.order.findMany({
+                where: {
+                    status: { in: eligibleStatuses },
+                    createdAt: { gte: startDate },
+                    items: { some: { product: { ownerId } } },
+                },
+                select: {
+                    id: true,
+                    createdAt: true,
+                    items: {
+                        where: { product: { ownerId } },
+                        select: { quantity: true, priceSnapshot: true },
+                    },
+                },
+            }),
+            prisma.order.count({
+                where: {
+                    status: { in: ["PENDING", "COD_PENDING"] },
+                    items: { some: { product: { ownerId } } },
+                },
+            }),
+            prisma.orderItem.groupBy({
+                by: ["productId"],
+                where: { product: { ownerId }, order: { status: { in: eligibleStatuses } } },
+                _sum: { quantity: true },
+                orderBy: { _sum: { quantity: "desc" } },
+                take: 5,
+            }),
         ]);
-        return { products, sales: grouped.reduce((sum, item) => sum + item.quantity, 0), revenue: grouped.reduce((sum, item) => sum + item.quantity * item.priceSnapshot, 0), feedbackCount: feedback._count, feedbackAverage: feedback._avg.overallRating ?? 0, reviewCount: reviews._count, reviewAverage: reviews._avg.rating ?? 0 };
+
+        const dailyMap = new Map<string, { orderIds: Set<string>; revenue: number }>();
+        for (let dayOffset = 0; dayOffset < 30; dayOffset += 1) {
+            const date = new Date(startDate);
+            date.setUTCDate(date.getUTCDate() + dayOffset);
+            dailyMap.set(date.toISOString().slice(0, 10), { orderIds: new Set(), revenue: 0 });
+        }
+        for (const order of dailyOrders) {
+            const dateKey = order.createdAt.toISOString().slice(0, 10);
+            const day = dailyMap.get(dateKey);
+            if (!day) continue;
+            day.orderIds.add(order.id);
+            day.revenue += order.items.reduce(
+                (sum, item) => sum + item.quantity * item.priceSnapshot,
+                0
+            );
+        }
+
+        const topProductIds = topProductGroups.map((item) => item.productId);
+        const topProductRecords = await prisma.product.findMany({
+            where: { id: { in: topProductIds } },
+            select: { id: true, title: true, images: { orderBy: { position: "asc" }, take: 1, select: { url: true } } },
+        });
+        const topProductMap = new Map(topProductRecords.map((product) => [product.id, product]));
+
+        return {
+            products,
+            sales: grouped.reduce((sum, item) => sum + item.quantity, 0),
+            revenue: grouped.reduce((sum, item) => sum + item.quantity * item.priceSnapshot, 0),
+            pendingOrders,
+            daily: Array.from(dailyMap, ([date, day]) => ({
+                date,
+                sales: day.orderIds.size,
+                revenue: day.revenue,
+            })),
+            topProducts: topProductGroups.flatMap((item) => {
+                const product = topProductMap.get(item.productId);
+                return product ? [{
+                    id: product.id,
+                    title: product.title,
+                    unitsSold: item._sum?.quantity ?? 0,
+                    imageUrl: product.images[0]?.url ?? null,
+                }] : [];
+            }),
+            feedbackCount: feedback._count,
+            feedbackAverage: feedback._avg.overallRating ?? 0,
+            reviewCount: reviews._count,
+            reviewAverage: reviews._avg.rating ?? 0,
+        };
     }
 }
 

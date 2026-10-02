@@ -10,6 +10,7 @@ export type PublicUser = {
   age: number | null;
   gender: "MALE" | "FEMALE" | "OTHER" | null;
   role: "SELLER" | "CUSTOMER" | "ADMIN";
+  isPrimaryAdmin: boolean;
   isVerified: boolean;
   emailVerified: boolean;
   phoneVerified: boolean;

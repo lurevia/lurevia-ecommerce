@@ -13,6 +13,7 @@ export class AuthMapper {
       age: user.age,
       gender: user.gender,
       role: user.role,
+      isPrimaryAdmin: user.isPrimaryAdmin,
       isVerified: user.isVerified,
       emailVerified: user.emailVerified,
       phoneVerified: user.phoneVerified,

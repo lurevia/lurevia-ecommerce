@@ -48,7 +48,7 @@ export class ProductsController {
     });
 
     create = asyncHandler(async (req: Request, res: Response) => {
-        const product = await this.service.create(req.body, req.user!.id);
+        const product = await this.service.create(req.body, req.user!.id, req.user!.role);
         sendCreated(res, { product });
     });
 

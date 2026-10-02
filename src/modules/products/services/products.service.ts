@@ -42,13 +42,15 @@ export class ProductsService {
         const results = await this.repository.searchSuggestions(q, limit);
         return results.map((p) => ({
             id: p.id,
+            slug: p.slug,
             title: p.title,
             price: p.price,
             imageUrl: p.images[0]?.url ?? null,
         }));
     }
 
-    async create(input: CreateProductInput, ownerId: string) {
+    async create(input: CreateProductInput, ownerId: string, userRole = "SELLER") {
+        const categoryIds = await this.enforceSellerCategory(input.categoryIds, ownerId, userRole);
         const existingSku = await this.repository.findBySku(input.sku);
         if (existingSku) throw new ConflictError("Ce SKU est déjà utilisé.");
 
@@ -89,7 +91,7 @@ export class ProductsService {
             colors: { create: input.colors },
             sizes: { create: input.sizes.map((value) => ({ value })) },
             categories: {
-                create: input.categoryIds.map((categoryId) => ({ categoryId })),
+                create: categoryIds.map((categoryId) => ({ categoryId })),
             },
         });
 
@@ -103,6 +105,9 @@ export class ProductsService {
         userRole = "SELLER"
     ) {
         const existing = await this.assertOwnership(id, userId, userRole);
+        const categoryIds = input.categoryIds
+            ? await this.enforceSellerCategory(input.categoryIds, userId, userRole)
+            : undefined;
 
         if (input.sku && input.sku !== existing.sku) {
             const skuTaken = await this.repository.findBySku(input.sku);
@@ -143,7 +148,7 @@ export class ProductsService {
             images: input.images,
             colors: input.colors,
             sizes: input.sizes,
-            categoryIds: input.categoryIds,
+            categoryIds,
         });
 
         const updated = await this.repository.findById(id);
@@ -179,6 +184,22 @@ export class ProductsService {
             throw new ForbiddenError("Ce produit ne vous appartient pas.");
         }
         return product;
+    }
+
+    private async enforceSellerCategory(
+        categoryIds: string[],
+        ownerId: string,
+        userRole: string
+    ) {
+        if (userRole !== "SELLER") return categoryIds;
+        const storeCategoryId = await this.repository.sellerStoreCategoryId(ownerId);
+        if (!storeCategoryId) {
+            throw new ConflictError("Choisissez d’abord la catégorie de votre boutique.");
+        }
+        if (categoryIds.some((categoryId) => categoryId !== storeCategoryId)) {
+            throw new ForbiddenError("Tous les produits doivent utiliser la catégorie de votre boutique.");
+        }
+        return [storeCategoryId];
     }
 }
 

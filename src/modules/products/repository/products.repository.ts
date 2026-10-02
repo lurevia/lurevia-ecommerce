@@ -5,6 +5,14 @@ import { productDetailInclude } from "../lib/constant/products.constant";
 import { buildWhere, buildOrderBy } from "../lib/helper/products.helper";
 
 export class ProductsRepository {
+    async sellerStoreCategoryId(ownerId: string) {
+        const seller = await prisma.user.findUnique({
+            where: { id: ownerId },
+            select: { role: true, storeCategoryId: true },
+        });
+        return seller?.role === "SELLER" ? seller.storeCategoryId : null;
+    }
+
     findManyByOwner(ownerId: string, skip: number, take: number) {
         return prisma.$transaction([
             prisma.product.findMany({
@@ -83,6 +91,7 @@ export class ProductsRepository {
             take: limit,
             select: {
                 id: true,
+                slug: true,
                 title: true,
                 price: true,
                 images: { take: 1, orderBy: { position: "asc" } },
