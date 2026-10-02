@@ -25,6 +25,7 @@ export class SellerRepository {
                     publicStoreName: true,
                     publicStoreDescription: true,
                     publicStoreLogoUrl: true,
+                    storeCategory: { select: { id: true, name: true, slug: true } },
                     _count: { select: { ownedProducts: { where: { isActive: true } } } },
                 },
                 orderBy: { publicStoreName: "asc" },
@@ -50,6 +51,7 @@ export class SellerRepository {
                 publicStoreName: true,
                 publicStoreDescription: true,
                 publicStoreLogoUrl: true,
+                storeCategory: { select: { id: true, name: true, slug: true } },
                 ownedProducts: {
                     where: { isActive: true },
                     orderBy: { createdAt: "desc" },

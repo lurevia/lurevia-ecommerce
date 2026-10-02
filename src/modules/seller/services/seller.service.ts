@@ -17,8 +17,10 @@ export class SellerService {
         private readonly repository: SellerRepository
     ) { }
 
-    async apply(userId: string, input: { type: "PERCENTAGE" | "MONTHLY_FIXED"; value: number; storeName: string; storeDescription: string; storeLogoUrl?: string; }) {
+    async apply(userId: string, input: { type: "PERCENTAGE" | "MONTHLY_FIXED"; value: number; storeName: string; storeDescription: string; storeCategoryId: string; storeLogoUrl?: string; }) {
         return prisma.$transaction(async (tx) => {
+            const category = await tx.category.findUnique({ where: { id: input.storeCategoryId }, select: { id: true } });
+            if (!category) throw new NotFoundError("Catégorie de boutique");
             const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true, role: true, isVerified: true } });
             if (!user) throw new NotFoundError("Utilisateur");
             if (!user.isVerified) throw new ForbiddenError("Votre compte doit être vérifié avant de devenir vendeur.");
@@ -32,6 +34,7 @@ export class SellerService {
                     publicStoreName: input.storeName,
                     publicStoreDescription: input.storeDescription,
                     publicStoreLogoUrl: input.storeLogoUrl,
+                    storeCategoryId: category.id,
                 },
             });
             const latestContract = await tx.sellerContract.findFirst({
@@ -63,6 +66,7 @@ export class SellerService {
             storeName: seller.publicStoreName!,
             description: seller.publicStoreDescription,
             logoUrl: seller.publicStoreLogoUrl,
+            storeCategory: seller.storeCategory,
             productCount: seller._count.ownedProducts,
         }));
         return buildPaginatedResult(sellers, totalItems, pagination);
@@ -76,14 +80,26 @@ export class SellerService {
             storeName: seller.publicStoreName!,
             description: seller.publicStoreDescription,
             logoUrl: seller.publicStoreLogoUrl,
+            storeCategory: seller.storeCategory,
             products: productsMapper.toOutputList(seller.ownedProducts),
         };
     }
 
     async updateProfile(userId: string, input: UpdateSellerProfileInput) {
-        const seller = await this.repositoryProfile(userId);
+        const seller = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true, storeCategoryId: true, _count: { select: { ownedProducts: true } } },
+        });
+        if (!seller) throw new NotFoundError("Utilisateur");
         if (seller.role !== "SELLER") {
             throw new ForbiddenError("Seuls les vendeurs peuvent modifier leur boutique.");
+        }
+        if (input.storeCategoryId && input.storeCategoryId !== seller.storeCategoryId) {
+            if (seller._count.ownedProducts > 0) {
+                throw new ConflictError("La catégorie de boutique ne peut plus changer après la création de produits.");
+            }
+            const category = await prisma.category.findUnique({ where: { id: input.storeCategoryId }, select: { id: true } });
+            if (!category) throw new NotFoundError("Catégorie de boutique");
         }
         const updated = await prisma.user.update({
             where: { id: userId },
@@ -91,12 +107,16 @@ export class SellerService {
                 publicStoreName: input.storeName,
                 publicStoreDescription: input.storeDescription,
                 publicStoreLogoUrl: input.storeLogoUrl,
+                ...(input.storeCategoryId ? { storeCategoryId: input.storeCategoryId } : {}),
             },
             select: {
                 id: true,
+                storeCategoryId: true,
                 publicStoreName: true,
                 publicStoreDescription: true,
                 publicStoreLogoUrl: true,
+                storeCategory: { select: { id: true, name: true, slug: true } },
+                _count: { select: { ownedProducts: true } },
             },
         });
         return {
@@ -104,6 +124,9 @@ export class SellerService {
             storeName: updated.publicStoreName,
             description: updated.publicStoreDescription,
             logoUrl: updated.publicStoreLogoUrl,
+            storeCategoryId: updated.storeCategoryId,
+            storeCategory: updated.storeCategory,
+            productCount: updated._count.ownedProducts,
         };
     }
 
@@ -113,9 +136,12 @@ export class SellerService {
             select: {
                 id: true,
                 role: true,
+                storeCategoryId: true,
                 publicStoreName: true,
                 publicStoreDescription: true,
                 publicStoreLogoUrl: true,
+                storeCategory: { select: { id: true, name: true, slug: true } },
+                _count: { select: { ownedProducts: true } },
             },
         });
         if (!seller) throw new NotFoundError("Utilisateur");
@@ -127,6 +153,9 @@ export class SellerService {
             storeName: seller.publicStoreName ?? "",
             description: seller.publicStoreDescription ?? "",
             logoUrl: seller.publicStoreLogoUrl,
+            storeCategoryId: seller.storeCategoryId,
+            storeCategory: seller.storeCategory,
+            productCount: seller._count.ownedProducts,
         };
     }
 
@@ -144,12 +173,20 @@ export class SellerService {
         return { items, totalItems, page, limit, totalPages: Math.ceil(totalItems / limit) };
     }
 
-    createProduct(userId: string, input: CreateProductInput) {
-        return productsService.create(input, userId);
+    async createProduct(userId: string, input: CreateProductInput) {
+        const categoryId = await this.requireStoreCategory(userId);
+        this.assertProductCategory(input.categoryIds, categoryId);
+        return productsService.create({ ...input, categoryIds: [categoryId] }, userId);
     }
 
-    updateProduct(userId: string, id: string, input: UpdateProductInput) {
-        return productsService.update(id, input, userId);
+    async updateProduct(userId: string, id: string, input: UpdateProductInput) {
+        const categoryId = await this.requireStoreCategory(userId);
+        if (input.categoryIds) this.assertProductCategory(input.categoryIds, categoryId);
+        return productsService.update(
+            id,
+            { ...input, ...(input.categoryIds ? { categoryIds: [categoryId] } : {}) },
+            userId
+        );
     }
 
     removeProduct(userId: string, id: string) {
@@ -182,6 +219,22 @@ export class SellerService {
 
     stats(userId: string) {
         return this.repository.stats(userId);
+    }
+
+    private async requireStoreCategory(userId: string) {
+        const seller = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true, storeCategoryId: true },
+        });
+        if (!seller || seller.role !== "SELLER") throw new ForbiddenError("Compte vendeur requis.");
+        if (!seller.storeCategoryId) throw new ConflictError("Choisissez d’abord la catégorie de votre boutique.");
+        return seller.storeCategoryId;
+    }
+
+    private assertProductCategory(categoryIds: string[], storeCategoryId: string) {
+        if (categoryIds.some((categoryId) => categoryId !== storeCategoryId)) {
+            throw new ForbiddenError("Tous les produits doivent utiliser la catégorie de votre boutique.");
+        }
     }
 }
 

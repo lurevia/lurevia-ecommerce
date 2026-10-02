@@ -296,6 +296,9 @@ model User {
   publicStoreName        String?
   publicStoreDescription String? @db.Text
   publicStoreLogoUrl     String?
+  isPrimaryAdmin         Boolean  @default(false)
+  storeCategoryId        String?  @db.Uuid
+  storeCategory          Category? @relation("SellerStoreCategory", fields: [storeCategoryId], references: [id], onDelete: SetNull)
 
   // Auth
   passwordHash      String?
@@ -637,6 +640,7 @@ model Category {
   updatedAt   DateTime @updatedAt
 
   products ProductCategory[]
+  stores   User[] @relation("SellerStoreCategory")
 
   @@map("categories")
 }

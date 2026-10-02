@@ -9,6 +9,7 @@ export interface AuthenticatedUser {
   id: string;
   role: Role;
   isVerified: boolean;
+  isPrimaryAdmin: boolean;
 }
 
 declare global {
@@ -38,6 +39,7 @@ async function loadValidUser(
       id: true,
       role: true,
       isVerified: true,
+      isPrimaryAdmin: true,
       isActive: true,
       deletedAt: true,
       passwordChangedAt: true,
@@ -55,7 +57,12 @@ async function loadValidUser(
     return null;
   }
 
-  return { id: user.id, role: user.role, isVerified: user.isVerified };
+  return {
+    id: user.id,
+    role: user.role,
+    isVerified: user.isVerified,
+    isPrimaryAdmin: user.isPrimaryAdmin,
+  };
 }
 
 export const requireAuth = async (
@@ -161,3 +168,19 @@ export const requireSelf =
     }
     next();
   };
+
+export const requirePrimaryAdmin = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    next(new UnauthorizedError());
+    return;
+  }
+  if (req.user.role !== "ADMIN" || !req.user.isPrimaryAdmin) {
+    next(new ForbiddenError("Seul l’administrateur principal peut gérer les catégories."));
+    return;
+  }
+  next();
+};

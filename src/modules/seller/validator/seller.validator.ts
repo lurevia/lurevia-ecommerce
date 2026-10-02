@@ -9,6 +9,7 @@ export const applySellerSchema = z.object({
     value: z.coerce.number().int().nonnegative().max(100000000),
     storeName: z.string().trim().min(2).max(100),
     storeDescription: z.string().trim().min(20).max(1000),
+    storeCategoryId: z.string().uuid(),
     storeLogoUrl: z.string().trim().url().max(2048).optional(),
 }).strict().refine((v) => v.type !== "PERCENTAGE" || v.value <= 100, {
     message: "Le pourcentage doit être compris entre 0 et 100.",
@@ -18,6 +19,7 @@ export const updateSellerProfileSchema = z.object({
     storeName: z.string().trim().min(2).max(100),
     storeDescription: z.string().trim().min(20).max(1000),
     storeLogoUrl: z.string().trim().url().max(2048).nullable().optional(),
+    storeCategoryId: z.string().uuid().optional(),
 }).strict();
 export const publicSellerListSchema = z.object({
     page: z.coerce.number().int().positive().default(1),
