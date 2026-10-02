@@ -190,17 +190,10 @@ Vérifiez impérativement que `DATABASE_URL` cible la base de démonstration ava
 d'activer cette option. En développement, définissez `SEED_DEMO_DATA=false`
 pour omettre les 10 000 clients et 1 200 commandes simulés.
 
-Comptes de connexion locaux :
-
-| Rôle       | Identifiant           | Mot de passe   |
-|------------|------------------------|----------------|
-| Admin principal | `admin@lurevia.mg` | `Admin12345!` |
-| Client démo | `demo.client.00001@lurevia.test` | `Client1234!` |
-| Vendeur démo | `rakoto.artisan@lurevia.mg` | `Seller1234!` |
-
-Les 100 comptes vendeurs partagent le mot de passe local `Seller1234!`.
-Les adresses supplémentaires suivent `demo.vendeur.006` à `demo.vendeur.100`.
-Les mots de passe de démonstration ne doivent jamais être utilisés en production.
+Les identifiants de connexion sont regroupés dans le fichier local `ID.md` à la
+racine de l'API. Ce fichier est ignoré par Git et doit rester privé. En
+production, configurez les mots de passe via les variables d'environnement et
+ne réutilisez pas les comptes de démonstration.
 
 ---
 

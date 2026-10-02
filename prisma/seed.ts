@@ -1422,15 +1422,12 @@ async function main() {
   console.log(`\n🌱 Seed terminé avec succès en ${duration}s.\n`);
   console.log("👤 Comptes de connexion :");
   console.log(
-    `   Admin   : ${process.env.INITIAL_ADMIN_EMAIL || "admin@lurevia.mg"} / ${process.env.INITIAL_ADMIN_PASSWORD || "Admin12345!"}`
+    `   Admin   : ${process.env.INITIAL_ADMIN_EMAIL || "admin@lurevia.mg"} (voir ID.md pour les identifiants locaux)`
   );
-  console.log("\n   Vendeurs de démonstration (mot de passe commun : Seller1234!) :");
-  for (const s of SELLER_TEMPLATES) {
-    console.log(`   - ${s.storeName.padEnd(28)} → ${s.email}`);
-  }
+  console.log("   Vendeurs : identifiants locaux consignés dans ID.md");
   if (SEED_DEMO_DATA) {
-    console.log("   - 95 comptes vendeurs supplémentaires : demo.vendeur.006 à demo.vendeur.100@lurevia.mg");
-    console.log("   - Comptes clients : demo.client.00001 à demo.client.10000@lurevia.test");
+    console.log("   Vendeurs de démo : demo.vendeur.006 à demo.vendeur.100@lurevia.mg");
+    console.log("   Clients de démo : demo.client.00001 à demo.client.10000@lurevia.test");
   }
   console.log(
     "\n💡 Inscris-toi comme client via POST /api/v1/auth/oauth/callback (Google)\n"
