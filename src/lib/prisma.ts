@@ -31,13 +31,7 @@ const noOp: Record<string, (...args: any[]) => any> = {
 	deleteMany: async () => ({ count: 0 }),
 };
 
-/**
- * Enveloppe une PrismaPromise sans la dénaturer : `$transaction([...])` exige des
- * PrismaPromise natives (`Symbol.toStringTag === "PrismaPromise"`). Un simple
- * `.catch()` les transformait en `Promise` classiques et faisait échouer toutes les
- * transactions en tableau. Ici seule la résolution (`then`) est interceptée ; le
- * reste (dont le tag et `requestTransaction`) est délégué à l'objet d'origine.
- */
+
 function withMockFallback(promise: any, model: string, method: string, args: any[]): any {
 	const fallback = async (err: any) => {
 		logger.warn(
