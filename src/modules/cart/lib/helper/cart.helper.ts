@@ -1,11 +1,15 @@
-import { ConflictError } from "../../../../errors/AppError";
+import { ConflictError, ForbiddenError } from "../../../../errors/AppError";
 
 export const assertProductPurchasable = (product: {
+  ownerId?: string | null;
   isActive: boolean;
   pricingMode: string;
   stock: number;
   price: number | null;
-}) => {
+}, buyerId?: string) => {
+  if (buyerId && product.ownerId === buyerId) {
+    throw new ForbiddenError("Vous ne pouvez pas acheter vos propres produits.");
+  }
   if (!product.isActive) {
     throw new ConflictError("Ce produit n'est plus disponible.");
   }

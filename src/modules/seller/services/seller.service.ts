@@ -195,6 +195,29 @@ export class SellerService {
         return productsService.remove(id, userId);
     }
 
+    async requestProductDeletion(userId: string, productId: string, reason: string) {
+        const product = await prisma.product.findUnique({
+            where: { id: productId },
+            select: { id: true, ownerId: true, isActive: true },
+        });
+        if (!product) throw new NotFoundError("Produit");
+        if (product.ownerId !== userId) {
+            throw new ForbiddenError("Vous ne pouvez demander le retrait que de vos propres produits.");
+        }
+        if (!product.isActive) throw new ConflictError("Ce produit est déjà retiré de la boutique.");
+
+        const pendingRequest = await prisma.productDeletionRequest.findFirst({
+            where: { productId, sellerId: userId, status: "PENDING" },
+            select: { id: true },
+        });
+        if (pendingRequest) throw new ConflictError("Une demande de retrait est déjà en attente pour ce produit.");
+
+        return prisma.productDeletionRequest.create({
+            data: { productId, sellerId: userId, reason },
+            include: { product: { select: { id: true, title: true, sku: true } } },
+        });
+    }
+
     async listOrders(userId: string, page: number, limit: number) {
         const [items, totalItems] = await this.repository.orders(userId, (page - 1) * limit, limit);
         return { items, totalItems, page, limit, totalPages: Math.ceil(totalItems / limit) };

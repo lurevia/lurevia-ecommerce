@@ -24,7 +24,7 @@ export class CartService {
         const product = await productsRepository.findById(productId);
         if (!product) throw new NotFoundError("Produit");
 
-        assertProductPurchasable(product);
+        assertProductPurchasable(product, userId);
 
         if (product.stock <= 0) {
             throw new BadRequestError("Ce produit est en rupture de stock.");
@@ -91,7 +91,7 @@ export class CartService {
         const product = await productsRepository.findById(productId);
         if (!product) throw new NotFoundError("Produit");
 
-        assertProductPurchasable(product);
+        assertProductPurchasable(product, userId);
 
         if (product.stock <= 0) {
             throw new BadRequestError("Ce produit est en rupture de stock.");

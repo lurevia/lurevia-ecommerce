@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth, requireRole, requireVerified } from "../../../middlewares/auth.middleware";
 import { validate } from "../../../middlewares/validate.middleware";
 import { sellerController } from "../controller/seller.controller";
-import { applySellerSchema, createProductSchema, publicSellerIdSchema, publicSellerListSchema, sellerListSchema, sellerProductIdSchema, sellerStatusSchema, updateProductSchema, updateSellerProfileSchema } from "../dto";
+import { applySellerSchema, createProductSchema, productDeletionRequestSchema, publicSellerIdSchema, publicSellerListSchema, sellerListSchema, sellerProductIdSchema, sellerStatusSchema, updateProductSchema, updateSellerProfileSchema } from "../dto";
 import { financialController } from "../../financial/controller/financial.controller";
 import { createContractSchema } from "../../financial/validator/financial.validator";
 
@@ -19,6 +19,7 @@ router.get("/feedback", sellerController.feedback);
 router.get("/products", validate({ query: sellerListSchema }), sellerController.products);
 router.post("/products", validate({ body: createProductSchema }), sellerController.createProduct);
 router.patch("/products/:id", validate({ params: sellerProductIdSchema, body: updateProductSchema }), sellerController.updateProduct);
+router.post("/products/:id/deletion-request", validate({ params: sellerProductIdSchema, body: productDeletionRequestSchema }), sellerController.requestProductDeletion);
 router.delete("/products/:id", validate({ params: sellerProductIdSchema }), sellerController.removeProduct);
 router.get("/orders", validate({ query: sellerListSchema }), sellerController.orders);
 router.get("/orders/:id", validate({ params: sellerProductIdSchema }), sellerController.order);

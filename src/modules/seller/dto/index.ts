@@ -1,5 +1,6 @@
 export {
   sellerProductIdSchema,
+  productDeletionRequestSchema,
   sellerListSchema,
   sellerStatusSchema,
   applySellerSchema,

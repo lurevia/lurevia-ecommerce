@@ -36,6 +36,15 @@ export class SellerController {
 
     removeProduct = asyncHandler(async (req: Request, res: Response) => { await this.service.removeProduct(req.user!.id, req.params.id); res.status(204).send(); });
 
+    requestProductDeletion = asyncHandler(async (req: Request, res: Response) => {
+        const request = await this.service.requestProductDeletion(
+            req.user!.id,
+            req.params.id,
+            req.body.reason
+        );
+        res.status(201).json({ data: { request } });
+    });
+
     orders = asyncHandler(async (req: Request, res: Response) => res.json({ data: { orders: await this.service.listOrders(req.user!.id, Number(req.query.page), Number(req.query.limit)) } }));
 
     order = asyncHandler(async (req: Request, res: Response) => res.json({ data: { order: await this.service.getOrder(req.user!.id, req.params.id) } }));

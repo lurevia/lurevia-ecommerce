@@ -2,6 +2,9 @@ import { z } from "zod";
 import { createProductSchema, updateProductSchema } from "../../products/validator/products.validator";
 
 export const sellerProductIdSchema = z.object({ id: z.string().min(1) });
+export const productDeletionRequestSchema = z.object({
+    reason: z.string().trim().min(5).max(1000),
+}).strict();
 export const sellerListSchema = z.object({ page: z.coerce.number().int().positive().default(1), limit: z.coerce.number().int().positive().max(100).default(20) });
 export const sellerStatusSchema = z.object({ status: z.enum(["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED", "COD_PENDING", "COD_FAILED", "REFUNDED", "PAYMENT_FAILED"]) });
 export const applySellerSchema = z.object({

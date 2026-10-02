@@ -242,6 +242,12 @@ enum ProfileChangeRequestStatus {
   REJECTED
 }
 
+enum ProductDeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ─── Business vendeur ───
 enum SellerContractType {
   PERCENTAGE
@@ -348,6 +354,7 @@ model User {
   verificationRequests  VerificationRequest[]
   deletionRequests      AccountDeletionRequest[]
   profileChangeRequests ProfileChangeRequest[]
+  productDeletionRequests ProductDeletionRequest[] @relation("SellerProductDeletionRequests")
 
   // Relations client
   addresses        Address[]
@@ -530,6 +537,25 @@ model ProfileChangeRequest {
   @@map("profile_change_requests")
 }
 
+model ProductDeletionRequest {
+  id          String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId   String                       @db.Uuid
+  product     Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sellerId    String                       @db.Uuid
+  seller      User                         @relation("SellerProductDeletionRequests", fields: [sellerId], references: [id], onDelete: Cascade)
+  reason      String                       @db.Text
+  status      ProductDeletionRequestStatus @default(PENDING)
+  adminNote   String?                      @db.Text
+  reviewedBy  String?                      @db.Uuid
+  createdAt   DateTime                     @default(now())
+  reviewedAt  DateTime?
+
+  @@index([status, createdAt])
+  @@index([sellerId, status])
+  @@index([productId, status])
+  @@map("product_deletion_requests")
+}
+
 // ─── 2. ADRESSES & LOGISTIQUE ───
 
 model Address {
@@ -702,6 +728,7 @@ model Product {
   reviews    ProductReview[]
   bids       ProductBid[]
   feedbacks  ServiceFeedback[] @relation("FeedbackProduct")
+  deletionRequests ProductDeletionRequest[]
 
   // Relations enchères
   auctionMessages AuctionMessage[]
