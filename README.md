@@ -162,7 +162,7 @@ demande après approbation ou rejet; les comptes approuvés le conservent pour
 
 ## 4. Comptes de démonstration
 
-En environnement non-production, exécutez d’abord la migration puis le seed :
+En environnement local/staging, exécutez d’abord la migration puis le seed :
 
 ```bash
 npm run prisma:migrate:dev
@@ -171,9 +171,24 @@ npm run seed
 
 Le seed crée un admin principal, 100 vendeurs vérifiés, 10 000 clients vérifiés,
 des produits par boutique et 1 200 commandes/payements de démonstration pour
-alimenter les graphiques. Les données synthétiques sont idempotentes et ne sont
-pas créées lorsque `NODE_ENV=production`. Définissez `SEED_DEMO_DATA=false` pour
-les omettre dans un environnement de développement.
+alimenter les graphiques. Ce sont de vrais enregistrements `Order` et
+`Transaction` en base, marqués par des références `DEMO-*`; ils simulent des
+commandes livrées et des paiements réussis, mais ne déclenchent aucun paiement
+réel ni transfert d'argent. Les données sont idempotentes.
+
+En production, le seed crée seulement l'admin principal et les paramètres par
+défaut. Pour une présentation sur une base de staging/démonstration, activez les
+données explicitement :
+
+```powershell
+$env:SEED_DEMO_DATA = "true"
+npm run seed
+```
+
+`INITIAL_ADMIN_PASSWORD` doit aussi être défini avec au moins 12 caractères.
+Vérifiez impérativement que `DATABASE_URL` cible la base de démonstration avant
+d'activer cette option. En développement, définissez `SEED_DEMO_DATA=false`
+pour omettre les 10 000 clients et 1 200 commandes simulés.
 
 Comptes de connexion locaux :
 

@@ -100,7 +100,9 @@ function sellerLogo(email: string): string {
 const REALISTIC_STOCK = () => Math.floor(Math.random() * 40) + 5;
 const REALISTIC_RATING = () => Math.round((4 + Math.random()) * 10) / 10;
 const REALISTIC_REVIEWS = () => Math.floor(Math.random() * 80) + 3;
-const SEED_DEMO_DATA = process.env.NODE_ENV !== "production" && process.env.SEED_DEMO_DATA !== "false";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const SEED_DEMO_DATA = process.env.SEED_DEMO_DATA === "true"
+  || (!IS_PRODUCTION && process.env.SEED_DEMO_DATA !== "false");
 
 // ═════════════════════════════════════════════════════════════════════════════
 // DONNÉES : VENDEURS
@@ -1110,7 +1112,7 @@ async function seedAdmin() {
   ).toLowerCase();
   const adminPhone = process.env.INITIAL_ADMIN_PHONE || "+261340000000";
   const adminPasswordRaw =
-    process.env.INITIAL_ADMIN_PASSWORD || "Admin12345!";
+    process.env.INITIAL_ADMIN_PASSWORD || "Mahery123456789.";
 
   if (isProduction && adminPasswordRaw.length < 12) {
     throw new Error(
@@ -1397,10 +1399,10 @@ async function main() {
   console.log("🚀 Démarrage du seed Lurevia…\n");
   const start = Date.now();
 
-  await seedPlatformSettings();
   await seedAdmin();
-  if (process.env.NODE_ENV === "production") {
-    console.log("Seed de démonstration désactivé en production.");
+  await seedPlatformSettings();
+  if (IS_PRODUCTION && !SEED_DEMO_DATA) {
+    console.log("Seed de démonstration désactivé en production. Définissez SEED_DEMO_DATA=true pour l’activer explicitement.");
     return;
   }
   await seedCategories();
