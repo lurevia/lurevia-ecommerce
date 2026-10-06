@@ -6,6 +6,6 @@
  */
 
 export { default as mediaRouter } from "./routes/media.routes";
-
+export type { StoredMedia } from "./lib/types";
 export { mediaService } from "./services/media.service";
 export type { MediaService } from "./services/media.service";

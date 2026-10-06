@@ -58,7 +58,7 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   ADMIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(600),
   CIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
-
+  MEDIA_STORAGE: z.enum(["local", "github"]).optional(),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
