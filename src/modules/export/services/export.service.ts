@@ -27,8 +27,10 @@ export class ExportService {
                     orderBy: { createdAt: "desc" },
                     take: MAX_ORDERS,
                 },
-                reviews: { orderBy: { createdAt: "desc" }, take: MAX_REVIEWS },
-                serviceFeedbacks: { orderBy: { createdAt: "desc" } },
+                feedbacks: {
+                    include: { product: { select: { title: true, sku: true } } },
+                    orderBy: { createdAt: "desc" },
+                },
                 bids: {
                     include: { product: { select: { title: true, sku: true } } },
                     orderBy: { createdAt: "desc" },
@@ -54,13 +56,27 @@ export class ExportService {
         workbook.creator = "Lurevia";
         workbook.created = new Date();
 
-        buildProfileSheet(workbook, user);
-        buildAddressesSheet(workbook, user.addresses);
-        buildOrdersSheet(workbook, user.orders);
-        buildBidsSheet(workbook, user.bids);
-        buildReviewsSheet(workbook, user.reviews);
-        buildFavoritesSheet(workbook, user.favorites);
-        buildFeedbackSheet(workbook, user.serviceFeedbacks);
+        const productReviews = (user as any).feedbacks
+            ? (user as any).feedbacks.filter((f: any) => f.type === "PRODUCT").map((f: any) => ({
+                ...f,
+                rejectedAt: f.rejectionReason && !f.isApproved ? f.updatedAt : null,
+            }))
+            : [];
+        const serviceFeedbacks = (user as any).feedbacks
+            ? (user as any).feedbacks.filter((f: any) => f.type === "SERVICE").map((f: any) => ({
+                ...f,
+                overallRating: f.rating,
+                teamResponse: f.officialReply ?? null,
+            }))
+            : [];
+
+        buildProfileSheet(workbook, user as any);
+        buildAddressesSheet(workbook, (user as any).addresses ?? []);
+        buildOrdersSheet(workbook, (user as any).orders ?? []);
+        buildBidsSheet(workbook, (user as any).bids ?? []);
+        buildReviewsSheet(workbook, productReviews);
+        buildFavoritesSheet(workbook, (user as any).favorites ?? []);
+        buildFeedbackSheet(workbook, serviceFeedbacks);
 
         return workbook;
     }

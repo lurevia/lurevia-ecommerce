@@ -5,59 +5,55 @@ import type { Prisma } from "@prisma/client";
 
 export class SellerRepository {
     publicProfiles(search: string | undefined, skip: number, take: number) {
-        const where: Prisma.UserWhereInput = {
-            role: "SELLER",
-            isVerified: true,
+        const where: Prisma.BoutiqueWhereInput = {
             isActive: true,
             deletedAt: null,
-            publicStoreName: { not: null },
             ...(search ? {
                 OR: [
-                    { publicStoreName: { contains: search, mode: "insensitive" } },
-                    { publicStoreDescription: { contains: search, mode: "insensitive" } },
+                    { name: { contains: search, mode: "insensitive" } },
+                    { description: { contains: search, mode: "insensitive" } },
                 ],
             } : {}),
         };
         return prisma.$transaction([
-            prisma.user.findMany({
+            prisma.boutique.findMany({
                 where,
                 select: {
                     id: true,
-                    publicStoreName: true,
-                    publicStoreDescription: true,
-                    publicStoreLogoUrl: true,
-                    publicStoreCoverUrl: true,
+                    ownerId: true,
+                    name: true,
+                    description: true,
+                    logoUrl: true,
+                    coverUrl: true,
                     storeCategoryId: true,
                     storeCategory: { select: { id: true, name: true, slug: true } },
-                    _count: { select: { ownedProducts: { where: { isActive: true } } } },
+                    _count: { select: { products: { where: { isActive: true } } } },
                 },
-                orderBy: { publicStoreName: "asc" },
+                orderBy: { name: "asc" },
                 skip,
                 take,
             }),
-            prisma.user.count({ where }),
+            prisma.boutique.count({ where }),
         ]);
     }
 
     publicProfile(id: string) {
-        return prisma.user.findFirst({
+        return prisma.boutique.findFirst({
             where: {
-                id,
-                role: "SELLER",
-                isVerified: true,
+                OR: [{ id }, { ownerId: id }, { slug: id }],
                 isActive: true,
                 deletedAt: null,
-                publicStoreName: { not: null },
             },
             select: {
                 id: true,
-                publicStoreName: true,
-                publicStoreDescription: true,
-                publicStoreLogoUrl: true,
-                publicStoreCoverUrl: true,
+                ownerId: true,
+                name: true,
+                description: true,
+                logoUrl: true,
+                coverUrl: true,
                 storeCategoryId: true,
                 storeCategory: { select: { id: true, name: true, slug: true } },
-                ownedProducts: {
+                products: {
                     where: { isActive: true },
                     orderBy: { createdAt: "desc" },
                     include: productDetailInclude,
@@ -67,27 +63,39 @@ export class SellerRepository {
     }
 
     products(ownerId: string, skip: number, take: number) {
+        const where: Prisma.ProductWhereInput = { boutique: { ownerId } };
         return prisma.$transaction([
-            prisma.product.findMany({ where: { ownerId }, include: productDetailInclude, orderBy: { createdAt: "desc" }, skip, take }),
-            prisma.product.count({ where: { ownerId } }),
+            prisma.product.findMany({ where, include: productDetailInclude, orderBy: { createdAt: "desc" }, skip, take }),
+            prisma.product.count({ where }),
         ]);
     }
 
     orders(ownerId: string, skip: number, take: number) {
+        const where: Prisma.OrderWhereInput = { items: { some: { product: { boutique: { ownerId } } } } };
         return prisma.$transaction([
-            prisma.order.findMany({ where: { items: { some: { product: { ownerId } } } }, include: { items: true, user: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: "desc" }, skip, take }),
-            prisma.order.count({ where: { items: { some: { product: { ownerId } } } } }),
+            prisma.order.findMany({ where, include: { items: true, user: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: "desc" }, skip, take }),
+            prisma.order.count({ where }),
         ]);
     }
 
     order(ownerId: string, id: string) {
-        return prisma.order.findFirst({ where: { id, items: { some: { product: { ownerId } } } }, include: { items: { include: { product: { select: { ownerId: true } } } }, user: { select: { id: true, fullName: true, email: true } } } });
+        return prisma.order.findFirst({
+            where: { id, items: { some: { product: { boutique: { ownerId } } } } },
+            include: {
+                items: { include: { product: { select: { boutique: { select: { ownerId: true } } } } } },
+                user: { select: { id: true, fullName: true, email: true } },
+            },
+        });
     }
 
     feedback(ownerId: string) {
-        return prisma.serviceFeedback.findMany({
-            where: { OR: [{ product: { ownerId } }, { order: { items: { some: { product: { ownerId } } } } }] },
-            include: { user: { select: { id: true, fullName: true, avatarUrl: true } }, product: { select: { id: true, title: true } }, order: { select: { id: true, orderNumber: true } } },
+        return prisma.feedback.findMany({
+            where: { OR: [{ boutique: { ownerId } }, { product: { boutique: { ownerId } } }] },
+            include: {
+                user: { select: { id: true, fullName: true, avatarUrl: true } },
+                product: { select: { id: true, title: true } },
+                order: { select: { id: true, orderNumber: true } },
+            },
             orderBy: { createdAt: "desc" },
         });
     }
@@ -99,24 +107,32 @@ export class SellerRepository {
         startDate.setUTCDate(startDate.getUTCDate() - 29);
 
         const [products, grouped, feedback, reviews, dailyOrders, pendingOrders, topProductGroups] = await Promise.all([
-            prisma.product.count({ where: { ownerId } }),
+            prisma.product.count({ where: { boutique: { ownerId } } }),
             prisma.orderItem.findMany({
-                where: { product: { ownerId }, order: { status: { in: eligibleStatuses } } },
+                where: { product: { boutique: { ownerId } }, order: { status: { in: eligibleStatuses } } },
                 select: { quantity: true, priceSnapshot: true },
             }),
-            prisma.serviceFeedback.aggregate({ where: { OR: [{ product: { ownerId } }, { order: { items: { some: { product: { ownerId } } } } }] }, _avg: { overallRating: true }, _count: true }),
-            prisma.productReview.aggregate({ where: { product: { ownerId } }, _avg: { rating: true }, _count: true }),
+            prisma.feedback.aggregate({
+                where: { type: "SERVICE", OR: [{ boutique: { ownerId } }, { product: { boutique: { ownerId } } }] },
+                _avg: { rating: true },
+                _count: true,
+            }),
+            prisma.feedback.aggregate({
+                where: { type: "PRODUCT", product: { boutique: { ownerId } } },
+                _avg: { rating: true },
+                _count: true,
+            }),
             prisma.order.findMany({
                 where: {
                     status: { in: eligibleStatuses },
                     createdAt: { gte: startDate },
-                    items: { some: { product: { ownerId } } },
+                    items: { some: { product: { boutique: { ownerId } } } },
                 },
                 select: {
                     id: true,
                     createdAt: true,
                     items: {
-                        where: { product: { ownerId } },
+                        where: { product: { boutique: { ownerId } } },
                         select: { quantity: true, priceSnapshot: true },
                     },
                 },
@@ -124,12 +140,12 @@ export class SellerRepository {
             prisma.order.count({
                 where: {
                     status: { in: ["PENDING", "COD_PENDING"] },
-                    items: { some: { product: { ownerId } } },
+                    items: { some: { product: { boutique: { ownerId } } } },
                 },
             }),
             prisma.orderItem.groupBy({
                 by: ["productId"],
-                where: { product: { ownerId }, order: { status: { in: eligibleStatuses } } },
+                where: { product: { boutique: { ownerId } }, order: { status: { in: eligibleStatuses } } },
                 _sum: { quantity: true },
                 orderBy: { _sum: { quantity: "desc" } },
                 take: 5,
@@ -148,12 +164,12 @@ export class SellerRepository {
             if (!day) continue;
             day.orderIds.add(order.id);
             day.revenue += order.items.reduce(
-                (sum, item) => sum + item.quantity * item.priceSnapshot,
+                (sum: number, item: { quantity: number; priceSnapshot: number }) => sum + item.quantity * item.priceSnapshot,
                 0
             );
         }
 
-        const topProductIds = topProductGroups.map((item) => item.productId);
+        const topProductIds = topProductGroups.map((item: { productId: string }) => item.productId);
         const topProductRecords = await prisma.product.findMany({
             where: { id: { in: topProductIds } },
             select: { id: true, title: true, images: { orderBy: { position: "asc" }, take: 1, select: { url: true } } },
@@ -162,15 +178,15 @@ export class SellerRepository {
 
         return {
             products,
-            sales: grouped.reduce((sum, item) => sum + item.quantity, 0),
-            revenue: grouped.reduce((sum, item) => sum + item.quantity * item.priceSnapshot, 0),
+            sales: grouped.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0),
+            revenue: grouped.reduce((sum: number, item: { quantity: number; priceSnapshot: number }) => sum + item.quantity * item.priceSnapshot, 0),
             pendingOrders,
             daily: Array.from(dailyMap, ([date, day]) => ({
                 date,
                 sales: day.orderIds.size,
                 revenue: day.revenue,
             })),
-            topProducts: topProductGroups.flatMap((item) => {
+            topProducts: topProductGroups.flatMap((item: { productId: string; _sum?: { quantity: number | null } }) => {
                 const product = topProductMap.get(item.productId);
                 return product ? [{
                     id: product.id,
@@ -180,7 +196,7 @@ export class SellerRepository {
                 }] : [];
             }),
             feedbackCount: feedback._count,
-            feedbackAverage: feedback._avg.overallRating ?? 0,
+            feedbackAverage: feedback._avg.rating ?? 0,
             reviewCount: reviews._count,
             reviewAverage: reviews._avg.rating ?? 0,
         };

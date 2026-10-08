@@ -37,8 +37,8 @@ export class AdminRepository {
                 },
             }),
             prisma.order.count({ where: { createdAt: { gte: since30d } } }),
-            prisma.productReview.count({
-                where: { isApproved: false, rejectedAt: null },
+            prisma.feedback.count({
+                where: { type: "PRODUCT", isApproved: false, rejectionReason: null },
             }),
             prisma.identityVerification.count({ where: { status: "PENDING" } }),
             prisma.accountDeletionRequest.count({ where: { status: "PENDING" } }),
@@ -79,7 +79,7 @@ export class AdminRepository {
                     where: { role: "CUSTOMER", createdAt: { gte: since7d } },
                     select: { createdAt: true },
                 }),
-                prisma.productReview.count(),
+                prisma.feedback.count({ where: { type: "PRODUCT" } }),
             ]);
 
             const startOfToday = new Date();
@@ -328,8 +328,8 @@ export class AdminRepository {
                 : {}),
         };
         return prisma.$transaction([
-            prisma.productReview.findMany({
-                where,
+            prisma.feedback.findMany({
+                where: { ...where, type: "PRODUCT" },
                 include: {
                     user: { select: { fullName: true, email: true, avatarUrl: true } },
                     product: { select: { title: true } },
@@ -338,16 +338,16 @@ export class AdminRepository {
                 skip: params.skip,
                 take: params.take,
             }),
-            prisma.productReview.count({ where }),
+            prisma.feedback.count({ where: { ...where, type: "PRODUCT" } }),
         ]);
     }
 
     findReviewById(id: string) {
-        return prisma.productReview.findUnique({ where: { id } });
+        return prisma.feedback.findUnique({ where: { id } });
     }
 
     deleteReview(id: string) {
-        return prisma.productReview.delete({ where: { id } });
+        return prisma.feedback.delete({ where: { id } });
     }
 
     // ── Feedback ─────────────────────────────────────────────────────
@@ -356,29 +356,35 @@ export class AdminRepository {
         take: number;
         category?: FeedbackCategory;
     }) {
-        const where = params.category ? { category: params.category } : {};
+        const where: Prisma.FeedbackWhereInput = {
+            type: "SERVICE",
+            ...(params.category ? { category: params.category } : {}),
+        };
         return prisma.$transaction([
-            prisma.serviceFeedback.findMany({
+            prisma.feedback.findMany({
                 where,
                 include: { user: { select: { fullName: true, email: true } } },
                 orderBy: { createdAt: "desc" },
                 skip: params.skip,
                 take: params.take,
             }),
-            prisma.serviceFeedback.count({ where }),
+            prisma.feedback.count({ where }),
         ]);
     }
 
     findFeedbackById(id: string) {
-        return prisma.serviceFeedback.findUnique({ where: { id } });
+        return prisma.feedback.findUnique({ where: { id } });
     }
 
     updateFeedbackResponse(id: string, teamResponse: string) {
-        return prisma.serviceFeedback.update({ where: { id }, data: { teamResponse } });
+        return prisma.feedback.update({
+            where: { id },
+            data: { teamResponse },
+        });
     }
 
     deleteFeedback(id: string) {
-        return prisma.serviceFeedback.delete({ where: { id } });
+        return prisma.feedback.delete({ where: { id } });
     }
 
     // ── Suppression de compte ────────────────────────────────────────

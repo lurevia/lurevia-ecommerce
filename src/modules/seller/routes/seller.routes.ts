@@ -9,6 +9,8 @@ import { createContractSchema } from "../../financial/validator/financial.valida
 const router = Router();
 router.get("/public", validate({ query: publicSellerListSchema }), sellerController.publicProfiles);
 router.get("/public/:id", validate({ params: publicSellerIdSchema }), sellerController.publicProfile);
+router.post("/public/:id/subscribe", requireAuth, validate({ params: publicSellerIdSchema }), sellerController.subscribe);
+router.delete("/public/:id/subscribe", requireAuth, validate({ params: publicSellerIdSchema }), sellerController.unsubscribe);
 router.post("/apply", requireAuth, requireVerified, validate({ body: applySellerSchema }), sellerController.apply);
 router.use(requireAuth, requireRole("SELLER"), requireVerified);
 router.get("/profile", sellerController.myProfile);

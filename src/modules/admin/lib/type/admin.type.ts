@@ -35,19 +35,21 @@ export interface IdentityListQuery {
 
 export interface RawReviewRow {
   id: string;
-  productId: string;
+  productId: string | null;
   userId: string;
   rating: number;
   title: string | null;
   comment: string;
   isApproved: boolean;
   approvedAt: Date | null;
-  rejectedAt: Date | null;
+  rejectedAt?: Date | null;
   rejectionReason: string | null;
-  isVerifiedPurchase: boolean;
+  isVerifiedPurchase?: boolean;
+  orderId?: string | null;
+  orderItemId?: string | null;
   createdAt: Date;
   user: { fullName: string; email: string | null; avatarUrl: string | null; };
-  product: { title: string; };
+  product?: { title: string; } | null;
 }
 
 export interface RawUserRow {

@@ -37,7 +37,8 @@ export class BidsService {
         }
 
         // 3. Le vendeur ne peut pas enchérir sur son propre produit
-        if (product.ownerId === userId) {
+        const productOwnerId = (product as any).boutique?.ownerId ?? (product as any).ownerId;
+        if (productOwnerId === userId) {
             throw new ForbiddenError("Vous ne pouvez pas enchérir sur votre propre produit.");
         }
 
@@ -157,7 +158,7 @@ export class BidsService {
         if (!bid) throw new NotFoundError("Offre");
 
         // Vérifie que l'actor est le vendeur du produit OU un admin
-        const isOwner = bid.product.ownerId === actorId;
+        const isOwner = ((bid.product as any).boutique?.ownerId ?? (bid.product as any).ownerId) === actorId;
         const isAdmin = await prisma.user
             .findUnique({ where: { id: actorId }, select: { role: true } })
             .then((u) => u?.role === "ADMIN");

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { usersController } from "../controller/users.controller";
+import { sellerController } from "../../seller/controller/seller.controller";
 import { requireAuth } from "../../../middlewares/auth.middleware";
 import { validate } from "../../../middlewares/validate.middleware";
 import { authRateLimiter } from "../../../middlewares/rateLimit.middleware";
@@ -8,6 +9,8 @@ import { changePasswordSchema, completeOAuthProfileSchema, requestDeletionSchema
 const router = Router();
 
 router.use(requireAuth);
+
+router.get("/subscriptions", sellerController.mySubscriptions);
 
 router.patch(
     "/me",

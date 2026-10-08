@@ -23,30 +23,30 @@ export class AdminModerationService {
             status: query.status,
             rating: query.rating,
         });
-        return buildPaginatedResult(adminReviewMapper.toOutputList(reviews), totalItems, pagination);
+        return buildPaginatedResult(adminReviewMapper.toOutputList(reviews as any), totalItems, pagination);
     }
 
     async removeReview(id: string) {
         const review = await this.repository.findReviewById(id);
         if (!review) throw new NotFoundError("Avis");
         await this.repository.deleteReview(id);
-        await productsRepository.refreshRatingCache(review.productId);
+        if (review.productId) {
+            await productsRepository.refreshRatingCache(review.productId);
+        }
     }
 
     async approveReview(id: string, adminId: string) {
         const review = await this.repository.findReviewById(id);
         if (!review) throw new NotFoundError("Avis");
-        if (review.rejectedAt) {
+        if (review.rejectionReason && !review.isApproved) {
             throw new ConflictError("Cet avis a déjà été rejeté.");
         }
-        const updated = await prisma.productReview.update({
+        const updated = await prisma.feedback.update({
             where: { id },
             data: {
                 isApproved: true,
                 approvedBy: adminId,
                 approvedAt: new Date(),
-                rejectedBy: null,
-                rejectedAt: null,
                 rejectionReason: null,
             },
             include: {
@@ -54,28 +54,32 @@ export class AdminModerationService {
                 product: { select: { title: true } },
             },
         });
-        await productsRepository.refreshRatingCache(review.productId);
-        return adminReviewMapper.toOutput(updated);
+        if (review.productId) {
+            await productsRepository.refreshRatingCache(review.productId);
+        }
+        return adminReviewMapper.toOutput(updated as any);
     }
 
     async rejectReview(id: string, adminId: string, reason?: string) {
         const review = await this.repository.findReviewById(id);
         if (!review) throw new NotFoundError("Avis");
-        const updated = await prisma.productReview.update({
+        const updated = await prisma.feedback.update({
             where: { id },
             data: {
                 isApproved: false,
-                rejectedBy: adminId,
-                rejectedAt: new Date(),
-                rejectionReason: reason ?? null,
+                approvedBy: null,
+                approvedAt: null,
+                rejectionReason: reason ?? "Avis rejeté",
             },
             include: {
                 user: { select: { fullName: true, email: true, avatarUrl: true } },
                 product: { select: { title: true } },
             },
         });
-        await productsRepository.refreshRatingCache(review.productId);
-        return adminReviewMapper.toOutput(updated);
+        if (review.productId) {
+            await productsRepository.refreshRatingCache(review.productId);
+        }
+        return adminReviewMapper.toOutput(updated as any);
     }
 
     // ─── Feedback ───
@@ -87,15 +91,15 @@ export class AdminModerationService {
             category: query.category as FeedbackCategory | undefined,
         });
 
-        const mapped = items.map((item) => ({
+        const mapped = items.map((item: any) => ({
             id: item.id,
             userId: item.userId,
-            userName: item.user.fullName,
-            userEmail: item.user.email ?? undefined,
-            overallRating: item.overallRating,
+            userName: item.user?.fullName ?? "",
+            userEmail: item.user?.email ?? undefined,
+            overallRating: item.rating ?? item.overallRating ?? 0,
             category: item.category,
             comment: item.comment,
-            teamResponse: item.teamResponse ?? undefined,
+            teamResponse: item.officialReply ?? item.teamResponse ?? undefined,
             createdAt: item.createdAt.toISOString(),
             updatedAt: item.updatedAt.toISOString(),
         }));

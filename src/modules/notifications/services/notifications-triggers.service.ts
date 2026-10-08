@@ -15,7 +15,9 @@ export class NotificationTriggersService {
             this.repository.findReviewedProductIds(userId),
         ]);
 
-        const reviewedProductIds = new Set(reviewed.map((r) => r.productId));
+        const reviewedProductIds = new Set(
+            reviewed.map((r: { productId: string | null }) => r.productId).filter((id): id is string => Boolean(id))
+        );
         const now = Date.now();
 
         for (const order of deliveredOrders) {

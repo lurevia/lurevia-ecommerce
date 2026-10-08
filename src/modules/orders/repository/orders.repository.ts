@@ -115,15 +115,16 @@ export class OrdersRepository {
             // 3. Création des settlements vendeurs
             const owners = await tx.orderItem.findMany({
                 where: { orderId: order.id },
-                include: { product: { select: { ownerId: true } } },
+                include: { product: { select: { boutique: { select: { ownerId: true } } } } },
             });
 
             const bySeller = new Map<string, number>();
             for (const item of owners) {
-                if (item.product.ownerId) {
+                const sellerId = (item.product as any).boutique?.ownerId;
+                if (sellerId) {
                     bySeller.set(
-                        item.product.ownerId,
-                        (bySeller.get(item.product.ownerId) ?? 0) +
+                        sellerId,
+                        (bySeller.get(sellerId) ?? 0) +
                         item.quantity * item.priceSnapshot
                     );
                 }

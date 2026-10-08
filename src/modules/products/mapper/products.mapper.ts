@@ -42,7 +42,7 @@ export class ProductsMapper {
       isActive: product.isActive,
 
       // Stat
-      tags: product.tags,
+      tags: product.tags?.map((t) => (typeof t === "string" ? t : (t as any).tag?.name ?? (t as any).tagId ?? "")) ?? [],
       rating: Math.round(product.ratingCache * 10) / 10,
       reviewCount: product.reviewCountCache,
 
@@ -63,8 +63,8 @@ export class ProductsMapper {
       })),
       categorySlugs: product.categories.map((pc) => pc.category.slug),
 
-      // Vendeur
-      ownerId: product.ownerId,
+      // Vendeur & Boutique
+      ownerId: (product as any).boutique?.ownerId ?? (product as any).ownerId ?? null,
 
       createdAt: product.createdAt.toISOString(),
       updatedAt: product.updatedAt.toISOString(),

@@ -11,7 +11,7 @@ export class ReviewsMapper {
       rating: review.rating,
       title: review.title ?? undefined,
       comment: review.comment,
-      isVerifiedPurchase: review.isVerifiedPurchase,
+      isVerifiedPurchase: review.isVerifiedPurchase ?? Boolean(review.orderId || review.orderItemId),
       isApproved: review.isApproved,
       approvedAt: review.approvedAt?.toISOString(),
       rejectedAt: review.rejectedAt?.toISOString(),

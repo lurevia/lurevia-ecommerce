@@ -1,5 +1,14 @@
 import { prisma } from "../../../lib/prisma";
-import type { Prisma } from "@prisma/client";
+import type { FeedbackCategory } from "@prisma/client";
+
+const toRow = (item: any) => {
+    if (!item) return null;
+    return {
+        ...item,
+        overallRating: item.rating,
+        teamResponse: item.officialReply ?? null,
+    };
+};
 
 export class FeedbackRepository {
     // ─── Vérifications d'appartenance ───
@@ -21,10 +30,10 @@ export class FeedbackRepository {
     }
 
     // ─── Liste publique (UNIQUEMENT approuvés) ───
-    findManyPublic(skip: number, take: number) {
-        return prisma.$transaction([
-            prisma.serviceFeedback.findMany({
-                where: { isApproved: true }, // ✅ CRITIQUE
+    async findManyPublic(skip: number, take: number) {
+        const [items, count] = await prisma.$transaction([
+            prisma.feedback.findMany({
+                where: { type: "SERVICE", isApproved: true },
                 include: {
                     user: { select: { id: true, fullName: true, avatarUrl: true } },
                 },
@@ -32,65 +41,99 @@ export class FeedbackRepository {
                 skip,
                 take,
             }),
-            prisma.serviceFeedback.count({ where: { isApproved: true } }),
+            prisma.feedback.count({ where: { type: "SERVICE", isApproved: true } }),
         ]);
+        return [items.map(toRow), count] as const;
     }
 
     // ─── Liste personnelle (paginated, tous statuts) ───
-    findManyByUser(userId: string, skip = 0, take = 20) {
-        return prisma.$transaction([
-            prisma.serviceFeedback.findMany({
-                where: { userId },
+    async findManyByUser(userId: string, skip = 0, take = 20) {
+        const [items, count] = await prisma.$transaction([
+            prisma.feedback.findMany({
+                where: { userId, type: "SERVICE" },
+                include: {
+                    user: { select: { id: true, fullName: true, avatarUrl: true } },
+                },
                 orderBy: { createdAt: "desc" },
                 skip,
                 take,
             }),
-            prisma.serviceFeedback.count({ where: { userId } }),
+            prisma.feedback.count({ where: { userId, type: "SERVICE" } }),
         ]);
+        return [items.map(toRow), count] as const;
     }
 
-    findById(id: string) {
-        return prisma.serviceFeedback.findUnique({ where: { id } });
+    async findById(id: string) {
+        const item = await prisma.feedback.findUnique({ where: { id } });
+        return toRow(item);
     }
 
     // ✅ Inclut la relation user pour construire un DTO complet
-    findByIdWithUser(id: string) {
-        return prisma.serviceFeedback.findUnique({
+    async findByIdWithUser(id: string) {
+        const item = await prisma.feedback.findUnique({
             where: { id },
             include: {
                 user: { select: { id: true, fullName: true, avatarUrl: true } },
             },
         });
+        return toRow(item);
     }
 
-    create(data: Prisma.ServiceFeedbackCreateInput) {
-        return prisma.serviceFeedback.create({
-            data,
+    async create(data: {
+        user: { connect: { id: string } };
+        overallRating?: number;
+        rating?: number;
+        criteria?: any;
+        category?: FeedbackCategory;
+        comment: string;
+        orderId?: string | null;
+        productId?: string | null;
+    }) {
+        const item = await prisma.feedback.create({
+            data: {
+                type: "SERVICE",
+                userId: data.user.connect.id,
+                rating: data.overallRating ?? data.rating ?? 5,
+                criteria: data.criteria,
+                category: data.category,
+                comment: data.comment,
+                orderId: data.orderId ?? null,
+                productId: data.productId ?? null,
+            },
             include: {
                 user: { select: { id: true, fullName: true, avatarUrl: true } },
             },
         });
+        return toRow(item);
     }
 
-    update(id: string, data: Prisma.ServiceFeedbackUpdateInput) {
-        return prisma.serviceFeedback.update({
+    async update(id: string, data: { rating?: number; overallRating?: number; criteria?: any; category?: FeedbackCategory; comment?: string }) {
+        const item = await prisma.feedback.update({
             where: { id },
-            data,
+            data: {
+                ...(data.rating !== undefined || data.overallRating !== undefined
+                    ? { rating: data.overallRating ?? data.rating }
+                    : {}),
+                ...(data.criteria !== undefined ? { criteria: data.criteria } : {}),
+                ...(data.category !== undefined ? { category: data.category } : {}),
+                ...(data.comment !== undefined ? { comment: data.comment } : {}),
+            },
             include: {
                 user: { select: { id: true, fullName: true, avatarUrl: true } },
             },
         });
+        return toRow(item);
     }
 
     delete(id: string) {
-        return prisma.serviceFeedback.delete({ where: { id } });
+        return prisma.feedback.delete({ where: { id } });
     }
 
     // ✅ Stats sur les feedbacks approuvés uniquement
     aggregateStats() {
-        return prisma.serviceFeedback.aggregate({
-            where: { isApproved: true },
-            _avg: { overallRating: true },
+        return prisma.feedback.aggregate({
+            where: { type: "SERVICE", isApproved: true },
+            _avg: { rating: true },
             _count: true,
         });
     }

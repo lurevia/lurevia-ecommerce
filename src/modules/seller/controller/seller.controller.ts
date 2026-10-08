@@ -54,6 +54,21 @@ export class SellerController {
     feedback = asyncHandler(async (req: Request, res: Response) => res.json({ data: { feedback: await this.service.feedback(req.user!.id) } }));
 
     stats = asyncHandler(async (req: Request, res: Response) => res.json({ data: { stats: await this.service.stats(req.user!.id) } }));
+
+    subscribe = asyncHandler(async (req: Request, res: Response) => {
+        const result = await this.service.subscribe(req.user!.id, req.params.id);
+        sendSuccess(res, result);
+    });
+
+    unsubscribe = asyncHandler(async (req: Request, res: Response) => {
+        const result = await this.service.unsubscribe(req.user!.id, req.params.id);
+        sendSuccess(res, result);
+    });
+
+    mySubscriptions = asyncHandler(async (req: Request, res: Response) => {
+        const subscriptions = await this.service.getUserSubscriptions(req.user!.id);
+        sendSuccess(res, { subscriptions });
+    });
 }
 
 export const sellerController = new SellerController(sellerService);

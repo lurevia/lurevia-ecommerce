@@ -34,7 +34,8 @@ export async function closeExpiredAuctions() {
                         logger.error({ err, productId: product.id }, "Notif won failed")
                     );
 
-                if (product.ownerId) {
+                const ownerId = (product as any).boutique?.ownerId ?? (product as any).ownerId;
+                if (ownerId) {
                     await prisma.adminNotification.create({
                         data: {
                             type: "AUCTION_DISPUTE",

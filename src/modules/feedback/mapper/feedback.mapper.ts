@@ -10,7 +10,7 @@ export class FeedbackMapper {
       userAvatar: feedback.user?.avatarUrl ?? undefined,
       overallRating: feedback.overallRating,
       criteria: feedback.criteria ?? undefined,
-      category: CATEGORY_TO_API[feedback.category],
+      category: feedback.category ? CATEGORY_TO_API[feedback.category] : undefined,
       comment: feedback.comment,
       teamResponse: feedback.teamResponse ?? undefined,
       isApproved: feedback.isApproved,

@@ -35,7 +35,15 @@ export class AuctionsRepository {
             where: { id: productId },
             include: {
                 images: { orderBy: { position: "asc" } },
-                owner: { select: { id: true, fullName: true, avatarUrl: true } },
+                boutique: {
+                    select: {
+                        id: true,
+                        name: true,
+                        logoUrl: true,
+                        ownerId: true,
+                        owner: { select: { id: true, fullName: true, avatarUrl: true } },
+                    },
+                },
                 _count: { select: { bids: true, auctionWatchers: true } },
             },
         });
@@ -120,6 +128,7 @@ export class AuctionsRepository {
                 auctionEndAt: { lt: new Date() },
             },
             include: {
+                boutique: { select: { ownerId: true } },
                 bids: {
                     where: { isWinningBid: true },
                     include: { user: true },

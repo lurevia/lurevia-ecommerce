@@ -52,7 +52,7 @@ export const buildWhere = async (
     where.auctionStatus = query.auctionStatus;
   }
   if (query.ownerId) {
-    where.ownerId = query.ownerId;
+    where.boutique = { ownerId: query.ownerId };
   }
 
   const range = query.priceRange?.split("-").map(Number);

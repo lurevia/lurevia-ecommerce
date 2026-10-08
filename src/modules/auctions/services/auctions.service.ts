@@ -59,8 +59,8 @@ export class AuctionsService {
         return {
             ...auctionsMapper.toAuctionDto(product as unknown as AuctionProduct),
             description: product.description,
-            images: product.images.map((i) => i.url),
-            owner: product.owner,
+            images: (product as any).images?.map((i: any) => i.url) ?? [],
+            owner: (product as any).boutique?.owner ?? (product as any).owner ?? null,
             hasReserve: product.auctionReservePrice !== null,
             reserveMet:
                 product.auctionReservePrice !== null &&

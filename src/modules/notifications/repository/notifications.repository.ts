@@ -63,8 +63,8 @@ export class NotificationsRepository {
     }
 
     findReviewedProductIds(userId: string) {
-        return prisma.productReview.findMany({
-            where: { userId },
+        return prisma.feedback.findMany({
+            where: { userId, type: "PRODUCT" },
             select: { productId: true },
         });
     }

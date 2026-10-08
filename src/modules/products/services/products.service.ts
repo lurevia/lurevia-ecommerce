@@ -4,6 +4,8 @@ import { generateUniqueProductSlug } from "../../../utils/slug";
 import { ConflictError, ForbiddenError, NotFoundError } from "../../../errors/AppError";
 import type { CreateProductInput, ListProductsQuery, UpdateProductInput } from "../dto";
 import { productsMapper } from "../mapper/products.mapper";
+import { prisma } from "../../../lib/prisma";
+import slugify from "slugify";
 
 export class ProductsService {
     constructor(
@@ -56,8 +58,42 @@ export class ProductsService {
 
         const slug = await generateUniqueProductSlug(input.title);
 
+        let boutique = await prisma.boutique.findUnique({
+            where: { ownerId },
+            select: { id: true },
+        });
+        if (!boutique) {
+            const seller = await prisma.user.findUnique({
+                where: { id: ownerId },
+                select: { fullName: true },
+            });
+            const boutiqueName = seller?.fullName ? `Boutique de ${seller.fullName}` : `Boutique ${ownerId.slice(0, 8)}`;
+            boutique = await prisma.boutique.create({
+                data: {
+                    ownerId,
+                    name: boutiqueName,
+                    slug: await generateUniqueProductSlug(boutiqueName),
+                },
+                select: { id: true },
+            });
+        }
+
+        const tagConnectors = input.tags?.length
+            ? await Promise.all(
+                input.tags.map(async (name) => {
+                    const tagSlug = slugify(name, { lower: true, strict: true }) || name.toLowerCase();
+                    const tag = await prisma.tag.upsert({
+                        where: { slug: tagSlug },
+                        update: {},
+                        create: { name, slug: tagSlug },
+                    });
+                    return { tag: { connect: { id: tag.id } } };
+                })
+            )
+            : [];
+
         const product = await this.repository.create({
-            owner: { connect: { id: ownerId } },
+            boutique: { connect: { id: boutique.id } },
             title: input.title,
             slug,
             sku: input.sku,
@@ -83,7 +119,7 @@ export class ProductsService {
             lowStockThreshold: input.lowStockThreshold,
             isNew: input.isNew,
             isActive: input.isActive,
-            tags: input.tags,
+            tags: tagConnectors.length ? { create: tagConnectors } : undefined,
 
             images: {
                 create: input.images.map((url, position) => ({ url, position })),
@@ -141,8 +177,22 @@ export class ProductsService {
             lowStockThreshold: input.lowStockThreshold,
             isNew: input.isNew,
             isActive: input.isActive,
-            tags: input.tags,
         });
+
+        if (input.tags) {
+            await prisma.productTag.deleteMany({ where: { productId: id } });
+            for (const name of input.tags) {
+                const tagSlug = slugify(name, { lower: true, strict: true }) || name.toLowerCase();
+                const tag = await prisma.tag.upsert({
+                    where: { slug: tagSlug },
+                    update: {},
+                    create: { name, slug: tagSlug },
+                });
+                await prisma.productTag.create({
+                    data: { productId: id, tagId: tag.id },
+                });
+            }
+        }
 
         await this.repository.replaceRelations(id, {
             images: input.images,
@@ -180,7 +230,7 @@ export class ProductsService {
     private async assertOwnership(productId: string, userId: string, userRole: string) {
         const product = await this.repository.findById(productId);
         if (!product) throw new NotFoundError("Produit");
-        if (userRole !== "ADMIN" && product.ownerId !== userId) {
+        if (userRole !== "ADMIN" && product.boutique?.ownerId !== userId) {
             throw new ForbiddenError("Ce produit ne vous appartient pas.");
         }
         return product;

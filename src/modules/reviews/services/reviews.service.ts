@@ -20,7 +20,7 @@ export class ReviewsService {
             pagination.limit
         );
         return buildPaginatedResult(
-            reviewsMapper.toOutputList(items),
+            reviewsMapper.toOutputList(items as any),
             totalItems,
             pagination
         );
@@ -31,7 +31,7 @@ export class ReviewsService {
             productId,
             userId
         );
-        return review ? reviewsMapper.toOutput(review) : null;
+        return review ? reviewsMapper.toOutput(review as any) : null;
     }
 
     getProductRating(...args: Parameters<ReviewsAnalyticsService["getProductRating"]>) {
@@ -64,7 +64,7 @@ export class ReviewsService {
         });
 
         await productsRepository.refreshRatingCache(productId);
-        return reviewsMapper.toOutput(review);
+        return reviewsMapper.toOutput(review as any);
     }
 
     async update(reviewId: string, userId: string, input: UpdateReviewInput) {
@@ -90,8 +90,10 @@ export class ReviewsService {
             }),
         });
 
-        await productsRepository.refreshRatingCache(review.productId);
-        return reviewsMapper.toOutput(updated);
+        if (review.productId) {
+            await productsRepository.refreshRatingCache(review.productId);
+        }
+        return reviewsMapper.toOutput(updated as any);
     }
 
     async remove(reviewId: string, userId: string) {
@@ -102,7 +104,9 @@ export class ReviewsService {
         }
 
         await this.reviewsRepository.delete(reviewId);
-        await productsRepository.refreshRatingCache(review.productId);
+        if (review.productId) {
+            await productsRepository.refreshRatingCache(review.productId);
+        }
     }
 }
 

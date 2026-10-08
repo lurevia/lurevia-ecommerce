@@ -25,7 +25,7 @@ export class BidsRepository {
                         id: true,
                         title: true,
                         sku: true,
-                        ownerId: true,
+                        boutique: { select: { ownerId: true } },
                         pricingMode: true,
                     },
                 },

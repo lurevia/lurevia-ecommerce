@@ -6,23 +6,26 @@ import { buildWhere, buildOrderBy } from "../lib/helper/products.helper";
 
 export class ProductsRepository {
     async sellerStoreCategoryId(ownerId: string) {
-        const seller = await prisma.user.findUnique({
-            where: { id: ownerId },
-            select: { role: true, storeCategoryId: true },
+        const boutique = await prisma.boutique.findUnique({
+            where: { ownerId },
+            select: { storeCategoryId: true },
         });
-        return seller?.role === "SELLER" ? seller.storeCategoryId : null;
+        return boutique?.storeCategoryId ?? null;
     }
 
-    findManyByOwner(ownerId: string, skip: number, take: number) {
+    async findManyByOwner(ownerId: string, skip: number, take: number) {
+        const where: Prisma.ProductWhereInput = {
+            boutique: { ownerId },
+        };
         return prisma.$transaction([
             prisma.product.findMany({
-                where: { ownerId },
+                where,
                 orderBy: { createdAt: "desc" },
                 skip,
                 take,
                 include: productDetailInclude,
             }),
-            prisma.product.count({ where: { ownerId } }),
+            prisma.product.count({ where }),
         ]);
     }
 
@@ -170,8 +173,8 @@ export class ProductsRepository {
     }
 
     async refreshRatingCache(productId: string) {
-        const aggregate = await prisma.productReview.aggregate({
-            where: { productId, isApproved: true },
+        const aggregate = await prisma.feedback.aggregate({
+            where: { productId, type: "PRODUCT", isApproved: true },
             _avg: { rating: true },
             _count: { rating: true },
         });

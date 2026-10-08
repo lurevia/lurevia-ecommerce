@@ -31,10 +31,25 @@ export class SellerService {
                 where: { id: userId },
                 data: {
                     role: "SELLER",
-                    publicStoreName: input.storeName,
-                    publicStoreDescription: input.storeDescription,
-                    publicStoreLogoUrl: input.storeLogoUrl,
-                    publicStoreCoverUrl: input.storeCoverUrl,
+                },
+            });
+            const slugCandidate = input.storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+            await tx.boutique.upsert({
+                where: { ownerId: userId },
+                create: {
+                    ownerId: userId,
+                    name: input.storeName,
+                    slug: slugCandidate || `boutique-${userId.slice(0, 8)}`,
+                    description: input.storeDescription,
+                    logoUrl: input.storeLogoUrl,
+                    coverUrl: input.storeCoverUrl,
+                    storeCategoryId: category.id,
+                },
+                update: {
+                    name: input.storeName,
+                    description: input.storeDescription,
+                    logoUrl: input.storeLogoUrl,
+                    coverUrl: input.storeCoverUrl,
                     storeCategoryId: category.id,
                 },
             });
@@ -64,13 +79,13 @@ export class SellerService {
         );
         const sellers = items.map((seller) => ({
             id: seller.id,
-            storeName: seller.publicStoreName!,
-            description: seller.publicStoreDescription,
-            logoUrl: seller.publicStoreLogoUrl,
-            coverUrl: seller.publicStoreCoverUrl,
+            storeName: seller.name,
+            description: seller.description,
+            logoUrl: seller.logoUrl,
+            coverUrl: seller.coverUrl,
             storeCategoryId: seller.storeCategoryId,
             storeCategory: seller.storeCategory,
-            productCount: seller._count.ownedProducts,
+            productCount: seller._count.products,
         }));
         return buildPaginatedResult(sellers, totalItems, pagination);
     }
@@ -80,92 +95,85 @@ export class SellerService {
         if (!seller) throw new NotFoundError("Vendeur");
         return {
             id: seller.id,
-            storeName: seller.publicStoreName!,
-            description: seller.publicStoreDescription,
-            logoUrl: seller.publicStoreLogoUrl,
-            coverUrl: seller.publicStoreCoverUrl,
+            storeName: seller.name,
+            description: seller.description,
+            logoUrl: seller.logoUrl,
+            coverUrl: seller.coverUrl,
             storeCategoryId: seller.storeCategoryId,
             storeCategory: seller.storeCategory,
-            products: productsMapper.toOutputList(seller.ownedProducts),
+            products: productsMapper.toOutputList(seller.products),
         };
     }
 
     async updateProfile(userId: string, input: UpdateSellerProfileInput) {
-        const seller = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { role: true, storeCategoryId: true, _count: { select: { ownedProducts: true } } },
+        const boutique = await prisma.boutique.findUnique({
+            where: { ownerId: userId },
+            select: { id: true, storeCategoryId: true, _count: { select: { products: true } } },
         });
-        if (!seller) throw new NotFoundError("Utilisateur");
-        if (seller.role !== "SELLER") {
-            throw new ForbiddenError("Seuls les vendeurs peuvent modifier leur boutique.");
-        }
-        if (input.storeCategoryId && input.storeCategoryId !== seller.storeCategoryId) {
-            if (seller._count.ownedProducts > 0) {
+        if (!boutique) throw new NotFoundError("Boutique non trouvée.");
+        if (input.storeCategoryId && input.storeCategoryId !== boutique.storeCategoryId) {
+            if (boutique._count.products > 0) {
                 throw new ConflictError("La catégorie de boutique ne peut plus changer après la création de produits.");
             }
             const category = await prisma.category.findUnique({ where: { id: input.storeCategoryId }, select: { id: true } });
             if (!category) throw new NotFoundError("Catégorie de boutique");
         }
-        const updated = await prisma.user.update({
-            where: { id: userId },
+        const updated = await prisma.boutique.update({
+            where: { ownerId: userId },
             data: {
-                publicStoreName: input.storeName,
-                publicStoreDescription: input.storeDescription,
-                publicStoreLogoUrl: input.storeLogoUrl,
-                ...(input.storeCoverUrl !== undefined ? { publicStoreCoverUrl: input.storeCoverUrl } : {}),
+                ...(input.storeName ? { name: input.storeName } : {}),
+                ...(input.storeDescription !== undefined ? { description: input.storeDescription } : {}),
+                ...(input.storeLogoUrl !== undefined ? { logoUrl: input.storeLogoUrl } : {}),
+                ...(input.storeCoverUrl !== undefined ? { coverUrl: input.storeCoverUrl } : {}),
                 ...(input.storeCategoryId ? { storeCategoryId: input.storeCategoryId } : {}),
             },
             select: {
                 id: true,
                 storeCategoryId: true,
-                publicStoreName: true,
-                publicStoreDescription: true,
-                publicStoreLogoUrl: true,
-                publicStoreCoverUrl: true,
+                name: true,
+                description: true,
+                logoUrl: true,
+                coverUrl: true,
                 storeCategory: { select: { id: true, name: true, slug: true } },
-                _count: { select: { ownedProducts: true } },
+                _count: { select: { products: true } },
             },
         });
         return {
             id: updated.id,
-            storeName: updated.publicStoreName,
-            description: updated.publicStoreDescription,
-            logoUrl: updated.publicStoreLogoUrl,
-            coverUrl: updated.publicStoreCoverUrl,
+            storeName: updated.name,
+            description: updated.description,
+            logoUrl: updated.logoUrl,
+            coverUrl: updated.coverUrl,
             storeCategoryId: updated.storeCategoryId,
             storeCategory: updated.storeCategory,
-            productCount: updated._count.ownedProducts,
+            productCount: updated._count.products,
         };
     }
 
     async getMyProfile(userId: string) {
-        const seller = await prisma.user.findUnique({
-            where: { id: userId },
+        const boutique = await prisma.boutique.findUnique({
+            where: { ownerId: userId },
             select: {
                 id: true,
-                role: true,
                 storeCategoryId: true,
-                publicStoreName: true,
-                publicStoreDescription: true,
-                publicStoreLogoUrl: true,
-                publicStoreCoverUrl: true,
+                name: true,
+                description: true,
+                logoUrl: true,
+                coverUrl: true,
                 storeCategory: { select: { id: true, name: true, slug: true } },
-                _count: { select: { ownedProducts: true } },
+                _count: { select: { products: true } },
             },
         });
-        if (!seller) throw new NotFoundError("Utilisateur");
-        if (seller.role !== "SELLER") {
-            throw new ForbiddenError("Seuls les vendeurs peuvent consulter leur boutique.");
-        }
+        if (!boutique) throw new NotFoundError("Boutique");
         return {
-            id: seller.id,
-            storeName: seller.publicStoreName ?? "",
-            description: seller.publicStoreDescription ?? "",
-            logoUrl: seller.publicStoreLogoUrl,
-            coverUrl: seller.publicStoreCoverUrl,
-            storeCategoryId: seller.storeCategoryId,
-            storeCategory: seller.storeCategory,
-            productCount: seller._count.ownedProducts,
+            id: boutique.id,
+            storeName: boutique.name ?? "",
+            description: boutique.description ?? "",
+            logoUrl: boutique.logoUrl,
+            coverUrl: boutique.coverUrl,
+            storeCategoryId: boutique.storeCategoryId,
+            storeCategory: boutique.storeCategory,
+            productCount: boutique._count.products,
         };
     }
 
@@ -198,10 +206,10 @@ export class SellerService {
     async requestProductDeletion(userId: string, productId: string, reason: string) {
         const product = await prisma.product.findUnique({
             where: { id: productId },
-            select: { id: true, ownerId: true, isActive: true },
+            select: { id: true, boutique: { select: { ownerId: true } }, isActive: true },
         });
         if (!product) throw new NotFoundError("Produit");
-        if (product.ownerId !== userId) {
+        if (product.boutique.ownerId !== userId) {
             throw new ForbiddenError("Vous ne pouvez demander le retrait que de vos propres produits.");
         }
         if (!product.isActive) throw new ConflictError("Ce produit est déjà retiré de la boutique.");
@@ -231,7 +239,7 @@ export class SellerService {
 
     async updateOrderStatus(userId: string, id: string, status: OrderStatus) {
         const order = await this.getOrder(userId, id);
-        const hasOtherSellerItems = order.items.some((item) => item.product.ownerId !== userId);
+        const hasOtherSellerItems = order.items.some((item) => (item.product as any).boutique?.ownerId !== userId);
         if (hasOtherSellerItems) {
             throw new ForbiddenError("Cette commande contient des articles d'un autre vendeur et ne peut pas être modifiée globalement.");
         }
@@ -246,6 +254,101 @@ export class SellerService {
         return this.repository.stats(userId);
     }
 
+    async subscribe(userId: string, boutiqueOrSellerId: string) {
+        const boutique = await prisma.boutique.findFirst({
+            where: {
+                OR: [
+                    { id: boutiqueOrSellerId },
+                    { ownerId: boutiqueOrSellerId },
+                    { slug: boutiqueOrSellerId },
+                ],
+                isActive: true,
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+        if (!boutique) throw new NotFoundError("Boutique non trouvée.");
+
+        await prisma.subscription.upsert({
+            where: {
+                userId_boutiqueId: {
+                    userId,
+                    boutiqueId: boutique.id,
+                },
+            },
+            create: {
+                userId,
+                boutiqueId: boutique.id,
+            },
+            update: {
+                deletedAt: null,
+            },
+        });
+
+        const subscriberCount = await prisma.subscription.count({
+            where: { boutiqueId: boutique.id, deletedAt: null },
+        });
+        await prisma.boutique.update({
+            where: { id: boutique.id },
+            data: { subscriberCountCache: subscriberCount },
+        });
+
+        return { subscribed: true, subscriberCount };
+    }
+
+    async unsubscribe(userId: string, boutiqueOrSellerId: string) {
+        const boutique = await prisma.boutique.findFirst({
+            where: {
+                OR: [
+                    { id: boutiqueOrSellerId },
+                    { ownerId: boutiqueOrSellerId },
+                    { slug: boutiqueOrSellerId },
+                ],
+            },
+            select: { id: true },
+        });
+        if (!boutique) throw new NotFoundError("Boutique non trouvée.");
+
+        await prisma.subscription.deleteMany({
+            where: { userId, boutiqueId: boutique.id },
+        });
+
+        const subscriberCount = await prisma.subscription.count({
+            where: { boutiqueId: boutique.id, deletedAt: null },
+        });
+        await prisma.boutique.update({
+            where: { id: boutique.id },
+            data: { subscriberCountCache: subscriberCount },
+        });
+
+        return { subscribed: false, subscriberCount };
+    }
+
+    async getUserSubscriptions(userId: string) {
+        const subscriptions = await prisma.subscription.findMany({
+            where: { userId, deletedAt: null },
+            include: {
+                boutique: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        logoUrl: true,
+                        coverUrl: true,
+                        description: true,
+                        subscriberCountCache: true,
+                        ratingCache: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+        return subscriptions.map((s) => ({
+            id: s.id,
+            createdAt: s.createdAt,
+            boutique: s.boutique,
+        }));
+    }
 }
 
 export const sellerService = new SellerService(sellerRepository);

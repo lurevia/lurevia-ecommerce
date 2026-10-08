@@ -1,13 +1,12 @@
 import { prisma } from "../../../lib/prisma";
-import type { Prisma } from "@prisma/client";
 import { PURCHASE_STATUSES } from "../lib/constant/reviews.constant";
 
 export class ReviewsRepository {
     // ─── Liste paginée (uniquement approuvés) ───
     findByProduct(productId: string, skip = 0, take = 20) {
         return prisma.$transaction([
-            prisma.productReview.findMany({
-                where: { productId, isApproved: true },
+            prisma.feedback.findMany({
+                where: { productId, type: "PRODUCT", isApproved: true },
                 include: {
                     user: { select: { id: true, fullName: true, avatarUrl: true } },
                 },
@@ -15,27 +14,41 @@ export class ReviewsRepository {
                 skip,
                 take,
             }),
-            prisma.productReview.count({
-                where: { productId, isApproved: true },
+            prisma.feedback.count({
+                where: { productId, type: "PRODUCT", isApproved: true },
             }),
         ]);
     }
 
     // ─── Avis de l'utilisateur sur un produit (peu importe statut) ───
     findByProductAndUser(productId: string, userId: string) {
-        return prisma.productReview.findUnique({
-            where: { productId_userId: { productId, userId } },
+        return prisma.feedback.findFirst({
+            where: { productId, userId, type: "PRODUCT" },
         });
     }
 
     findById(id: string) {
-        return prisma.productReview.findUnique({ where: { id } });
+        return prisma.feedback.findUnique({ where: { id } });
     }
 
     // ─── Création (avec user inclus pour le DTO complet) ───
-    create(data: Prisma.ProductReviewCreateInput) {
-        return prisma.productReview.create({
-            data,
+    create(data: {
+        product: { connect: { id: string } };
+        user: { connect: { id: string } };
+        rating: number;
+        title?: string;
+        comment: string;
+        isVerifiedPurchase?: boolean;
+    }) {
+        return prisma.feedback.create({
+            data: {
+                type: "PRODUCT",
+                productId: data.product.connect.id,
+                userId: data.user.connect.id,
+                rating: data.rating,
+                title: data.title,
+                comment: data.comment,
+            },
             include: {
                 user: { select: { id: true, fullName: true, avatarUrl: true } },
             },
@@ -43,8 +56,8 @@ export class ReviewsRepository {
     }
 
     // ─── Mise à jour ───
-    update(id: string, data: Prisma.ProductReviewUpdateInput) {
-        return prisma.productReview.update({
+    update(id: string, data: { rating?: number; title?: string; comment?: string }) {
+        return prisma.feedback.update({
             where: { id },
             data,
             include: {
@@ -54,14 +67,14 @@ export class ReviewsRepository {
     }
 
     delete(id: string) {
-        return prisma.productReview.delete({ where: { id } });
+        return prisma.feedback.delete({ where: { id } });
     }
 
     // ─── Distribution des notes ───
     distributionByProduct(productId: string) {
-        return prisma.productReview.groupBy({
+        return prisma.feedback.groupBy({
             by: ["rating"],
-            where: { productId, isApproved: true },
+            where: { productId, type: "PRODUCT", isApproved: true },
             _count: { rating: true },
         });
     }

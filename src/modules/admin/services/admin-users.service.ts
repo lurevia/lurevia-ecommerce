@@ -46,7 +46,7 @@ export class AdminUsersService {
                 ? {
                     OR: [
                         { fullName: { contains: query.search, mode: "insensitive" as const } },
-                        { publicStoreName: { contains: query.search, mode: "insensitive" as const } },
+                        { boutique: { name: { contains: query.search, mode: "insensitive" as const } } },
                         { email: { contains: query.search, mode: "insensitive" as const } },
                         { phone: { contains: query.search, mode: "insensitive" as const } },
                     ],
@@ -58,6 +58,7 @@ export class AdminUsersService {
             prisma.user.findMany({
                 where,
                 include: {
+                    boutique: { select: { name: true } },
                     sellerContracts: {
                         orderBy: { version: "desc" },
                         take: 1,
@@ -73,7 +74,7 @@ export class AdminUsersService {
 
         const items = users.map((user) => ({
             id: user.id,
-            name: user.publicStoreName ?? user.fullName,
+            name: user.boutique?.name ?? user.fullName,
             sellerName: user.fullName,
             email: user.email,
             phone: user.phone,

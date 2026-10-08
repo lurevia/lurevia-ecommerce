@@ -5,7 +5,7 @@ export interface FeedbackRow {
   userId: string;
   overallRating: number;
   criteria: unknown;
-  category: FeedbackCategory;
+  category: FeedbackCategory | null;
   comment: string;
   teamResponse: string | null;
   isApproved: boolean;

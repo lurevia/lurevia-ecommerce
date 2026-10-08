@@ -5,19 +5,19 @@ export class AdminReviewMapper {
     return {
       id: r.id,
       productId: r.productId,
-      productTitle: r.product.title,
+      productTitle: r.product?.title ?? "",
       userId: r.userId,
       userName: r.user.fullName,
       userEmail: r.user.email ?? undefined,
       userAvatar: r.user.avatarUrl ?? undefined,
       isApproved: r.isApproved,
       approvedAt: r.approvedAt?.toISOString(),
-      rejectedAt: r.rejectedAt?.toISOString(),
+      rejectedAt: r.rejectedAt?.toISOString() ?? (r.rejectionReason && !r.isApproved ? r.createdAt.toISOString() : undefined),
       rejectionReason: r.rejectionReason ?? undefined,
       rating: r.rating,
       title: r.title ?? undefined,
       comment: r.comment,
-      isVerifiedPurchase: r.isVerifiedPurchase,
+      isVerifiedPurchase: r.isVerifiedPurchase ?? Boolean(r.orderId || r.orderItemId),
       createdAt: r.createdAt.toISOString(),
     };
   }

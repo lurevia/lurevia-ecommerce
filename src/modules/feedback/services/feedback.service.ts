@@ -40,7 +40,7 @@ export class FeedbackService {
     async stats() {
         const result = await this.repository.aggregateStats();
         return {
-            average: Math.round((result._avg.overallRating ?? 0) * 10) / 10,
+            average: Math.round(((result._avg as any).rating ?? (result._avg as any).overallRating ?? 0) * 10) / 10,
             count: result._count,
         };
     }

@@ -26,7 +26,7 @@ export class OrdersService {
         if (cartItems.length === 0) {
             throw new BadRequestError("Votre panier est vide.");
         }
-        if (cartItems.some((item) => item.product.ownerId === userId)) {
+        if (cartItems.some((item) => ((item.product as any).boutique?.ownerId ?? (item.product as any).ownerId) === userId)) {
             throw new ForbiddenError("Vous ne pouvez pas acheter vos propres produits.");
         }
 
