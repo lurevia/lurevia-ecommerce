@@ -1,3 +1,19 @@
+// ════════════════════════════════════════════════════════════════════
+//  LUREVIA — schema.prisma v2 (complet)
+//  Marketplace où les vendeurs sont en concurrence sur le SEO et le contenu.
+//
+//  Organisation du fichier :
+//    0. Config            7.  Commandes & paiements
+//    1. Enums             8.  Feedback
+//    2. Identité & auth   9.  Notifications & messages
+//    3. Boutiques         10. Business vendeur
+//    4. Logistique        11. Admin, audit, média
+//    5. Catalogue         12. Configuration plateforme
+//    6. Contenu & SEO     13. Mesures, scoring, classements, récompenses
+//
+//  Les anciens champs gardés "par compatibilité" sont signalés [COMPAT].
+// ════════════════════════════════════════════════════════════════════
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,11 +23,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ENUMS
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════ 1. ENUMS ═══════════════════════════
 
-// ─── Identité & Auth ───
 enum Gender {
   MALE
   FEMALE
@@ -22,6 +35,80 @@ enum Role {
   SELLER
   CUSTOMER
   ADMIN
+}
+
+enum SellerTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+enum LeaderboardPeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum LeaderboardScope {
+  GLOBAL
+  BY_CATEGORY
+  BY_REGION
+}
+
+enum RewardType {
+  COMMISSION_DISCOUNT
+  PREMIUM_FEATURE
+  CASH_BONUS
+  FREE_SHIPPING_CREDITS
+  PROMOTED_LISTING_CREDITS
+  PHYSICAL_GIFT
+  BADGE_UPGRADE
+}
+
+enum RewardStatus {
+  PENDING
+  GRANTED
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+enum PremiumFeatureCode {
+  FEATURED_BOUTIQUE
+  HOME_BANNER
+  ADVANCED_ANALYTICS
+  CUSTOM_DOMAIN
+  BULK_UPLOAD
+  PRIORITY_SUPPORT
+  AUTOMATED_MARKETING
+  ZERO_COMMISSION_DAY
+  NEGOTIABLE_PRODUCTS
+  AUCTION_UNLIMITED
+}
+
+enum AchievementCode {
+  FIRST_SALE
+  FIRST_REVIEW
+  HUNDRED_SALES
+  THOUSAND_SALES
+  PERFECT_MONTH
+  TOP_SELLER_MONTH
+  TOP_SELLER_YEAR
+  FAST_SHIPPER
+  HIGHLY_RATED
+  MILLION_REVENUE
+  TEN_THOUSAND_SUBSCRIBERS
+  FIVE_STAR_STREAK
+}
+
+enum AchievementRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
 }
 
 enum AuthIdentifier {
@@ -50,41 +137,39 @@ enum GuardianRelation {
   OTHER
 }
 
-// ─── Catalogue ───
 enum ProductPricingMode {
-  FIXED // Prix fixe
-  NEGOTIABLE // Négociable (offre libre, sans date de fin)
-  AUCTION // Enchère live (date de fin, meilleure offre gagne)
-  ON_REQUEST // Prix sur demande
+  FIXED
+  NEGOTIABLE
+  AUCTION
+  ON_REQUEST
 }
 
 enum BidStatus {
-  PENDING // En attente
-  ACCEPTED // Acceptée (NEGOTIABLE)
-  REJECTED // Refusée
-  OUTBID // Dépassée (AUCTION)
-  WINNING // Meilleure offre actuelle (AUCTION)
-  WON // Gagnante (enchère terminée)
-  CANCELLED // Annulée par le client
+  PENDING
+  ACCEPTED
+  REJECTED
+  OUTBID
+  WINNING
+  WON
+  CANCELLED
 }
 
 enum AuctionStatus {
-  SCHEDULED // Programmée (pas encore commencée)
-  ACTIVE // En cours
-  ENDED // Terminée
-  CANCELLED // Annulée par le vendeur
-  SOLD // Vendue (gagnant désigné)
-  UNSOLD // Non vendue (prix de réserve non atteint)
+  SCHEDULED
+  ACTIVE
+  ENDED
+  CANCELLED
+  SOLD
+  UNSOLD
 }
 
 enum AuctionMessageType {
-  CHAT // Message de chat normal
-  BID // Notification d'offre
-  SYSTEM // Message système ("enchère commencée", "5 min restantes")
-  MODERATION // Message de modération admin
+  CHAT
+  BID
+  SYSTEM
+  MODERATION
 }
 
-// ─── Commandes & Paiements ───
 enum OrderStatus {
   PENDING
   PAID
@@ -124,7 +209,6 @@ enum DeliveryMode {
   PICKUP_POINT
 }
 
-// ─── Logistique ───
 enum ProvinceMadagascar {
   ANTANANARIVO
   ANTSIRANANA
@@ -134,40 +218,39 @@ enum ProvinceMadagascar {
   TOLIARA
 }
 
-// 24 régions officielles de Madagascar (depuis 2023)
 enum RegionMadagascar {
   DIANA
   SAVA
-
   ITASY
   ANALAMANGA
   VAKINANKARATRA
   BONGOLAVA
-
   SOFIA
   BOENY
   BETSIBOKA
   MELAKY
-
   ALAOTRA_MANGORO
   ATSINANANA
   ANALANJIROFO
   AMBATOSOA
-
   AMORON_I_MANIA
   HAUTE_MATSIATRA
   VATOVAVY
   FITOVINANY
   ATSIMO_ATSINANANA
   IHOROMBE
-
   MENABE
   ATSIMO_ANDREFANA
   ANDROY
   ANOSY
 }
 
-// ─── Avis & Feedback ───
+enum FeedbackType {
+  PRODUCT
+  BOUTIQUE
+  SERVICE
+}
+
 enum FeedbackCategory {
   DELIVERY
   PAYMENT
@@ -176,7 +259,6 @@ enum FeedbackCategory {
   OTHER
 }
 
-// ─── Notifications ───
 enum NotificationType {
   REVIEW_PENDING
   ORDER_SHIPPED
@@ -213,7 +295,6 @@ enum MessageType {
   SYSTEM
 }
 
-// ─── Vérification / Demandes ───
 enum VerificationStatus {
   PENDING
   APPROVED
@@ -248,7 +329,6 @@ enum ProductDeletionRequestStatus {
   REJECTED
 }
 
-// ─── Business vendeur ───
 enum SellerContractType {
   PERCENTAGE
   MONTHLY_FIXED
@@ -277,7 +357,6 @@ enum TransferStatus {
   CANCELLED
 }
 
-// ─── Média ───
 enum MediaArchiveStatus {
   PENDING
   SUCCESS
@@ -285,40 +364,94 @@ enum MediaArchiveStatus {
   NOT_CONFIGURED
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// MODÈLES
-// ═══════════════════════════════════════════════════════════════════════════
 
-// ─── 1. IDENTITÉ & AUTH ───
+enum ContentLocale {
+  FR
+  MG
+  EN
+}
+
+enum ModerationStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SeoEntityType {
+  BOUTIQUE
+  PRODUCT
+  CATEGORY
+  POST
+}
+
+enum SeoIssueSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum SeoIssueCode {
+  TITLE_MISSING
+  TITLE_TOO_SHORT
+  TITLE_TOO_LONG
+  META_DESCRIPTION_MISSING
+  META_DESCRIPTION_TOO_SHORT
+  META_DESCRIPTION_TOO_LONG
+  FOCUS_KEYWORD_MISSING
+  KEYWORD_NOT_IN_TITLE
+  DESCRIPTION_TOO_SHORT
+  NO_ALT_TEXT
+  NOT_ENOUGH_IMAGES
+  NO_ATTRIBUTES
+  NO_FAQ
+  NO_CATEGORY
+  MISSING_TRANSLATION
+  DUPLICATE_CONTENT
+}
+
+enum ScoreComponent {
+  TOTAL
+  SEO
+  CONTENT
+  TRUST
+  ENGAGEMENT
+  QUALITY
+  RECENCY
+  SERVICE
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum JobStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
 
 model User {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  fullName  String
-  email     String  @unique
-  phone     String? @unique
-  avatarUrl String?
-  age       Int?
-  gender    Gender?
-  publicStoreName        String?
-  publicStoreDescription String? @db.Text
-  publicStoreLogoUrl     String?
-  publicStoreCoverUrl    String?  @db.Text
-  isPrimaryAdmin         Boolean  @default(false)
-  storeCategoryId        String?  @db.Uuid
-  storeCategory          Category? @relation("SellerStoreCategory", fields: [storeCategoryId], references: [id], onDelete: SetNull)
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullName       String
+  email          String  @unique
+  phone          String? @unique
+  avatarUrl      String?
+  age            Int?
+  gender         Gender?
+  isPrimaryAdmin Boolean @default(false)
 
-  // Auth
   passwordHash      String?
   passwordChangedAt DateTime?
   primaryIdentifier AuthIdentifier @default(EMAIL)
   primaryProvider   AuthProvider   @default(LOCAL)
 
-  // Vérification
   emailVerified Boolean @default(false)
   phoneVerified Boolean @default(false)
   isVerified    Boolean @default(false)
-
-  // CIN personnel
   cinNumber                  String?                    @unique
   cinVerifiedAt              DateTime?
   identityDocumentType       IdentityDocumentType?
@@ -328,7 +461,6 @@ model User {
   identityVerificationStatus IdentityVerificationStatus @default(NOT_SUBMITTED)
   identityRejectionReason    String?
 
-  // CIN du tuteur (mineurs ou sans CIN)
   isMinor                Boolean           @default(false)
   guardianFullName       String?
   guardianCinNumber      String?
@@ -347,50 +479,45 @@ model User {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  // Relations Auth
-  oauthAccounts         OAuthAccount[]
-  passwordResets        PasswordResetToken[]
-  refreshTokens         RefreshToken[]
-  verificationRequests  VerificationRequest[]
-  deletionRequests      AccountDeletionRequest[]
-  profileChangeRequests ProfileChangeRequest[]
+  oauthAccounts           OAuthAccount[]
+  passwordResets          PasswordResetToken[]
+  refreshTokens           RefreshToken[]
+  verificationRequests    VerificationRequest[]
+  deletionRequests        AccountDeletionRequest[]
+  profileChangeRequests   ProfileChangeRequest[]
   productDeletionRequests ProductDeletionRequest[] @relation("SellerProductDeletionRequests")
+  identityVerifications   IdentityVerification[]
 
-  // Relations client
+  boutique         Boutique?         @relation("BoutiqueOwner")
+  managedBoutiques ManagedBoutique[]
+  subscriptions    Subscription[]
+
   addresses        Address[]
   cartItems        CartItem[]
   favorites        FavoriteItem[]
   orders           Order[]
-  reviews          ProductReview[]
-  serviceFeedbacks ServiceFeedback[]
+  feedbacks        Feedback[]
   notifications    Notification[]
-  messagesReceived UserMessage[]     @relation("MessageRecipient")
-  messagesSent     UserMessage[]     @relation("MessageSender")
-  auditLogs        AuditLog[]        @relation("AuditActor")
+  messagesReceived UserMessage[]  @relation("MessageRecipient")
+  messagesSent     UserMessage[]  @relation("MessageSender")
+  auditLogs        AuditLog[]     @relation("AuditActor")
 
-  // Relations vendeur
   bids            ProductBid[]
-  ownedProducts   Product[]          @relation("ProductOwner")
   sellerContracts SellerContract[]
   settlements     SellerSettlement[]
   transfers       TransferLedger[]
   mediaAssets     MediaAsset[]
 
-  // Relations livreur
   deliveries DeliveryTracking[] @relation("DeliveryCourier")
 
-  // ✅ Relations enchères
-  auctionProductsWon   Product[]              @relation("AuctionWinner")
-  auctionMessages      AuctionMessage[]
-  auctionWatchers      AuctionWatcher[]
-  IdentityVerification IdentityVerification[]
+  auctionProductsWon Product[]         @relation("AuctionWinner")
+  auctionMessages    AuctionMessage[]
+  auctionWatchers    AuctionWatcher[]
 
-  @@index([email])
-  @@index([phone])
-  @@index([cinNumber])
-  @@index([guardianCinNumber])
-  @@index([identityVerificationStatus])
+  @@index([role])
   @@index([deletedAt])
+  @@index([identityVerificationStatus])
+  @@index([guardianCinNumber])
   @@map("users")
 }
 
@@ -538,17 +665,17 @@ model ProfileChangeRequest {
 }
 
 model ProductDeletionRequest {
-  id          String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  productId   String                       @db.Uuid
-  product     Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sellerId    String                       @db.Uuid
-  seller      User                         @relation("SellerProductDeletionRequests", fields: [sellerId], references: [id], onDelete: Cascade)
-  reason      String                       @db.Text
-  status      ProductDeletionRequestStatus @default(PENDING)
-  adminNote   String?                      @db.Text
-  reviewedBy  String?                      @db.Uuid
-  createdAt   DateTime                     @default(now())
-  reviewedAt  DateTime?
+  id         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId  String                       @db.Uuid
+  product    Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sellerId   String                       @db.Uuid
+  seller     User                         @relation("SellerProductDeletionRequests", fields: [sellerId], references: [id], onDelete: Cascade)
+  reason     String                       @db.Text
+  status     ProductDeletionRequestStatus @default(PENDING)
+  adminNote  String?                      @db.Text
+  reviewedBy String?                      @db.Uuid
+  createdAt  DateTime                     @default(now())
+  reviewedAt DateTime?
 
   @@index([status, createdAt])
   @@index([sellerId, status])
@@ -556,26 +683,178 @@ model ProductDeletionRequest {
   @@map("product_deletion_requests")
 }
 
-// ─── 2. ADRESSES & LOGISTIQUE ───
+// ═══════════════════ 3. BOUTIQUES ═══════════════════
+// Boutique = identité + coordonnées + légal + caches de lecture.
+// Le contenu éditorial/SEO par langue vit dans BoutiqueLocalization,
+// les scores détaillés dans SellerScoreSnapshot.
+
+model Boutique {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId String @unique @db.Uuid
+  owner   User   @relation("BoutiqueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @unique
+  slug String @unique @db.VarChar(120)
+
+  // [COMPAT] Contenu par défaut (FR). Source de vérité = BoutiqueLocalization.
+  tagline         String?  @db.VarChar(160)
+  description     String?  @db.Text
+  longDescription String?  @db.Text
+  story           String?  @db.Text
+  values          String?  @db.Text
+  bio             String?
+  metaTitle       String?  @db.VarChar(70)
+  metaDescription String?  @db.VarChar(160)
+  metaKeywords    String[] @default([])
+  canonicalUrl    String?
+  ogImageUrl      String?
+  noIndex         Boolean  @default(false)
+
+  logoUrl     String?
+  coverUrl    String?
+  galleryUrls String[] @default([])
+
+  province  ProvinceMadagascar?
+  region    RegionMadagascar?
+  city      String?
+  address   String?
+  latitude  Float?
+  longitude Float?
+
+  contactEmail   String?
+  contactPhone   String?
+  websiteUrl     String?
+  facebookUrl    String?
+  instagramUrl   String?
+  tiktokUrl      String?
+  whatsappNumber String?
+  linkedinUrl    String?
+
+  legalName               String?
+  legalRegistrationNumber String?
+  taxId                   String?
+  isVerified              Boolean   @default(false)
+  verifiedAt              DateTime?
+  verifiedBy              String?   @db.Uuid
+  trustLevel              Int       @default(0)
+
+  returnPolicy       String? @db.Text
+  shippingPolicy     String? @db.Text
+  warrantyPolicy     String? @db.Text
+  processingTimeDays Int?
+
+  storeCategoryId String?   @db.Uuid
+  storeCategory   Category? @relation("BoutiqueStoreCategory", fields: [storeCategoryId], references: [id], onDelete: SetNull)
+
+  // Caches de lecture (écrits UNIQUEMENT par les jobs, jamais par l'API)
+  ratingCache          Float @default(0)
+  reviewCountCache     Int   @default(0)
+  subscriberCountCache Int   @default(0)
+  productCountCache    Int   @default(0)
+  salesCountCache      Int   @default(0)
+  viewCountCache       Int   @default(0)
+  favoriteCountCache   Int   @default(0)
+  scoreTotal           Float @default(0)
+  seoScoreCache        Float @default(0)
+  contentScoreCache    Float @default(0)
+
+  lastProductAt       DateTime?
+  lastOrderAt         DateTime?
+  lastReviewAt        DateTime?
+  lastActiveAt        DateTime?
+  responseTimeMinutes Int?
+
+  tier SellerTier @default(BRONZE)
+
+  isActive        Boolean   @default(true)
+  isFeatured      Boolean   @default(false)
+  isSuspended     Boolean   @default(false)
+  suspendedReason String?
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  managers      ManagedBoutique[]
+  products      Product[]
+  subscriptions Subscription[]
+  feedbacks     Feedback[]
+
+  localizations  BoutiqueLocalization[]
+  posts          BoutiquePost[]
+  seoAudits      SeoAudit[]
+  dailyStats     BoutiqueDailyStat[]
+  scoreSnapshots SellerScoreSnapshot[]
+
+  stats              SellerStats[]
+  leaderboardEntries SellerLeaderboardEntry[]
+  premiumAccesses    SellerPremiumAccess[]
+  rewards            SellerReward[]
+  achievements       SellerAchievementAward[]
+  promotions         SellerPromotion[]
+
+  @@index([storeCategoryId])
+  @@index([isActive, deletedAt])
+  @@index([isFeatured, scoreTotal(sort: Desc)])
+  @@index([scoreTotal(sort: Desc)])
+  @@index([seoScoreCache(sort: Desc)])
+  @@index([ratingCache(sort: Desc)])
+  @@index([subscriberCountCache(sort: Desc)])
+  @@index([province, region])
+  @@index([publishedAt])
+  @@map("boutiques")
+}
+
+model ManagedBoutique {
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  role       String?
+  createdAt  DateTime @default(now())
+
+  @@id([userId, boutiqueId])
+  @@index([boutiqueId])
+  @@map("managed_boutiques")
+}
+
+model Subscription {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@unique([userId, boutiqueId])
+  @@index([boutiqueId])
+  @@index([userId])
+  @@map("subscriptions")
+}
+
+// ═══════════════════ 4. ADRESSES & LOGISTIQUE ═══════════════════
 
 model Address {
-  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId       String             @db.Uuid
-  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label        String
-  fullName     String
-  phone        String
-  email        String?
-  province     ProvinceMadagascar
-  region       RegionMadagascar
-  city         String
-  neighborhood String?
-  address      String
-  latitude     Float?
-  longitude    Float?
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String             @db.Uuid
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label          String
+  fullName       String
+  phone          String
+  email          String?
+  province       ProvinceMadagascar
+  region         RegionMadagascar
+  city           String
+  neighborhood   String?
+  address        String
+  latitude       Float?
+  longitude      Float?
   accuracyMeters Float?
-  notes        String?
-  isDefault    Boolean            @default(false)
+  notes          String?
+  isDefault      Boolean            @default(false)
 
   pickupPointId String?      @db.Uuid
   pickupPoint   PickupPoint? @relation(fields: [pickupPointId], references: [id], onDelete: SetNull)
@@ -653,7 +932,7 @@ model DeliveryTracking {
   @@map("delivery_tracking")
 }
 
-// ─── 3. CATALOGUE (avec enchères) ───
+// ═══════════════════ 5. CATALOGUE ═══════════════════
 
 model Category {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -664,81 +943,109 @@ model Category {
   bannerUrl   String
   iconName    String   @default("ShoppingBag")
   position    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
-  products ProductCategory[]
-  stores   User[] @relation("SellerStoreCategory")
+  // Hiérarchie (arbre de catégories)
+  parentId String?    @db.Uuid
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+  depth    Int        @default(0)
+  path     String     @default("") // "artisanat/vannerie/paniers"
+  isActive Boolean    @default(true)
 
+  // SEO catégorie
+  metaTitle       String? @db.VarChar(70)
+  metaDescription String? @db.VarChar(160)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products  ProductCategory[]
+  boutiques Boutique[]        @relation("BoutiqueStoreCategory")
+
+  @@index([parentId])
+  @@index([isActive, position])
   @@map("categories")
 }
 
 model Product {
-  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId         String? @db.Uuid
-  owner           User?   @relation("ProductOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  slug       String   @unique
+  sku        String   @unique
+
+  // [COMPAT] Contenu par défaut (FR). Source de vérité = ProductLocalization.
   title           String
-  slug            String  @unique
-  sku             String  @unique
   description     String?
   longDescription String?
 
-  // Mode de vente
+  // ── Prix ──
   pricingMode ProductPricingMode @default(FIXED)
-
-  // Prix fixe / négociable
-  price         Int?
+  price       Int?
   originalPrice Int?
-  minPrice      Int?
-  maxPrice      Int?
+  minPrice    Int?
+  maxPrice    Int?
 
-  // ✅ Enchère
-  auctionStartPrice   Int? // Prix de départ
-  auctionReservePrice Int? // Prix de réserve (secret)
-  auctionCurrentPrice Int? // Meilleure offre actuelle (dénormalisé pour perf)
-  auctionStartAt      DateTime? // Début prévu
-  auctionEndAt        DateTime? // Fin prévue
-  auctionStatus       AuctionStatus? @default(ACTIVE)
+  // ── Enchères (à extraire plus tard dans un modèle Auction) ──
+  auctionStartPrice   Int?
+  auctionReservePrice Int?
+  auctionCurrentPrice Int?
+  auctionStartAt      DateTime?
+  auctionEndAt        DateTime?
+  auctionStatus       AuctionStatus? // null = pas une enchère (ancien default ACTIVE supprimé)
   auctionWinnerId     String?        @db.Uuid
   auctionWinner       User?          @relation("AuctionWinner", fields: [auctionWinnerId], references: [id], onDelete: SetNull)
-  auctionFinalPrice   Int? // Prix final après clôture
-  auctionBidCount     Int            @default(0) // Nombre d'offres (dénormalisé)
-  auctionWatcherCount Int            @default(0) // Nombre de spectateurs (dénormalisé)
+  auctionFinalPrice   Int?
+  auctionBidCount     Int            @default(0)
+  auctionWatcherCount Int            @default(0)
 
-  // Stock
+  // ── Stock & état ──
   stock             Int     @default(0)
   lowStockThreshold Int     @default(5)
   isActive          Boolean @default(true)
   isNew             Boolean @default(false)
 
-  tags             String[] @default([])
-  ratingCache      Float    @default(0)
-  reviewCountCache Int      @default(0)
+  // Caches de lecture (écrits par les jobs)
+  ratingCache       Float @default(0)
+  reviewCountCache  Int   @default(0)
+  seoScoreCache     Float @default(0)
+  contentScoreCache Float @default(0)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
+  // Relations catalogue
   images     ProductImage[]
   colors     ProductColor[]
   sizes      ProductSize[]
   categories ProductCategory[]
-  cartItems  CartItem[]
-  favorites  FavoriteItem[]
-  orderItems OrderItem[]
-  reviews    ProductReview[]
-  bids       ProductBid[]
-  feedbacks  ServiceFeedback[] @relation("FeedbackProduct")
+
+  // Contenu & SEO
+  localizations ProductLocalization[]
+  attributes    ProductAttribute[]
+  faqs          ProductFaq[]
+  tags          ProductTag[]
+  dailyStats    ProductDailyStat[]
+
+  // Commerce
+  cartItems        CartItem[]
+  favorites        FavoriteItem[]
+  orderItems       OrderItem[]
+  feedbacks        Feedback[]
   deletionRequests ProductDeletionRequest[]
 
-  // Relations enchères
+  // Enchères
+  bids            ProductBid[]
   auctionMessages AuctionMessage[]
   auctionWatchers AuctionWatcher[]
 
+  @@index([boutiqueId, isActive, deletedAt])
+  @@index([isActive, seoScoreCache(sort: Desc)])
   @@index([price])
   @@index([createdAt])
   @@index([stock])
-  @@index([isActive])
-  @@index([ownerId])
   @@index([pricingMode, auctionStatus])
   @@index([auctionEndAt])
   @@map("products")
@@ -750,6 +1057,13 @@ model ProductImage {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   url       String
   position  Int     @default(0)
+
+  // SEO images + performance
+  altText   String?  @db.VarChar(200)
+  width     Int?
+  height    Int?
+  blurHash  String?
+  isPrimary Boolean  @default(false)
 
   @@index([productId])
   @@map("product_images")
@@ -791,6 +1105,57 @@ model ProductCategory {
   @@map("product_categories")
 }
 
+// Attributs structurés (matière, origine, poids...) → filtres + données structurées
+model ProductAttribute {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key       String  @db.VarChar(60)
+  value     String  @db.VarChar(200)
+  unit      String? @db.VarChar(20)
+  position  Int     @default(0)
+
+  @@unique([productId, key])
+  @@index([key, value])
+  @@map("product_attributes")
+}
+
+model ProductFaq {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String        @db.Uuid
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locale    ContentLocale @default(FR)
+  question  String        @db.VarChar(300)
+  answer    String        @db.Text
+  position  Int           @default(0)
+
+  @@index([productId, locale])
+  @@map("product_faqs")
+}
+
+model Tag {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  slug      String       @unique
+  createdAt DateTime     @default(now())
+  products  ProductTag[]
+
+  @@map("tags")
+}
+
+model ProductTag {
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tagId     String  @db.Uuid
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@index([tagId])
+  @@map("product_tags")
+}
+
+// ── Enchères ──
+
 model ProductBid {
   id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productId String  @db.Uuid
@@ -802,7 +1167,6 @@ model ProductBid {
   comment       String?
   status        BidStatus @default(PENDING)
 
-  // Enchères automatiques
   isAutoBid    Boolean @default(false)
   autoBidMax   Int?
   isWinningBid Boolean @default(false)
@@ -817,7 +1181,6 @@ model ProductBid {
   @@map("product_bids")
 }
 
-// Chat live pendant les enchères
 model AuctionMessage {
   id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productId String  @db.Uuid
@@ -827,7 +1190,7 @@ model AuctionMessage {
 
   type     AuctionMessageType @default(CHAT)
   content  String             @db.Text
-  metadata Json? // Pour BID: { amount: 5000 }, pour SYSTEM: { event: "..." }
+  metadata Json?
 
   isDeleted Boolean   @default(false)
   deletedBy String?   @db.Uuid
@@ -841,7 +1204,6 @@ model AuctionMessage {
   @@map("auction_messages")
 }
 
-// Suivi des spectateurs d'une enchère (pour "X personnes regardent")
 model AuctionWatcher {
   id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productId String  @db.Uuid
@@ -859,7 +1221,7 @@ model AuctionWatcher {
   @@map("auction_watchers")
 }
 
-// ─── 4. PANIER & FAVORIS ───
+// ── Panier & favoris ──
 
 model CartItem {
   id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -894,7 +1256,164 @@ model FavoriteItem {
   @@map("favorite_items")
 }
 
-// ─── 5. COMMANDES ───
+// ═══════════════════ 6. CONTENU & SEO ═══════════════════
+
+// Contenu + SEO d'un produit dans UNE langue.
+model ProductLocalization {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String        @db.Uuid
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locale    ContentLocale
+
+  // Contenu
+  title            String
+  shortDescription String? @db.VarChar(300)
+  description      String? @db.Text
+  longDescription  String? @db.Text
+
+  // SEO
+  metaTitle       String?  @db.VarChar(70)
+  metaDescription String?  @db.VarChar(160)
+  focusKeyword    String?  @db.VarChar(80)
+  keywords        String[] @default([])
+  canonicalUrl    String?
+  ogImageUrl      String?
+  noIndex         Boolean  @default(false)
+
+  // Mesures calculées par job (jamais saisies à la main)
+  wordCount        Int     @default(0)
+  readabilityScore Float?
+  contentHash      String? @db.VarChar(64) // détection de contenu dupliqué
+
+  moderationStatus ModerationStatus @default(APPROVED)
+  moderatedBy      String?          @db.Uuid
+  moderatedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, locale])
+  @@index([locale, moderationStatus])
+  @@index([contentHash])
+  @@map("product_localizations")
+}
+
+model BoutiqueLocalization {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String        @db.Uuid
+  boutique   Boutique      @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  locale     ContentLocale
+
+  tagline         String? @db.VarChar(160)
+  description     String? @db.Text
+  longDescription String? @db.Text
+  story           String? @db.Text
+  values          String? @db.Text
+
+  metaTitle       String?  @db.VarChar(70)
+  metaDescription String?  @db.VarChar(160)
+  focusKeyword    String?  @db.VarChar(80)
+  keywords        String[] @default([])
+  canonicalUrl    String?
+  ogImageUrl      String?
+  noIndex         Boolean  @default(false)
+
+  wordCount        Int              @default(0)
+  moderationStatus ModerationStatus @default(APPROVED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([boutiqueId, locale])
+  @@map("boutique_localizations")
+}
+
+// Contenu éditorial vendeur (blog, guides) = levier SEO long terme
+model BoutiquePost {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String        @db.Uuid
+  boutique   Boutique      @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  locale     ContentLocale @default(FR)
+
+  slug     String  @db.VarChar(160)
+  title    String  @db.VarChar(200)
+  excerpt  String? @db.VarChar(300)
+  content  String  @db.Text
+  coverUrl String?
+
+  metaTitle       String? @db.VarChar(70)
+  metaDescription String? @db.VarChar(160)
+  focusKeyword    String? @db.VarChar(80)
+
+  status           PostStatus       @default(DRAFT)
+  moderationStatus ModerationStatus @default(PENDING)
+  publishedAt      DateTime?
+  wordCount        Int              @default(0)
+  viewCountCache   Int              @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([boutiqueId, slug])
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("boutique_posts")
+}
+
+// 301 automatique quand un slug change (conserve le référencement)
+model SlugRedirect {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType SeoEntityType
+  entityId   String        @db.Uuid
+  oldSlug    String
+  createdAt  DateTime      @default(now())
+
+  @@unique([entityType, oldSlug])
+  @@index([entityType, entityId])
+  @@map("slug_redirects")
+}
+
+// Audit SEO : un audit = une entité à un instant T, avec liste d'actions
+model SeoAudit {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String        @db.Uuid
+  boutique   Boutique      @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  entityType SeoEntityType
+  entityId   String        @db.Uuid
+  locale     ContentLocale @default(FR)
+
+  seoScore     Float // 0-100
+  contentScore Float // 0-100
+  issueCount   Int     @default(0)
+
+  ruleSetId  String?         @db.Uuid
+  ruleSet    ScoringRuleSet? @relation(fields: [ruleSetId], references: [id], onDelete: SetNull)
+  isLatest   Boolean         @default(true)
+  computedAt DateTime        @default(now())
+
+  issues SeoIssue[]
+
+  @@index([entityType, entityId, isLatest])
+  @@index([boutiqueId, entityType, isLatest])
+  @@index([computedAt])
+  @@map("seo_audits")
+}
+
+model SeoIssue {
+  id       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  auditId  String           @db.Uuid
+  audit    SeoAudit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  code     SeoIssueCode
+  severity SeoIssueSeverity
+  field    String?
+  message  String?
+
+  @@index([auditId])
+  @@index([code, severity])
+  @@map("seo_issues")
+}
+
+// ═══════════════════ 7. COMMANDES & PAIEMENTS ═══════════════════
 
 model Order {
   id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -907,7 +1426,6 @@ model Order {
 
   deliveryMode DeliveryMode
 
-  // Snapshot adresse
   shippingFullName     String
   shippingPhone        String
   shippingEmail        String
@@ -918,19 +1436,16 @@ model Order {
   shippingAddress      String
   shippingNotes        String?
 
-  // GPS livraison
   deliveryLatitude    Float?
   deliveryLongitude   Float?
   deliveryAccuracy    Float?
   deliveryGpsSharedAt DateTime?
 
-  // Point relais
   shippingZoneId        String?       @db.Uuid
   shippingZone          ShippingZone? @relation(fields: [shippingZoneId], references: [id])
   shippingPickupPointId String?       @db.Uuid
   shippingPickupPoint   PickupPoint?  @relation(fields: [shippingPickupPointId], references: [id], onDelete: SetNull)
 
-  // Frais
   subtotal     Int
   shippingCost Int
   total        Int
@@ -952,14 +1467,12 @@ model Order {
 
   items            OrderItem[]
   transactions     Transaction[]
-  reviews          ProductReview[]
-  serviceFeedbacks ServiceFeedback[]
+  feedbacks        Feedback[]
   settlements      SellerSettlement[]
   deliveryTracking DeliveryTracking[]
 
   @@index([userId])
   @@index([status])
-  @@index([orderNumber])
   @@index([status, createdAt(sort: Desc)])
   @@index([userId, status, createdAt(sort: Desc)])
   @@index([deliveryMode, status])
@@ -973,6 +1486,10 @@ model OrderItem {
   productId String  @db.Uuid
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
+  // Dénormalisé : stats et règlements par vendeur sans passer par Product.
+  // Nullable le temps du backfill ; passer en NOT NULL ensuite.
+  boutiqueId String? @db.Uuid
+
   titleSnapshot String
   imageSnapshot String?
   skuSnapshot   String
@@ -981,12 +1498,13 @@ model OrderItem {
   sizeSnapshot  String?
   quantity      Int
 
+  feedbacks Feedback[]
+
   @@index([orderId])
   @@index([productId])
+  @@index([boutiqueId])
   @@map("order_items")
 }
-
-// ─── 6. PAIEMENTS ───
 
 model Transaction {
   id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1010,7 +1528,6 @@ model Transaction {
   completedAt DateTime?
 
   @@index([orderId])
-  @@index([externalId])
   @@index([status])
   @@map("transactions")
 }
@@ -1032,68 +1549,65 @@ model PaymentWebhook {
   @@map("payment_webhooks")
 }
 
-// ─── 7. AVIS & FEEDBACK ───
+// ═══════════════════ 8. FEEDBACK UNIFIÉ ═══════════════════
+// À ajouter dans une migration SQL (CHECK) :
+//   type='PRODUCT'  => productId  NOT NULL
+//   type='BOUTIQUE' => boutiqueId NOT NULL
+//   type='SERVICE'  => period     NOT NULL
 
-model ProductReview {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  productId String  @db.Uuid
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  userId    String  @db.Uuid
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orderId   String? @db.Uuid
-  order     Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+model Feedback {
+  id     String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String       @db.Uuid
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type   FeedbackType
 
-  rating             Int
-  title              String?
-  comment            String
-  isVerifiedPurchase Boolean @default(false)
+  // PRODUCT
+  productId   String?    @db.Uuid
+  product     Product?   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderId     String?    @db.Uuid
+  order       Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderItemId String?    @db.Uuid
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  // BOUTIQUE
+  boutiqueId String?   @db.Uuid
+  boutique   Boutique? @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  // SERVICE
+  period String?
+
+  // Commun
+  rating   Int
+  title    String?
+  comment  String            @db.Text
+  criteria Json?
+  category FeedbackCategory?
 
   isApproved      Boolean   @default(false)
-  approvedBy      String?
+  approvedBy      String?   @db.Uuid
   approvedAt      DateTime?
-  rejectedBy      String?
+  rejectedBy      String?   @db.Uuid
   rejectedAt      DateTime?
   rejectionReason String?
+  teamResponse    String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  @@unique([productId, userId])
+  @@unique([userId, productId])
+  @@unique([userId, boutiqueId])
+  @@unique([userId, period])
   @@index([productId, isApproved])
-  @@index([isApproved, createdAt])
-  @@map("product_reviews")
-}
-
-model ServiceFeedback {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String   @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orderId   String?  @db.Uuid
-  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  productId String?  @db.Uuid
-  product   Product? @relation("FeedbackProduct", fields: [productId], references: [id], onDelete: SetNull)
-
-  overallRating Int
-  criteria      Json?
-  category      FeedbackCategory
-  comment       String
-  teamResponse  String?
-
-  isApproved Boolean   @default(false)
-  approvedBy String?
-  approvedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([isApproved, createdAt])
+  @@index([boutiqueId, isApproved])
+  @@index([userId, type])
+  @@index([type, isApproved, createdAt])
   @@index([orderId])
-  @@index([productId])
-  @@map("service_feedbacks")
+  @@index([deletedAt])
+  @@map("feedbacks")
 }
 
-// ─── 8. NOTIFICATIONS & MESSAGES ───
+// ═══════════════════ 9. NOTIFICATIONS & MESSAGES ═══════════════════
 
 model Notification {
   id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1164,7 +1678,7 @@ model NewsletterSubscriber {
   @@map("newsletter_subscribers")
 }
 
-// ─── 9. BUSINESS VENDEUR ───
+// ═══════════════════ 10. BUSINESS VENDEUR ═══════════════════
 
 model SellerContract {
   id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1236,7 +1750,7 @@ model TransferLedger {
   @@map("transfer_ledger")
 }
 
-// ─── 10. ADMIN & AUDIT ───
+// ═══════════════════ 11. ADMIN, AUDIT, MÉDIA ═══════════════════
 
 model AuditLog {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1254,8 +1768,6 @@ model AuditLog {
   @@index([entityType, entityId])
   @@map("audit_logs")
 }
-
-// ─── 11. MÉDIA ───
 
 model MediaAsset {
   id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1277,12 +1789,29 @@ model MediaAsset {
   @@map("media_assets")
 }
 
-// ─── 12. CONFIGURATION PLATEFORME ───
+// Chaque job (scores, audits, stats) s'enregistre ici : pas de double
+// exécution, et on sait ce qui a échoué.
+model JobRun {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String // "compute-daily-stats", "compute-scores", "seo-audit"
+  runKey     String // "2026-10-07", "2026-W41"
+  status     JobStatus @default(RUNNING)
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  processed  Int       @default(0)
+  error      String?   @db.Text
+  meta       Json?
+
+  @@unique([name, runKey])
+  @@index([name, status, startedAt(sort: Desc)])
+  @@map("job_runs")
+}
+
+// ═══════════════════ 12. CONFIGURATION PLATEFORME ═══════════════════
 
 model PlatformSettings {
   id String @id @default("singleton")
 
-  // Général
   siteName        String @default("Lurevia")
   siteTagline     String @default("Artisanat malgache authentique")
   siteDescription String @default("Découvrez l'artisanat malgache fait main")
@@ -1291,34 +1820,29 @@ model PlatformSettings {
   contactAddress  String @default("Antananarivo, Madagascar")
   defaultCurrency String @default("MGA")
 
-  // Marque
   logoUrl        String?
   faviconUrl     String?
   primaryColor   String  @default("#2F7BF6")
   secondaryColor String  @default("#0A1B3D")
   accentColor    String  @default("#E8A33D")
 
-  // Réseaux sociaux
   facebookUrl    String?
   instagramUrl   String?
   tiktokUrl      String?
   whatsappNumber String?
   linkedinUrl    String?
 
-  // Légal
   privacyPolicy           String  @default("") @db.Text
   termsOfService          String  @default("") @db.Text
   cookieMessage           String  @default("Nous utilisons des cookies pour améliorer votre expérience.") @db.Text
   legalCompanyName        String  @default("Lurevia SARL")
   legalRegistrationNumber String?
 
-  // Livraison
   freeShippingThreshold Int     @default(250000)
   defaultShippingCost   Int     @default(8000)
   homeDeliveryEnabled   Boolean @default(true)
   pickupPointEnabled    Boolean @default(true)
 
-  // Paiements
   enableMVola         Boolean @default(true)
   enableCOD           Boolean @default(true)
   enableCard          Boolean @default(false)
@@ -1326,22 +1850,19 @@ model PlatformSettings {
   mvolaMerchantNumber String?
   codMaxAmount        Int?
 
-  // KYC / CIN
   requireCinForSellers   Boolean @default(true)
   requireCinForCOD       Boolean @default(false)
   cinVerificationEnabled Boolean @default(true)
   allowMinorWithGuardian Boolean @default(true)
   minorAgeThreshold      Int     @default(18)
 
-  // Enchères
   auctionsEnabled          Boolean @default(true)
-  auctionMinIncrement      Int     @default(1000) // Incrément minimum en Ar
-  auctionAutoExtendMinutes Int     @default(2) // Anti-snipe : prolonge de X min si offre à la fin
-  auctionDefaultDurationH  Int     @default(24) // Durée par défaut en heures
+  auctionMinIncrement      Int     @default(1000)
+  auctionAutoExtendMinutes Int     @default(2)
+  auctionDefaultDurationH  Int     @default(24)
   auctionChatEnabled       Boolean @default(true)
-  auctionChatModeration    Boolean @default(true) // Filtre auto des messages
+  auctionChatModeration    Boolean @default(true)
 
-  // Notifications
   notifyOnNewOrder         Boolean @default(true)
   notifyOnNewReview        Boolean @default(true)
   notifyOnLowStock         Boolean @default(true)
@@ -1349,31 +1870,427 @@ model PlatformSettings {
   sendOrderConfirmation    Boolean @default(true)
   sendShippingNotification Boolean @default(true)
 
-  // SEO
   metaTitle       String?
   metaDescription String?
 
-  // Maintenance
   maintenanceMode    Boolean @default(false)
   maintenanceMessage String  @default("") @db.Text
 
   updatedAt DateTime @updatedAt
   updatedBy String?  @db.Uuid
+
+  @@map("platform_settings")
 }
 
 model SitePage {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug         String   @unique @db.VarChar(80)
-  title        String   @db.VarChar(200)
-  summary      String   @default("") @db.Text
-  content      String   @default("") @db.Text
-  published    Boolean  @default(false)
-  showInFooter Boolean  @default(false)
-  footerSection String? @db.VarChar(20)
-  updatedBy    String?  @db.Uuid
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug          String   @unique @db.VarChar(80)
+  title         String   @db.VarChar(200)
+  summary       String   @default("") @db.Text
+  content       String   @default("") @db.Text
+  published     Boolean  @default(false)
+  showInFooter  Boolean  @default(false)
+  footerSection String?  @db.VarChar(20)
+  updatedBy     String?  @db.Uuid
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([published, showInFooter])
   @@map("site_pages")
 }
+
+// ═══════════════ 13. MESURES, SCORING, CLASSEMENTS, RÉCOMPENSES ═══════════════
+
+// ── 13.1 Mesures journalières (faits agrégés, append-only) ──
+// Les événements bruts (chaque vue/clic) restent hors base (ou table
+// partitionnée) ; on ne garde ici que l'agrégat du jour.
+
+model ProductDailyStat {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId  String   @db.Uuid
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  boutiqueId String   @db.Uuid // dénormalisé : agrégation vendeur sans jointure
+  date       DateTime @db.Date
+
+  impressions  Int    @default(0)
+  clicks       Int    @default(0)
+  views        Int    @default(0)
+  uniqueViews  Int    @default(0)
+  organicViews Int    @default(0) // venues des moteurs de recherche
+  addToCart    Int    @default(0)
+  favorites    Int    @default(0)
+  orders       Int    @default(0)
+  unitsSold    Int    @default(0)
+  revenue      BigInt @default(0)
+  avgPosition  Float? // position moyenne dans la recherche interne
+
+  @@unique([productId, date])
+  @@index([boutiqueId, date])
+  @@index([date])
+  @@map("product_daily_stats")
+}
+
+model BoutiqueDailyStat {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  date       DateTime @db.Date
+
+  views              Int    @default(0)
+  uniqueViews        Int    @default(0)
+  organicViews       Int    @default(0)
+  newSubscribers     Int    @default(0)
+  lostSubscribers    Int    @default(0)
+  orders             Int    @default(0)
+  revenue            BigInt @default(0)
+  messagesReceived   Int    @default(0)
+  messagesAnswered   Int    @default(0)
+  avgResponseMinutes Int?
+
+  @@unique([boutiqueId, date])
+  @@index([date])
+  @@map("boutique_daily_stats")
+}
+
+// Ce que cherchent les clients → guide les vendeurs sur les bons mots-clés
+model SearchTermDailyStat {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  term       String        @db.VarChar(120)
+  locale     ContentLocale @default(FR)
+  date       DateTime      @db.Date
+  searches   Int           @default(0)
+  zeroResult Int           @default(0)
+  clicks     Int           @default(0)
+
+  @@unique([term, locale, date])
+  @@index([date, searches(sort: Desc)])
+  @@map("search_term_daily_stats")
+}
+
+// ── 13.2 Statistiques business par période ──
+
+model SellerStats {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  period    LeaderboardPeriod
+  periodKey String // "2026-W42", "2026-10", "2026-Q4", "2026"
+  startsAt  DateTime
+  endsAt    DateTime
+
+  totalRevenue    Int   @default(0)
+  totalOrders     Int   @default(0)
+  completedOrders Int   @default(0)
+  cancelledOrders Int   @default(0)
+  returnedOrders  Int   @default(0)
+  disputedOrders  Int   @default(0)
+  avgOrderValue   Float @default(0)
+
+  avgRating       Float @default(0)
+  totalReviews    Int   @default(0)
+  fiveStarReviews Int   @default(0)
+
+  avgResponseMinutes Int?  @default(0)
+  onTimeDeliveryRate Float @default(0)
+  cancellationRate   Float @default(0)
+  returnRate         Float @default(0)
+  disputeRate        Float @default(0)
+
+  newSubscribers  Int @default(0)
+  lostSubscribers Int @default(0)
+  newProducts     Int @default(0)
+  totalViews      Int @default(0)
+
+  // Le score détaillé vit dans SellerScoreSnapshot ; ces 3 champs
+  // restent par compatibilité avec le code existant.
+  scoreTotal Float      @default(0)
+  rank       Int?
+  tier       SellerTier @default(BRONZE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([boutiqueId, period, periodKey])
+  @@index([period, periodKey, scoreTotal(sort: Desc)])
+  @@index([period, periodKey, rank])
+  @@index([boutiqueId, period])
+  @@map("seller_stats")
+}
+
+// ── 13.3 Scoring versionné ──
+
+model ScoringRuleSet {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version Int    @unique
+  name    String
+
+  weightSeo        Float @default(0.25)
+  weightContent    Float @default(0.20)
+  weightTrust      Float @default(0.20)
+  weightEngagement Float @default(0.15)
+  weightQuality    Float @default(0.15)
+  weightRecency    Float @default(0.05)
+
+  params     Json? // seuils : longueur titre idéale, nb images min...
+  isActive   Boolean   @default(false)
+  activeFrom DateTime?
+  createdBy  String?   @db.Uuid
+  createdAt  DateTime  @default(now())
+
+  audits    SeoAudit[]
+  snapshots SellerScoreSnapshot[]
+
+  @@index([isActive])
+  @@map("scoring_rule_sets")
+}
+
+model SellerScoreSnapshot {
+  id         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String            @db.Uuid
+  boutique   Boutique          @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  period     LeaderboardPeriod
+  periodKey  String
+  ruleSetId  String            @db.Uuid
+  ruleSet    ScoringRuleSet    @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+
+  scoreSeo        Float @default(0)
+  scoreContent    Float @default(0)
+  scoreTrust      Float @default(0)
+  scoreEngagement Float @default(0)
+  scoreQuality    Float @default(0)
+  scoreRecency    Float @default(0)
+  scoreTotal      Float @default(0)
+  rank            Int?
+  breakdown       Json? // détail explicable : "pourquoi j'ai ce score"
+
+  computedAt DateTime @default(now())
+
+  @@unique([boutiqueId, period, periodKey, ruleSetId])
+  @@index([period, periodKey, scoreTotal(sort: Desc)])
+  @@index([boutiqueId, period])
+  @@map("seller_score_snapshots")
+}
+
+// ── 13.4 Classements officiels ──
+
+model SellerLeaderboard {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  period    LeaderboardPeriod
+  periodKey String
+  scope     LeaderboardScope  @default(GLOBAL)
+  scopeKey  String            @default("ALL") // categoryId, province... (plus de NULL : unicité fiable)
+  metric    ScoreComponent    @default(TOTAL) // "meilleur SEO", "meilleur contenu"...
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  publishedAt DateTime?
+  isFinalized Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries SellerLeaderboardEntry[]
+
+  @@unique([period, periodKey, scope, scopeKey, metric])
+  @@index([period, periodKey, scope])
+  @@map("seller_leaderboards")
+}
+
+model SellerLeaderboardEntry {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leaderboardId String            @db.Uuid
+  leaderboard   SellerLeaderboard @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
+
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  rank       Int
+  scoreTotal Float
+  tier       SellerTier @default(BRONZE)
+
+  totalRevenue Int   @default(0)
+  totalOrders  Int   @default(0)
+  avgRating    Float @default(0)
+  totalReviews Int   @default(0)
+
+  isWinner Boolean @default(false)
+
+  reward SellerReward?
+
+  createdAt DateTime @default(now())
+
+  @@unique([leaderboardId, boutiqueId])
+  @@index([leaderboardId, rank])
+  @@index([boutiqueId])
+  @@map("seller_leaderboard_entries")
+}
+
+// ── 13.5 Fonctionnalités premium ──
+
+model PremiumFeature {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         PremiumFeatureCode @unique
+  name         String
+  description  String             @db.Text
+  iconName     String?
+  durationDays Int                @default(7)
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  accesses SellerPremiumAccess[]
+  rewards  SellerReward[]
+
+  @@map("premium_features")
+}
+
+model SellerPremiumAccess {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String         @db.Uuid
+  boutique   Boutique       @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  featureId  String         @db.Uuid
+  feature    PremiumFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  source    String? // "LEADERBOARD", "ADMIN_GRANT", "PROMOTION"
+  reason    String?
+  grantedAt DateTime  @default(now())
+  expiresAt DateTime?
+  revokedAt DateTime?
+  isActive  Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([boutiqueId, isActive])
+  @@index([featureId, isActive])
+  @@index([expiresAt])
+  @@map("seller_premium_access")
+}
+
+// ── 13.6 Récompenses ──
+
+model SellerReward {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  type        RewardType
+  status      RewardStatus @default(PENDING)
+  title       String
+  description String?      @db.Text
+  value       Int?
+  currency    String?      @default("MGA")
+
+  featureId String?         @db.Uuid
+  feature   PremiumFeature? @relation(fields: [featureId], references: [id], onDelete: SetNull)
+
+  leaderboardEntryId String?                 @unique @db.Uuid
+  leaderboardEntry   SellerLeaderboardEntry? @relation(fields: [leaderboardEntryId], references: [id], onDelete: SetNull)
+
+  achievementAwardId String?                 @unique @db.Uuid
+  achievementAward   SellerAchievementAward? @relation(fields: [achievementAwardId], references: [id], onDelete: SetNull)
+
+  grantedAt    DateTime?
+  expiresAt    DateTime?
+  usedAt       DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([boutiqueId, status])
+  @@index([type, status])
+  @@index([expiresAt])
+  @@map("seller_rewards")
+}
+
+// ── 13.7 Badges / achievements ──
+
+model Achievement {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        AchievementCode   @unique
+  name        String
+  description String            @db.Text
+  iconName    String?
+  rarity      AchievementRarity @default(COMMON)
+  points      Int               @default(10)
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+
+  awards SellerAchievementAward[]
+
+  @@map("achievements")
+}
+
+model SellerAchievementAward {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId    String      @db.Uuid
+  boutique      Boutique    @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  achievementId String      @db.Uuid
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  earnedAt  DateTime @default(now())
+  periodKey String   @default("LIFETIME") // plus de NULL : un badge à vie ne peut plus être dupliqué
+  metadata  Json?
+
+  reward SellerReward?
+
+  createdAt DateTime @default(now())
+
+  @@unique([boutiqueId, achievementId, periodKey])
+  @@index([boutiqueId])
+  @@index([achievementId])
+  @@map("seller_achievement_awards")
+}
+
+// ── 13.8 Promotions vendeur ──
+
+model SellerPromotion {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  code            String  @unique
+  title           String
+  description     String? @db.Text
+  discountPercent Int?
+  discountAmount  Int?
+  maxUses         Int?
+  usedCount       Int     @default(0)
+  minOrderAmount  Int?
+
+  source    String?
+  startsAt  DateTime
+  expiresAt DateTime
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([boutiqueId, isActive])
+  @@map("seller_promotions")
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SQL À AJOUTER DANS UNE MIGRATION (non exprimable en Prisma)
+// ════════════════════════════════════════════════════════════════════
+//  CREATE EXTENSION IF NOT EXISTS pg_trgm;
+//
+//  CREATE INDEX product_loc_title_trgm ON product_localizations
+//    USING gin (title gin_trgm_ops);
+//
+//  CREATE INDEX product_loc_fts ON product_localizations
+//    USING gin (to_tsvector('french', coalesce(title,'') || ' ' || coalesce(description,'')));
+//
+//  CREATE UNIQUE INDEX seo_audit_latest ON seo_audits (entity_type, entity_id, locale)
+//    WHERE is_latest = true;
+//
+//  ALTER TABLE feedbacks ADD CONSTRAINT feedback_type_target CHECK (
+//    (type = 'PRODUCT'  AND product_id  IS NOT NULL) OR
+//    (type = 'BOUTIQUE' AND boutique_id IS NOT NULL) OR
+//    (type = 'SERVICE'  AND period      IS NOT NULL));
+// ════════════════════════════════════════════════════════════════════

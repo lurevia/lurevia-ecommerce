@@ -22,9 +22,6 @@ import { mediaStorage } from "../storages";
 
 
 export class MediaService {
-  /**
-   * Upload d'une image encodée en data URL (base64).
-   */
   async uploadDataUrl(ownerId: string, dataUrl: string) {
     const match = dataUrlPattern.exec(dataUrl);
     if (!match) {
