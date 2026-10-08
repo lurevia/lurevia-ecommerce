@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- Migration: sync_shop (version finale corrigée, ordonnée par phases)
+-- Migration: sync_shop (version finale corrigée)
 -- Règle : dépendances d'abord, données ensuite, contraintes en dernier.
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -141,8 +141,8 @@ CREATE TABLE "product_faqs" (
     CONSTRAINT "product_faqs_pkey" PRIMARY KEY ("id")
 );
 
--- tags : la contrainte unique sur slug est créée IMMÉDIATEMENT
--- pour que l'INSERT plus bas puisse utiliser ON CONFLICT ("slug").
+-- tags : l'index unique sur slug est créé IMMÉDIATEMENT pour que l'INSERT
+-- plus bas puisse utiliser ON CONFLICT ("slug").
 CREATE TABLE "tags" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "name" TEXT NOT NULL,
@@ -697,6 +697,7 @@ JOIN "tags" tg
 ON CONFLICT DO NOTHING;
 
 -- 6.2 product_reviews → feedbacks (type = PRODUCT)
+-- Cast ::uuid car approvedBy/rejectedBy sont TEXT en source, UUID en cible.
 INSERT INTO "feedbacks" (
   "id", "userId", "type", "productId", "orderId",
   "rating", "title", "comment",
@@ -708,14 +709,18 @@ SELECT
   pr."id", pr."userId", 'PRODUCT'::"FeedbackType",
   pr."productId", pr."orderId",
   pr."rating", pr."title", pr."comment",
-  pr."isApproved", pr."approvedBy", pr."approvedAt",
-  pr."rejectedBy", pr."rejectedAt", pr."rejectionReason",
+  pr."isApproved",
+  pr."approvedBy"::uuid,
+  pr."approvedAt",
+  pr."rejectedBy"::uuid,
+  pr."rejectedAt",
+  pr."rejectionReason",
   pr."createdAt", pr."updatedAt"
 FROM "product_reviews" pr;
 
 -- 6.3 service_feedbacks → feedbacks (type = SERVICE)
--- IMPORTANT : period est dérivé de createdAt (format YYYY-MM)
--- car le CHECK feedback_type_target exige period NOT NULL pour SERVICE.
+-- Cast ::uuid car approvedBy est TEXT en source, UUID en cible.
+-- period est dérivé de createdAt car le CHECK exige period NOT NULL pour SERVICE.
 INSERT INTO "feedbacks" (
   "id", "userId", "type", "orderId", "productId",
   "period", "rating", "comment", "criteria", "category", "teamResponse",
@@ -727,7 +732,9 @@ SELECT
   sf."orderId", sf."productId",
   TO_CHAR(sf."createdAt", 'YYYY-MM'),
   sf."overallRating", sf."comment", sf."criteria", sf."category", sf."teamResponse",
-  sf."isApproved", sf."approvedBy", sf."approvedAt",
+  sf."isApproved",
+  sf."approvedBy"::uuid,
+  sf."approvedAt",
   sf."createdAt", sf."updatedAt"
 FROM "service_feedbacks" sf;
 
@@ -799,7 +806,6 @@ DROP TABLE "service_feedbacks";
 
 
 -- ═══════════════════ PHASE 9 : INDEX RESTANTS ═══════════════════
--- (les index uniques critiques ont déjà été créés dans la phase 2)
 
 CREATE INDEX "boutiques_storeCategoryId_idx" ON "boutiques"("storeCategoryId");
 CREATE INDEX "boutiques_isActive_deletedAt_idx" ON "boutiques"("isActive", "deletedAt");
