@@ -1,9 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- Migration: sync_shop (version corrigée manuellement)
--- Règle d'or : backfill AVANT suppression, nullable AVANT NOT NULL.
+-- Migration: sync_shop (version finale corrigée, ordonnée par phases)
+-- Règle : dépendances d'abord, données ensuite, contraintes en dernier.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- ─── 1. ENUMS ───
+
+-- ═══════════════════ PHASE 1 : ENUMS ═══════════════════
 CREATE TYPE "SellerTier" AS ENUM ('BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND');
 CREATE TYPE "LeaderboardPeriod" AS ENUM ('WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY');
 CREATE TYPE "LeaderboardScope" AS ENUM ('GLOBAL', 'BY_CATEGORY', 'BY_REGION');
@@ -22,7 +23,8 @@ CREATE TYPE "ScoreComponent" AS ENUM ('TOTAL', 'SEO', 'CONTENT', 'TRUST', 'ENGAG
 CREATE TYPE "PostStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
 CREATE TYPE "JobStatus" AS ENUM ('RUNNING', 'SUCCESS', 'FAILED');
 
--- ─── 2. NOUVELLES TABLES (créées en premier, aucune dépendance de données) ───
+
+-- ═══════════════════ PHASE 2 : NOUVELLES TABLES ═══════════════════
 
 CREATE TABLE "boutiques" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -96,6 +98,9 @@ CREATE TABLE "boutiques" (
     "deletedAt" TIMESTAMP(3),
     CONSTRAINT "boutiques_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "boutiques_ownerId_key" ON "boutiques"("ownerId");
+CREATE UNIQUE INDEX "boutiques_name_key" ON "boutiques"("name");
+CREATE UNIQUE INDEX "boutiques_slug_key" ON "boutiques"("slug");
 
 CREATE TABLE "managed_boutiques" (
     "userId" UUID NOT NULL,
@@ -113,6 +118,7 @@ CREATE TABLE "subscriptions" (
     "deletedAt" TIMESTAMP(3),
     CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "subscriptions_userId_boutiqueId_key" ON "subscriptions"("userId", "boutiqueId");
 
 CREATE TABLE "product_attributes" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -123,6 +129,7 @@ CREATE TABLE "product_attributes" (
     "position" INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT "product_attributes_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "product_attributes_productId_key_key" ON "product_attributes"("productId", "key");
 
 CREATE TABLE "product_faqs" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -134,6 +141,8 @@ CREATE TABLE "product_faqs" (
     CONSTRAINT "product_faqs_pkey" PRIMARY KEY ("id")
 );
 
+-- tags : la contrainte unique sur slug est créée IMMÉDIATEMENT
+-- pour que l'INSERT plus bas puisse utiliser ON CONFLICT ("slug").
 CREATE TABLE "tags" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "name" TEXT NOT NULL,
@@ -141,6 +150,7 @@ CREATE TABLE "tags" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "tags_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "tags_slug_key" ON "tags"("slug");
 
 CREATE TABLE "product_tags" (
     "productId" UUID NOT NULL,
@@ -173,6 +183,7 @@ CREATE TABLE "product_localizations" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "product_localizations_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "product_localizations_productId_locale_key" ON "product_localizations"("productId", "locale");
 
 CREATE TABLE "boutique_localizations" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -196,6 +207,7 @@ CREATE TABLE "boutique_localizations" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "boutique_localizations_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "boutique_localizations_boutiqueId_locale_key" ON "boutique_localizations"("boutiqueId", "locale");
 
 CREATE TABLE "boutique_posts" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -219,6 +231,7 @@ CREATE TABLE "boutique_posts" (
     "deletedAt" TIMESTAMP(3),
     CONSTRAINT "boutique_posts_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "boutique_posts_boutiqueId_slug_key" ON "boutique_posts"("boutiqueId", "slug");
 
 CREATE TABLE "slug_redirects" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -228,6 +241,7 @@ CREATE TABLE "slug_redirects" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "slug_redirects_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "slug_redirects_entityType_oldSlug_key" ON "slug_redirects"("entityType", "oldSlug");
 
 CREATE TABLE "seo_audits" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -293,8 +307,7 @@ CREATE TABLE "job_runs" (
     "meta" JSONB,
     CONSTRAINT "job_runs_pkey" PRIMARY KEY ("id")
 );
-
--- platform_settings : voir plus bas, on RENOMME la table existante.
+CREATE UNIQUE INDEX "job_runs_name_runKey_key" ON "job_runs"("name", "runKey");
 
 CREATE TABLE "product_daily_stats" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -314,6 +327,7 @@ CREATE TABLE "product_daily_stats" (
     "avgPosition" DOUBLE PRECISION,
     CONSTRAINT "product_daily_stats_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "product_daily_stats_productId_date_key" ON "product_daily_stats"("productId", "date");
 
 CREATE TABLE "boutique_daily_stats" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -331,6 +345,7 @@ CREATE TABLE "boutique_daily_stats" (
     "avgResponseMinutes" INTEGER,
     CONSTRAINT "boutique_daily_stats_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "boutique_daily_stats_boutiqueId_date_key" ON "boutique_daily_stats"("boutiqueId", "date");
 
 CREATE TABLE "search_term_daily_stats" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -342,6 +357,7 @@ CREATE TABLE "search_term_daily_stats" (
     "clicks" INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT "search_term_daily_stats_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "search_term_daily_stats_term_locale_date_key" ON "search_term_daily_stats"("term", "locale", "date");
 
 CREATE TABLE "seller_stats" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -376,6 +392,7 @@ CREATE TABLE "seller_stats" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "seller_stats_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "seller_stats_boutiqueId_period_periodKey_key" ON "seller_stats"("boutiqueId", "period", "periodKey");
 
 CREATE TABLE "scoring_rule_sets" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -394,6 +411,7 @@ CREATE TABLE "scoring_rule_sets" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "scoring_rule_sets_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "scoring_rule_sets_version_key" ON "scoring_rule_sets"("version");
 
 CREATE TABLE "seller_score_snapshots" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -413,6 +431,7 @@ CREATE TABLE "seller_score_snapshots" (
     "computedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "seller_score_snapshots_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "seller_score_snapshots_boutiqueId_period_periodKey_ruleSetI_key" ON "seller_score_snapshots"("boutiqueId", "period", "periodKey", "ruleSetId");
 
 CREATE TABLE "seller_leaderboards" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -429,6 +448,7 @@ CREATE TABLE "seller_leaderboards" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "seller_leaderboards_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "seller_leaderboards_period_periodKey_scope_scopeKey_metric_key" ON "seller_leaderboards"("period", "periodKey", "scope", "scopeKey", "metric");
 
 CREATE TABLE "seller_leaderboard_entries" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -445,6 +465,7 @@ CREATE TABLE "seller_leaderboard_entries" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "seller_leaderboard_entries_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "seller_leaderboard_entries_leaderboardId_boutiqueId_key" ON "seller_leaderboard_entries"("leaderboardId", "boutiqueId");
 
 CREATE TABLE "premium_features" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -458,6 +479,7 @@ CREATE TABLE "premium_features" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "premium_features_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "premium_features_code_key" ON "premium_features"("code");
 
 CREATE TABLE "seller_premium_access" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -495,6 +517,8 @@ CREATE TABLE "seller_rewards" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "seller_rewards_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "seller_rewards_leaderboardEntryId_key" ON "seller_rewards"("leaderboardEntryId");
+CREATE UNIQUE INDEX "seller_rewards_achievementAwardId_key" ON "seller_rewards"("achievementAwardId");
 
 CREATE TABLE "achievements" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -508,6 +532,7 @@ CREATE TABLE "achievements" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "achievements_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "achievements_code_key" ON "achievements"("code");
 
 CREATE TABLE "seller_achievement_awards" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -519,6 +544,7 @@ CREATE TABLE "seller_achievement_awards" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "seller_achievement_awards_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "seller_achievement_awards_boutiqueId_achievementId_periodKe_key" ON "seller_achievement_awards"("boutiqueId", "achievementId", "periodKey");
 
 CREATE TABLE "seller_promotions" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -539,10 +565,11 @@ CREATE TABLE "seller_promotions" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "seller_promotions_pkey" PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX "seller_promotions_code_key" ON "seller_promotions"("code");
 
--- ─── 3. ALTERATIONS NON DESTRUCTIVES ───
 
--- categories : ajout de la hiérarchie + SEO (aucune donnée à préserver)
+-- ═══════════════════ PHASE 3 : NOUVELLES COLONNES (nullable d'abord) ═══════════════════
+
 ALTER TABLE "categories"
   ADD COLUMN "depth" INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -551,10 +578,8 @@ ALTER TABLE "categories"
   ADD COLUMN "parentId" UUID,
   ADD COLUMN "path" TEXT NOT NULL DEFAULT '';
 
--- order_items : ajout boutiqueId nullable (backfill ci-dessous)
 ALTER TABLE "order_items" ADD COLUMN "boutiqueId" UUID;
 
--- product_images : métadonnées SEO/perf (aucune donnée à préserver)
 ALTER TABLE "product_images"
   ADD COLUMN "altText" VARCHAR(200),
   ADD COLUMN "blurHash" TEXT,
@@ -562,7 +587,6 @@ ALTER TABLE "product_images"
   ADD COLUMN "isPrimary" BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN "width" INTEGER;
 
--- products : ajout boutiqueId NULLABLE, caches, dates
 ALTER TABLE "products"
   ADD COLUMN "boutiqueId" UUID,
   ADD COLUMN "contentScoreCache" DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -571,9 +595,10 @@ ALTER TABLE "products"
   ADD COLUMN "seoScoreCache" DOUBLE PRECISION NOT NULL DEFAULT 0,
   ALTER COLUMN "auctionStatus" DROP DEFAULT;
 
--- ─── 4. BACKFILL BOUTIQUES DEPUIS USERS ───
--- Crée une boutique pour chaque user qui a des produits OU un nom de boutique public.
--- Gère les collisions de noms en suffixant #2, #3...
+
+-- ═══════════════════ PHASE 4 : BACKFILL DONNÉES ═══════════════════
+
+-- 4.1 Créer une boutique pour chaque user qui a un nom de boutique public ou des produits
 WITH user_store AS (
   SELECT
     u."id" AS user_id,
@@ -582,7 +607,6 @@ WITH user_store AS (
     u."publicStoreLogoUrl" AS logo_,
     u."publicStoreCoverUrl" AS cover_,
     u."storeCategoryId" AS cat_,
-    u."createdAt" AS u_created,
     ROW_NUMBER() OVER (
       PARTITION BY COALESCE(u."publicStoreName", u."fullName")
       ORDER BY u."createdAt"
@@ -602,21 +626,17 @@ SELECT
   CASE WHEN us.rn = 1 THEN us.raw_name ELSE us.raw_name || ' #' || us.rn END,
   LOWER(REGEXP_REPLACE(us.raw_name, '[^a-zA-Z0-9]+', '-', 'g'))
     || '-' || SUBSTRING(gen_random_uuid()::text, 1, 6),
-  us.desc_,
-  us.logo_,
-  us.cover_,
-  us.cat_,
-  NOW(),
-  NOW()
+  us.desc_, us.logo_, us.cover_, us.cat_,
+  NOW(), NOW()
 FROM user_store us;
 
--- ─── 5. BACKFILL products.boutiqueId ───
+-- 4.2 Backfill products.boutiqueId
 UPDATE "products" p
 SET "boutiqueId" = b."id"
 FROM "boutiques" b
 WHERE b."ownerId" = p."ownerId";
 
--- Produits orphelins (ownerId NULL) → boutique "legacy" rattachée à un admin.
+-- 4.3 Produits orphelins → boutique legacy
 DO $$
 DECLARE
   v_owner UUID;
@@ -632,9 +652,7 @@ BEGIN
 
     INSERT INTO "boutiques" ("id", "ownerId", "name", "slug", "createdAt", "updatedAt")
     VALUES (
-      gen_random_uuid(),
-      v_owner,
-      'Boutique legacy',
+      gen_random_uuid(), v_owner, 'Boutique legacy',
       'boutique-legacy-' || SUBSTRING(gen_random_uuid()::text, 1, 8),
       NOW(), NOW()
     )
@@ -644,16 +662,21 @@ BEGIN
   END IF;
 END $$;
 
--- ─── 6. BACKFILL order_items.boutiqueId ───
+-- 4.4 Backfill order_items.boutiqueId
 UPDATE "order_items" oi
 SET "boutiqueId" = p."boutiqueId"
 FROM "products" p
 WHERE p."id" = oi."productId";
 
--- ─── 7. RENDRE boutiqueId OBLIGATOIRE (maintenant que tout est rempli) ───
+
+-- ═══════════════════ PHASE 5 : NOT NULL APRÈS BACKFILL ═══════════════════
+
 ALTER TABLE "products" ALTER COLUMN "boutiqueId" SET NOT NULL;
 
--- ─── 8. MIGRER products.tags → tags + product_tags ───
+
+-- ═══════════════════ PHASE 6 : MIGRATION DES DONNÉES LEGACY ═══════════════════
+
+-- 6.1 products.tags → tags + product_tags
 INSERT INTO "tags" ("id", "name", "slug", "createdAt")
 SELECT DISTINCT
   gen_random_uuid(),
@@ -666,16 +689,14 @@ WHERE t.tag IS NOT NULL AND t.tag <> ''
 ON CONFLICT ("slug") DO NOTHING;
 
 INSERT INTO "product_tags" ("productId", "tagId")
-SELECT DISTINCT
-  p."id",
-  tg."id"
+SELECT DISTINCT p."id", tg."id"
 FROM "products" p
 CROSS JOIN LATERAL UNNEST(p."tags") AS t(tag)
 JOIN "tags" tg
   ON tg."slug" = LOWER(REGEXP_REPLACE(t.tag, '[^a-zA-Z0-9]+', '-', 'g'))
 ON CONFLICT DO NOTHING;
 
--- ─── 9. MIGRER product_reviews → feedbacks (type = PRODUCT) ───
+-- 6.2 product_reviews → feedbacks (type = PRODUCT)
 INSERT INTO "feedbacks" (
   "id", "userId", "type", "productId", "orderId",
   "rating", "title", "comment",
@@ -684,93 +705,65 @@ INSERT INTO "feedbacks" (
   "createdAt", "updatedAt"
 )
 SELECT
-  pr."id",
-  pr."userId",
-  'PRODUCT'::"FeedbackType",
-  pr."productId",
-  pr."orderId",
-  pr."rating",
-  pr."title",
-  pr."comment",
-  pr."isApproved",
-  pr."approvedBy",
-  pr."approvedAt",
-  pr."rejectedBy",
-  pr."rejectedAt",
-  pr."rejectionReason",
-  pr."createdAt",
-  pr."updatedAt"
+  pr."id", pr."userId", 'PRODUCT'::"FeedbackType",
+  pr."productId", pr."orderId",
+  pr."rating", pr."title", pr."comment",
+  pr."isApproved", pr."approvedBy", pr."approvedAt",
+  pr."rejectedBy", pr."rejectedAt", pr."rejectionReason",
+  pr."createdAt", pr."updatedAt"
 FROM "product_reviews" pr;
 
--- ─── 10. MIGRER service_feedbacks → feedbacks (type = SERVICE) ───
+-- 6.3 service_feedbacks → feedbacks (type = SERVICE)
+-- IMPORTANT : period est dérivé de createdAt (format YYYY-MM)
+-- car le CHECK feedback_type_target exige period NOT NULL pour SERVICE.
 INSERT INTO "feedbacks" (
   "id", "userId", "type", "orderId", "productId",
-  "rating", "comment", "criteria", "category", "teamResponse",
+  "period", "rating", "comment", "criteria", "category", "teamResponse",
   "isApproved", "approvedBy", "approvedAt",
   "createdAt", "updatedAt"
 )
 SELECT
-  sf."id",
-  sf."userId",
-  'SERVICE'::"FeedbackType",
-  sf."orderId",
-  sf."productId",
-  sf."overallRating",
-  sf."comment",
-  sf."criteria",
-  sf."category",
-  sf."teamResponse",
-  sf."isApproved",
-  sf."approvedBy",
-  sf."approvedAt",
-  sf."createdAt",
-  sf."updatedAt"
+  sf."id", sf."userId", 'SERVICE'::"FeedbackType",
+  sf."orderId", sf."productId",
+  TO_CHAR(sf."createdAt", 'YYYY-MM'),
+  sf."overallRating", sf."comment", sf."criteria", sf."category", sf."teamResponse",
+  sf."isApproved", sf."approvedBy", sf."approvedAt",
+  sf."createdAt", sf."updatedAt"
 FROM "service_feedbacks" sf;
 
--- ─── 11. PEUPLER LES LOCALISATIONS PAR DÉFAUT (FR) ───
+-- 6.4 Peupler les localisations FR par défaut
 INSERT INTO "product_localizations" (
-  "id", "productId", "locale", "title", "shortDescription", "description", "longDescription",
+  "id", "productId", "locale", "title", "description", "longDescription",
   "moderationStatus", "createdAt", "updatedAt"
 )
 SELECT
-  gen_random_uuid(),
-  p."id",
-  'FR'::"ContentLocale",
-  p."title",
-  NULL,
-  p."description",
-  p."longDescription",
-  'APPROVED'::"ModerationStatus",
-  p."createdAt",
-  p."updatedAt"
+  gen_random_uuid(), p."id", 'FR'::"ContentLocale",
+  p."title", p."description", p."longDescription",
+  'APPROVED'::"ModerationStatus", p."createdAt", p."updatedAt"
 FROM "products" p;
 
 INSERT INTO "boutique_localizations" (
-  "id", "boutiqueId", "locale", "tagline", "description", "longDescription", "story", "values",
-  "metaTitle", "metaDescription",
+  "id", "boutiqueId", "locale", "tagline", "description", "longDescription",
+  "story", "values", "metaTitle", "metaDescription",
   "moderationStatus", "createdAt", "updatedAt"
 )
 SELECT
-  gen_random_uuid(),
-  b."id",
-  'FR'::"ContentLocale",
-  b."tagline",
-  b."description",
-  b."longDescription",
-  b."story",
-  b."values",
-  b."metaTitle",
-  b."metaDescription",
-  'APPROVED'::"ModerationStatus",
-  b."createdAt",
-  b."updatedAt"
+  gen_random_uuid(), b."id", 'FR'::"ContentLocale",
+  b."tagline", b."description", b."longDescription",
+  b."story", b."values", b."metaTitle", b."metaDescription",
+  'APPROVED'::"ModerationStatus", b."createdAt", b."updatedAt"
 FROM "boutiques" b;
 
--- ─── 12. RENOMMER PlatformSettings → platform_settings (préserve la config) ───
+
+-- ═══════════════════ PHASE 7 : RENOMMAGE PlatformSettings ═══════════════════
+
 ALTER TABLE "PlatformSettings" RENAME TO "platform_settings";
 ALTER TABLE "platform_settings" RENAME CONSTRAINT "PlatformSettings_pkey" TO "platform_settings_pkey";
 
--- ─── 13. SUPPRIMER LES ANCIENNES CLÉS ÉTRANGÈRES ───
+
+-- ═══════════════════ PHASE 8 : SUPPRESSION LEGACY ═══════════════════
+
+-- 8.1 Clés étrangères
 ALTER TABLE "product_reviews" DROP CONSTRAINT "product_reviews_orderId_fkey";
 ALTER TABLE "product_reviews" DROP CONSTRAINT "product_reviews_productId_fkey";
 ALTER TABLE "product_reviews" DROP CONSTRAINT "product_reviews_userId_fkey";
@@ -780,7 +773,7 @@ ALTER TABLE "service_feedbacks" DROP CONSTRAINT "service_feedbacks_productId_fke
 ALTER TABLE "service_feedbacks" DROP CONSTRAINT "service_feedbacks_userId_fkey";
 ALTER TABLE "users" DROP CONSTRAINT "users_storeCategoryId_fkey";
 
--- ─── 14. SUPPRIMER LES ANCIENS INDEX REDONDANTS ───
+-- 8.2 Index redondants
 DROP INDEX IF EXISTS "orders_orderNumber_idx";
 DROP INDEX IF EXISTS "products_isActive_idx";
 DROP INDEX IF EXISTS "products_ownerId_idx";
@@ -789,7 +782,7 @@ DROP INDEX IF EXISTS "users_cinNumber_idx";
 DROP INDEX IF EXISTS "users_email_idx";
 DROP INDEX IF EXISTS "users_phone_idx";
 
--- ─── 15. SUPPRIMER LES ANCIENNES COLONNES (données migrées) ───
+-- 8.3 Colonnes migrées
 ALTER TABLE "products" DROP COLUMN "ownerId";
 ALTER TABLE "products" DROP COLUMN "tags";
 
@@ -800,14 +793,14 @@ ALTER TABLE "users"
   DROP COLUMN "publicStoreName",
   DROP COLUMN "storeCategoryId";
 
--- ─── 16. SUPPRIMER LES ANCIENNES TABLES (données migrées) ───
+-- 8.4 Tables migrées
 DROP TABLE "product_reviews";
 DROP TABLE "service_feedbacks";
 
--- ─── 17. INDEX ───
-CREATE UNIQUE INDEX "boutiques_ownerId_key" ON "boutiques"("ownerId");
-CREATE UNIQUE INDEX "boutiques_name_key" ON "boutiques"("name");
-CREATE UNIQUE INDEX "boutiques_slug_key" ON "boutiques"("slug");
+
+-- ═══════════════════ PHASE 9 : INDEX RESTANTS ═══════════════════
+-- (les index uniques critiques ont déjà été créés dans la phase 2)
+
 CREATE INDEX "boutiques_storeCategoryId_idx" ON "boutiques"("storeCategoryId");
 CREATE INDEX "boutiques_isActive_deletedAt_idx" ON "boutiques"("isActive", "deletedAt");
 CREATE INDEX "boutiques_isFeatured_scoreTotal_idx" ON "boutiques"("isFeatured", "scoreTotal" DESC);
@@ -819,30 +812,19 @@ CREATE INDEX "boutiques_province_region_idx" ON "boutiques"("province", "region"
 CREATE INDEX "boutiques_publishedAt_idx" ON "boutiques"("publishedAt");
 
 CREATE INDEX "managed_boutiques_boutiqueId_idx" ON "managed_boutiques"("boutiqueId");
-
 CREATE INDEX "subscriptions_boutiqueId_idx" ON "subscriptions"("boutiqueId");
 CREATE INDEX "subscriptions_userId_idx" ON "subscriptions"("userId");
-CREATE UNIQUE INDEX "subscriptions_userId_boutiqueId_key" ON "subscriptions"("userId", "boutiqueId");
 
 CREATE INDEX "product_attributes_key_value_idx" ON "product_attributes"("key", "value");
-CREATE UNIQUE INDEX "product_attributes_productId_key_key" ON "product_attributes"("productId", "key");
-
 CREATE INDEX "product_faqs_productId_locale_idx" ON "product_faqs"("productId", "locale");
-
-CREATE UNIQUE INDEX "tags_slug_key" ON "tags"("slug");
 CREATE INDEX "product_tags_tagId_idx" ON "product_tags"("tagId");
 
 CREATE INDEX "product_localizations_locale_moderationStatus_idx" ON "product_localizations"("locale", "moderationStatus");
 CREATE INDEX "product_localizations_contentHash_idx" ON "product_localizations"("contentHash");
-CREATE UNIQUE INDEX "product_localizations_productId_locale_key" ON "product_localizations"("productId", "locale");
-
-CREATE UNIQUE INDEX "boutique_localizations_boutiqueId_locale_key" ON "boutique_localizations"("boutiqueId", "locale");
 
 CREATE INDEX "boutique_posts_status_publishedAt_idx" ON "boutique_posts"("status", "publishedAt" DESC);
-CREATE UNIQUE INDEX "boutique_posts_boutiqueId_slug_key" ON "boutique_posts"("boutiqueId", "slug");
 
 CREATE INDEX "slug_redirects_entityType_entityId_idx" ON "slug_redirects"("entityType", "entityId");
-CREATE UNIQUE INDEX "slug_redirects_entityType_oldSlug_key" ON "slug_redirects"("entityType", "oldSlug");
 
 CREATE INDEX "seo_audits_entityType_entityId_isLatest_idx" ON "seo_audits"("entityType", "entityId", "isLatest");
 CREATE INDEX "seo_audits_boutiqueId_entityType_isLatest_idx" ON "seo_audits"("boutiqueId", "entityType", "isLatest");
@@ -862,56 +844,39 @@ CREATE UNIQUE INDEX "feedbacks_userId_boutiqueId_key" ON "feedbacks"("userId", "
 CREATE UNIQUE INDEX "feedbacks_userId_period_key" ON "feedbacks"("userId", "period");
 
 CREATE INDEX "job_runs_name_status_startedAt_idx" ON "job_runs"("name", "status", "startedAt" DESC);
-CREATE UNIQUE INDEX "job_runs_name_runKey_key" ON "job_runs"("name", "runKey");
 
 CREATE INDEX "product_daily_stats_boutiqueId_date_idx" ON "product_daily_stats"("boutiqueId", "date");
 CREATE INDEX "product_daily_stats_date_idx" ON "product_daily_stats"("date");
-CREATE UNIQUE INDEX "product_daily_stats_productId_date_key" ON "product_daily_stats"("productId", "date");
 
 CREATE INDEX "boutique_daily_stats_date_idx" ON "boutique_daily_stats"("date");
-CREATE UNIQUE INDEX "boutique_daily_stats_boutiqueId_date_key" ON "boutique_daily_stats"("boutiqueId", "date");
 
 CREATE INDEX "search_term_daily_stats_date_searches_idx" ON "search_term_daily_stats"("date", "searches" DESC);
-CREATE UNIQUE INDEX "search_term_daily_stats_term_locale_date_key" ON "search_term_daily_stats"("term", "locale", "date");
 
 CREATE INDEX "seller_stats_period_periodKey_scoreTotal_idx" ON "seller_stats"("period", "periodKey", "scoreTotal" DESC);
 CREATE INDEX "seller_stats_period_periodKey_rank_idx" ON "seller_stats"("period", "periodKey", "rank");
 CREATE INDEX "seller_stats_boutiqueId_period_idx" ON "seller_stats"("boutiqueId", "period");
-CREATE UNIQUE INDEX "seller_stats_boutiqueId_period_periodKey_key" ON "seller_stats"("boutiqueId", "period", "periodKey");
 
-CREATE UNIQUE INDEX "scoring_rule_sets_version_key" ON "scoring_rule_sets"("version");
 CREATE INDEX "scoring_rule_sets_isActive_idx" ON "scoring_rule_sets"("isActive");
 
 CREATE INDEX "seller_score_snapshots_period_periodKey_scoreTotal_idx" ON "seller_score_snapshots"("period", "periodKey", "scoreTotal" DESC);
 CREATE INDEX "seller_score_snapshots_boutiqueId_period_idx" ON "seller_score_snapshots"("boutiqueId", "period");
-CREATE UNIQUE INDEX "seller_score_snapshots_boutiqueId_period_periodKey_ruleSetI_key" ON "seller_score_snapshots"("boutiqueId", "period", "periodKey", "ruleSetId");
 
 CREATE INDEX "seller_leaderboards_period_periodKey_scope_idx" ON "seller_leaderboards"("period", "periodKey", "scope");
-CREATE UNIQUE INDEX "seller_leaderboards_period_periodKey_scope_scopeKey_metric_key" ON "seller_leaderboards"("period", "periodKey", "scope", "scopeKey", "metric");
 
 CREATE INDEX "seller_leaderboard_entries_leaderboardId_rank_idx" ON "seller_leaderboard_entries"("leaderboardId", "rank");
 CREATE INDEX "seller_leaderboard_entries_boutiqueId_idx" ON "seller_leaderboard_entries"("boutiqueId");
-CREATE UNIQUE INDEX "seller_leaderboard_entries_leaderboardId_boutiqueId_key" ON "seller_leaderboard_entries"("leaderboardId", "boutiqueId");
-
-CREATE UNIQUE INDEX "premium_features_code_key" ON "premium_features"("code");
 
 CREATE INDEX "seller_premium_access_boutiqueId_isActive_idx" ON "seller_premium_access"("boutiqueId", "isActive");
 CREATE INDEX "seller_premium_access_featureId_isActive_idx" ON "seller_premium_access"("featureId", "isActive");
 CREATE INDEX "seller_premium_access_expiresAt_idx" ON "seller_premium_access"("expiresAt");
 
-CREATE UNIQUE INDEX "seller_rewards_leaderboardEntryId_key" ON "seller_rewards"("leaderboardEntryId");
-CREATE UNIQUE INDEX "seller_rewards_achievementAwardId_key" ON "seller_rewards"("achievementAwardId");
 CREATE INDEX "seller_rewards_boutiqueId_status_idx" ON "seller_rewards"("boutiqueId", "status");
 CREATE INDEX "seller_rewards_type_status_idx" ON "seller_rewards"("type", "status");
 CREATE INDEX "seller_rewards_expiresAt_idx" ON "seller_rewards"("expiresAt");
 
-CREATE UNIQUE INDEX "achievements_code_key" ON "achievements"("code");
-
 CREATE INDEX "seller_achievement_awards_boutiqueId_idx" ON "seller_achievement_awards"("boutiqueId");
 CREATE INDEX "seller_achievement_awards_achievementId_idx" ON "seller_achievement_awards"("achievementId");
-CREATE UNIQUE INDEX "seller_achievement_awards_boutiqueId_achievementId_periodKe_key" ON "seller_achievement_awards"("boutiqueId", "achievementId", "periodKey");
 
-CREATE UNIQUE INDEX "seller_promotions_code_key" ON "seller_promotions"("code");
 CREATE INDEX "seller_promotions_boutiqueId_isActive_idx" ON "seller_promotions"("boutiqueId", "isActive");
 
 CREATE INDEX "categories_parentId_idx" ON "categories"("parentId");
@@ -922,7 +887,9 @@ CREATE INDEX "products_boutiqueId_isActive_deletedAt_idx" ON "products"("boutiqu
 CREATE INDEX "products_isActive_seoScoreCache_idx" ON "products"("isActive", "seoScoreCache" DESC);
 CREATE INDEX "users_role_idx" ON "users"("role");
 
--- ─── 18. CLÉS ÉTRANGÈRES ───
+
+-- ═══════════════════ PHASE 10 : CLÉS ÉTRANGÈRES ═══════════════════
+
 ALTER TABLE "boutiques" ADD CONSTRAINT "boutiques_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "boutiques" ADD CONSTRAINT "boutiques_storeCategoryId_fkey" FOREIGN KEY ("storeCategoryId") REFERENCES "categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "managed_boutiques" ADD CONSTRAINT "managed_boutiques_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -963,7 +930,8 @@ ALTER TABLE "seller_achievement_awards" ADD CONSTRAINT "seller_achievement_award
 ALTER TABLE "seller_achievement_awards" ADD CONSTRAINT "seller_achievement_awards_achievementId_fkey" FOREIGN KEY ("achievementId") REFERENCES "achievements"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "seller_promotions" ADD CONSTRAINT "seller_promotions_boutiqueId_fkey" FOREIGN KEY ("boutiqueId") REFERENCES "boutiques"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ─── 19. SQL SPÉCIFIQUE POSTGRES (recherche, unicité partielle, CHECK) ───
+
+-- ═══════════════════ PHASE 11 : SQL SPÉCIFIQUE POSTGRES ═══════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
