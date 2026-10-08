@@ -5,13 +5,11 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Alpine a besoin d'OpenSSL pour le moteur Prisma
 RUN apk add --no-cache openssl
 
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma
 
-# Utilise npm ci si le lockfile est présent et valide, sinon npm install
 RUN if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
 
 COPY tsconfig.json ./

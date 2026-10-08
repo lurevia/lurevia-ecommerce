@@ -1,18 +1,3 @@
-// ════════════════════════════════════════════════════════════════════
-//  LUREVIA — schema.prisma v2 (complet)
-//  Marketplace où les vendeurs sont en concurrence sur le SEO et le contenu.
-//
-//  Organisation du fichier :
-//    0. Config            7.  Commandes & paiements
-//    1. Enums             8.  Feedback
-//    2. Identité & auth   9.  Notifications & messages
-//    3. Boutiques         10. Business vendeur
-//    4. Logistique        11. Admin, audit, média
-//    5. Catalogue         12. Configuration plateforme
-//    6. Contenu & SEO     13. Mesures, scoring, classements, récompenses
-//
-//  Les anciens champs gardés "par compatibilité" sont signalés [COMPAT].
-// ════════════════════════════════════════════════════════════════════
 
 generator client {
   provider = "prisma-client-js"
@@ -22,8 +7,6 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
-// ═══════════════════════════ 1. ENUMS ═══════════════════════════
 
 enum Gender {
   MALE
@@ -2032,7 +2015,7 @@ model ScoringRuleSet {
   weightQuality    Float @default(0.15)
   weightRecency    Float @default(0.05)
 
-  params     Json? // seuils : longueur titre idéale, nb images min...
+  params     Json?
   isActive   Boolean   @default(false)
   activeFrom DateTime?
   createdBy  String?   @db.Uuid
@@ -2062,7 +2045,7 @@ model SellerScoreSnapshot {
   scoreRecency    Float @default(0)
   scoreTotal      Float @default(0)
   rank            Int?
-  breakdown       Json? // détail explicable : "pourquoi j'ai ce score"
+  breakdown       Json?
 
   computedAt DateTime @default(now())
 
@@ -2080,8 +2063,8 @@ model SellerLeaderboard {
   period    LeaderboardPeriod
   periodKey String
   scope     LeaderboardScope  @default(GLOBAL)
-  scopeKey  String            @default("ALL") // categoryId, province... (plus de NULL : unicité fiable)
-  metric    ScoreComponent    @default(TOTAL) // "meilleur SEO", "meilleur contenu"...
+  scopeKey  String            @default("ALL")
+  metric    ScoreComponent    @default(TOTAL)
 
   startsAt DateTime
   endsAt   DateTime
@@ -2154,7 +2137,7 @@ model SellerPremiumAccess {
   featureId  String         @db.Uuid
   feature    PremiumFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
 
-  source    String? // "LEADERBOARD", "ADMIN_GRANT", "PROMOTION"
+  source    String?
   reason    String?
   grantedAt DateTime  @default(now())
   expiresAt DateTime?
@@ -2234,7 +2217,7 @@ model SellerAchievementAward {
   achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
 
   earnedAt  DateTime @default(now())
-  periodKey String   @default("LIFETIME") // plus de NULL : un badge à vie ne peut plus être dupliqué
+  periodKey String   @default("LIFETIME")
   metadata  Json?
 
   reward SellerReward?
