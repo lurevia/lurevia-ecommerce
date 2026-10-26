@@ -1,0 +1,238 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE : COMMANDES, PAIEMENTS & LOGISTIQUE
+// Règle : Un table = un seul rôle, intégrité référentielle stricte
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. COMMANDE (Cycle de vie d'achat et données financières) ──
+model Order {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNumber           String              @unique @db.VarChar(50)
+  userId                String              @db.Uuid
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  status                OrderStatus         @default(PENDING)
+  paymentMethod         PaymentMethod
+  currency              String              @default("MGA") @db.VarChar(10)
+
+  deliveryMode          DeliveryMode
+  shippingFullName      String              @db.VarChar(120)
+  shippingPhone         String              @db.VarChar(30)
+  shippingEmail         String              @db.VarChar(120)
+  shippingProvince      ProvinceMadagascar
+  shippingRegion        RegionMadagascar
+  shippingCity          String              @db.VarChar(100)
+  shippingNeighborhood  String?             @db.VarChar(100)
+  shippingAddress       String              @db.VarChar(255)
+  shippingNotes         String?             @db.VarChar(255)
+
+  deliveryLatitude      Float?
+  deliveryLongitude     Float?
+  deliveryAccuracy      Float?
+  deliveryGpsSharedAt   DateTime?
+
+  shippingZoneId        String?             @db.Uuid
+  shippingZone          ShippingZone?       @relation(fields: [shippingZoneId], references: [id], onDelete: SetNull)
+  shippingPickupPointId String?             @db.Uuid
+  shippingPickupPoint   PickupPoint?        @relation(fields: [shippingPickupPointId], references: [id], onDelete: SetNull)
+
+  subtotal              Int
+  shippingCost          Int
+  total                 Int
+
+  codAmountExpected     Int?
+  codCollectedAt        DateTime?
+  codCollectedBy        String?             @db.VarChar(100)
+
+  paidAt                DateTime?
+  shippedAt             DateTime?
+  deliveredAt           DateTime?
+  cancelledAt           DateTime?
+  refundedAt            DateTime?
+  reviewRequestedAt     DateTime?
+  stockReservedUntil    DateTime?
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  items                 OrderItem[]
+  transactions          Transaction[]
+  feedbacks             Feedback[]
+  settlements           SellerSettlement[]
+  deliveryTracking      DeliveryTracking[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("orders")
+}
+
+// ── 2. ARTICLES COMMANDÉS (Snapshot immuable lors de la commande) ──
+model OrderItem {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String     @db.Uuid
+  order         Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId     String     @db.Uuid
+  product       Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  boutiqueId    String?    @db.Uuid
+
+  titleSnapshot String     @db.VarChar(200)
+  imageSnapshot String?    @db.VarChar(500)
+  skuSnapshot   String     @db.VarChar(50)
+  priceSnapshot Int
+  colorSnapshot String?    @db.VarChar(50)
+  sizeSnapshot  String?    @db.VarChar(50)
+  quantity      Int
+
+  feedbacks     Feedback[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([boutiqueId])
+  @@map("order_items")
+}
+
+// ── 3. CARNET D'ADRESSES CLIENT ──
+model Address {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String             @db.Uuid
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  label          String             @db.VarChar(60)
+  fullName       String             @db.VarChar(120)
+  phone          String             @db.VarChar(30)
+  email          String?            @db.VarChar(120)
+  province       ProvinceMadagascar
+  region         RegionMadagascar
+  city           String             @db.VarChar(100)
+  neighborhood   String?            @db.VarChar(100)
+  address        String             @db.VarChar(255)
+  latitude       Float?
+  longitude      Float?
+  accuracyMeters Float?
+  notes          String?            @db.VarChar(255)
+  isDefault      Boolean            @default(false)
+
+  pickupPointId  String?            @db.Uuid
+  pickupPoint    PickupPoint?       @relation(fields: [pickupPointId], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([province, region])
+  @@map("addresses")
+}
+
+// ── 4. POINTS RELAIS ET DE RETRAIT ──
+model PickupPoint {
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String              @db.VarChar(120)
+  provider       String              @db.VarChar(60)
+  phone          String?             @db.VarChar(30)
+  email          String?             @db.VarChar(120)
+  province       ProvinceMadagascar
+  region         RegionMadagascar
+  city           String              @db.VarChar(100)
+  address        String              @db.VarChar(255)
+  latitude       Float?
+  longitude      Float?
+
+  shippingZoneId String?             @db.Uuid
+  shippingZone   ShippingZone?       @relation(fields: [shippingZoneId], references: [id], onDelete: SetNull)
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  addresses      Address[]
+  orders         Order[]
+
+  @@index([province, region])
+  @@index([provider])
+  @@index([isActive])
+  @@map("pickup_points")
+}
+
+// ── 5. ZONES D'EXPÉDITION ──
+model ShippingZone {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String              @unique @db.VarChar(100)
+  province      ProvinceMadagascar?
+  regions       RegionMadagascar[]
+  basePrice     Int
+  pricePerKg    Int?
+  estimatedDays Int?
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  orders        Order[]
+  pickupPoints  PickupPoint[]
+
+  @@index([province])
+  @@map("shipping_zones")
+}
+
+// ── 6. HISTORIQUE GPS DU COURSIER ──
+model DeliveryTracking {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String   @db.Uuid
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courierId  String?  @db.Uuid
+  courier    User?    @relation("DeliveryCourier", fields: [courierId], references: [id], onDelete: SetNull)
+
+  latitude   Float
+  longitude  Float
+  accuracy   Float?
+  speed      Float?
+  heading    Float?
+  recordedAt DateTime @default(now())
+
+  @@index([orderId, recordedAt])
+  @@index([courierId, recordedAt])
+  @@map("delivery_tracking")
+}
+
+// ── 7. TRANSACTIONS FINANCIÈRES ──
+model Transaction {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId           String               @db.Uuid
+  order             Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  amount            Int
+  currency          String               @default("MGA") @db.VarChar(10)
+  method            PaymentMethod
+  provider          MobileMoneyProvider?
+  status            TransactionStatus
+  externalId        String?              @unique @db.VarChar(120)
+  externalRequestId String?              @db.VarChar(120)
+  idempotencyKey    String               @unique @db.VarChar(128)
+  rawCallback       Json?
+  signatureVerified Boolean              @default(false)
+  failureReason     String?              @db.VarChar(255)
+
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  completedAt       DateTime?
+
+  @@index([orderId])
+  @@index([status])
+  @@map("transactions")
+}
+
+// ── 8. CALLBACKS PAIEMENTS (Webhooks) ──
+model PaymentWebhook {
+  id           String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider     MobileMoneyProvider
+  externalId   String?             @db.VarChar(120)
+  eventType    String              @db.VarChar(80)
+  rawPayload   Json
+  signature    String?             @db.VarChar(255)
+  verified     Boolean             @default(false)
+  processedAt  DateTime?
+  errorMessage String?             @db.VarChar(255)
+  receivedAt   DateTime            @default(now())
+
+  @@index([provider, externalId])
+  @@index([processedAt])
+  @@map("payment_webhooks")
+}

@@ -1,0 +1,151 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE : SYSTÈME, NOTIFICATIONS, AUDIT & MESSAGERIE
+// Règle : Un table = un seul rôle, sécurité et traçabilité
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. NOTIFICATIONS UTILISATEURS ──
+model Notification {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String           @db.Uuid
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         NotificationType
+  title        String           @db.VarChar(140)
+  message      String           @db.Text
+  actionUrl    String           @db.VarChar(255)
+  imageUrl     String?          @db.VarChar(500)
+  referenceKey String           @db.VarChar(120)
+  read         Boolean          @default(false)
+  readAt       DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@unique([userId, referenceKey])
+  @@index([userId, read, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// ── 2. MESSAGERIE INTERNE DIRECTE ──
+model UserMessage {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientId String      @db.Uuid
+  recipient   User        @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  senderId    String?     @db.Uuid
+  sender      User?       @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  type        MessageType @default(ADMIN_MESSAGE)
+  subject     String      @db.VarChar(160)
+  body        String      @db.Text
+  read        Boolean     @default(false)
+  readAt      DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@index([recipientId, createdAt])
+  @@index([senderId, createdAt])
+  @@map("user_messages")
+}
+
+// ── 3. ALERTES INTERNES POUR L'ÉQUIPE ADMINISTRATRICE ──
+model AdminNotification {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        AdminNotificationType
+  title       String                @db.VarChar(140)
+  message     String                @db.Text
+  entityType  String                @db.VarChar(60)
+  entityId    String                @db.VarChar(60)
+  actorUserId String?               @db.Uuid
+  priority    Int                   @default(0)
+  read        Boolean               @default(false)
+  readAt      DateTime?
+  createdAt   DateTime              @default(now())
+
+  @@index([read, createdAt])
+  @@index([entityType, entityId])
+  @@map("admin_notifications")
+}
+
+// ── 4. ABONNÉS NEWSLETTER ──
+model NewsletterSubscriber {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String    @unique @db.VarChar(120)
+  confirmationToken String?   @unique @db.VarChar(128)
+  confirmedAt       DateTime?
+  unsubscribedAt    DateTime?
+  unsubscribeReason String?   @db.VarChar(255)
+  createdByIp       String?   @db.VarChar(45)
+  subscribedAt      DateTime  @default(now())
+
+  @@index([confirmedAt])
+  @@map("newsletter_subscribers")
+}
+
+// ── 5. JOURNAL D'AUDIT SÉCURITÉ & OPÉRATIONS (Traçabilité) ──
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorUserId String?  @db.Uuid
+  actor       User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action      String   @db.VarChar(100)
+  entityType  String   @db.VarChar(60)
+  entityId    String?  @db.VarChar(60)
+  metadata    Json?
+  ipAddress   String?  @db.VarChar(45)
+  userAgent   String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// ── 6. MÉDIAS ET FICHIERS STOCKÉS ──
+model MediaAsset {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId             String             @db.Uuid
+  owner               User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sourceUrl           String             @db.Text
+  publicUrl           String             @db.Text
+  githubPath          String             @db.Text
+  contentType         String             @db.VarChar(100)
+  byteSize            Int
+  githubSha           String?            @db.VarChar(100)
+  googleArchiveStatus MediaArchiveStatus @default(NOT_CONFIGURED)
+  googleArchiveError  String?            @db.Text
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@index([googleArchiveStatus])
+  @@map("media_assets")
+}
+
+// ── 7. EXÉCUTION DES JOBS D'ARRIÈRE-PLAN ──
+model JobRun {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String    @db.VarChar(80)
+  runKey     String    @db.VarChar(60)
+  status     JobStatus @default(RUNNING)
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  processed  Int       @default(0)
+  error      String?   @db.Text
+  meta       Json?
+
+  @@unique([name, runKey])
+  @@index([name, status, startedAt(sort: Desc)])
+  @@map("job_runs")
+}
+
+// ── 8. PAGES STATIQUES CMS DU SITE ──
+model SitePage {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug          String   @unique @db.VarChar(80)
+  title         String   @db.VarChar(200)
+  summary       String   @default("") @db.Text
+  content       String   @default("") @db.Text
+  published     Boolean  @default(false)
+  showInFooter  Boolean  @default(false)
+  footerSection String?  @db.VarChar(20)
+  updatedBy     String?  @db.Uuid
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([published, showInFooter])
+  @@map("site_pages")
+}

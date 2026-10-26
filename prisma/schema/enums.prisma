@@ -1,0 +1,477 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// ÉNUMÉRATIONS GLOBALES DU SYSTÈME
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. UTILISATEURS & AUTH ──
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Role {
+  CUSTOMER
+  SELLER
+  ADMIN
+}
+
+enum AuthIdentifier {
+  EMAIL
+  PHONE
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  FACEBOOK
+}
+
+enum IdentityDocumentType {
+  CIN
+  PASSPORT
+  DRIVER_LICENSE
+  RESIDENCE_PERMIT
+}
+
+enum GuardianRelation {
+  FATHER
+  MOTHER
+  TUTOR
+  LEGAL_GUARDIAN
+  OTHER
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  USED
+  EXPIRED
+}
+
+enum IdentityVerificationStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum DeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProfileChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ── 2. VENDEURS & BOUTIQUES ──
+enum SellerTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+enum SellerContractType {
+  PERCENTAGE
+  MONTHLY_FIXED
+}
+
+enum SellerContractStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SettlementStatus {
+  PENDING_REVIEW
+  READY
+  TRANSFER_PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum TransferStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ── 3. CATALOGUE & PRODUITS ──
+enum ProductPricingMode {
+  FIXED
+  NEGOTIABLE
+  AUCTION
+  ON_REQUEST
+}
+
+enum ModerationStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProductDeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ── 4. ENCHÈRES ──
+enum AuctionStatus {
+  SCHEDULED
+  ACTIVE
+  ENDED
+  CANCELLED
+  SOLD
+  UNSOLD
+}
+
+enum BidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  OUTBID
+  WINNING
+  WON
+  CANCELLED
+}
+
+enum AuctionMessageType {
+  CHAT
+  BID
+  SYSTEM
+  MODERATION
+}
+
+// ── 5. COMMANDES & LOGISTIQUE ──
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  COD_PENDING
+  COD_FAILED
+  REFUNDED
+  PAYMENT_FAILED
+}
+
+enum PaymentMethod {
+  MOBILE_MONEY
+  CARD
+  COD
+  BANK_TRANSFERT
+}
+
+enum MobileMoneyProvider {
+  MVOLA
+  ORANGE_MONEY
+  AIRTEL_MONEY
+}
+
+enum TransactionStatus {
+  INITIATED
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum DeliveryMode {
+  HOME_DELIVERY
+  PICKUP_POINT
+}
+
+enum ProvinceMadagascar {
+  ANTANANARIVO
+  ANTSIRANANA
+  MAHAJANGA
+  TOAMASINA
+  FIANARANTSOA
+  TOLIARA
+}
+
+enum RegionMadagascar {
+  DIANA
+  SAVA
+  ITASY
+  ANALAMANGA
+  VAKINANKARATRA
+  BONGOLAVA
+  SOFIA
+  BOENY
+  BETSIBOKA
+  MELAKY
+  ALAOTRA_MANGORO
+  ATSINANANA
+  ANALANJIROFO
+  AMBATOSOA
+  AMORON_I_MANIA
+  HAUTE_MATSIATRA
+  VATOVAVY
+  FITOVINANY
+  ATSIMO_ATSINANANA
+  IHOROMBE
+  MENABE
+  ATSIMO_ANDREFANA
+  ANDROY
+  ANOSY
+}
+
+// ── 6. AVIS & FEEDBACK ──
+enum FeedbackType {
+  PRODUCT
+  BOUTIQUE
+  SERVICE
+}
+
+enum FeedbackCategory {
+  DELIVERY
+  PAYMENT
+  SUPPORT
+  WEBSITE
+  OTHER
+}
+
+// ── 7. NOTIFICATIONS & MESSAGES ──
+enum NotificationType {
+  REVIEW_PENDING
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  PROMO
+  ACCOUNT_VERIFICATION
+  IDENTITY_VERIFIED
+  GUARDIAN_CONSENT_NEEDED
+  AUCTION_STARTED
+  AUCTION_OUTBID
+  AUCTION_WON
+  AUCTION_LOST
+  AUCTION_ENDING_SOON
+}
+
+enum AdminNotificationType {
+  NEW_ORDER
+  NEW_REVIEW
+  NEW_FEEDBACK
+  DELETION_REQUEST
+  LOW_STOCK
+  PROFILE_CHANGE_REQUEST
+  NEW_SELLER_KYC
+  CIN_VERIFICATION_REQUEST
+  GUARDIAN_CIN_VERIFICATION_REQUEST
+  AUCTION_DISPUTE
+  AUCTION_REPORT
+}
+
+enum MessageType {
+  ADMIN_MESSAGE
+  ORDER_UPDATE
+  PROMO
+  SYSTEM
+}
+
+// ── 8. CLASSEMENTS, SCORES & RÉCOMPENSES ──
+enum LeaderboardPeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum LeaderboardScope {
+  GLOBAL
+  BY_CATEGORY
+  BY_REGION
+}
+
+enum ScoreComponent {
+  TOTAL
+  SEO
+  CONTENT
+  TRUST
+  ENGAGEMENT
+  QUALITY
+  RECENCY
+  SERVICE
+}
+
+enum RewardType {
+  COMMISSION_DISCOUNT
+  PREMIUM_FEATURE
+  CASH_BONUS
+  FREE_SHIPPING_CREDITS
+  PROMOTED_LISTING_CREDITS
+  PHYSICAL_GIFT
+  BADGE_UPGRADE
+}
+
+enum RewardStatus {
+  PENDING
+  GRANTED
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+enum PremiumFeatureCode {
+  FEATURED_BOUTIQUE
+  HOME_BANNER
+  ADVANCED_ANALYTICS
+  CUSTOM_DOMAIN
+  BULK_UPLOAD
+  PRIORITY_SUPPORT
+  AUTOMATED_MARKETING
+  ZERO_COMMISSION_DAY
+  NEGOTIABLE_PRODUCTS
+  AUCTION_UNLIMITED
+}
+
+enum AchievementCode {
+  FIRST_SALE
+  FIRST_REVIEW
+  HUNDRED_SALES
+  THOUSAND_SALES
+  PERFECT_MONTH
+  TOP_SELLER_MONTH
+  TOP_SELLER_YEAR
+  FAST_SHIPPER
+  HIGHLY_RATED
+  MILLION_REVENUE
+  TEN_THOUSAND_SUBSCRIBERS
+  FIVE_STAR_STREAK
+}
+
+enum AchievementRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+// ── 9. SEO & CONTENU ──
+enum ContentLocale {
+  FR
+  MG
+  EN
+}
+
+enum SeoEntityType {
+  BOUTIQUE
+  PRODUCT
+  CATEGORY
+  POST
+}
+
+enum SeoIssueSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum SeoIssueCode {
+  TITLE_MISSING
+  TITLE_TOO_SHORT
+  TITLE_TOO_LONG
+  META_DESCRIPTION_MISSING
+  META_DESCRIPTION_TOO_SHORT
+  META_DESCRIPTION_TOO_LONG
+  FOCUS_KEYWORD_MISSING
+  KEYWORD_NOT_IN_TITLE
+  DESCRIPTION_TOO_SHORT
+  NO_ALT_TEXT
+  NOT_ENOUGH_IMAGES
+  NO_ATTRIBUTES
+  NO_FAQ
+  NO_CATEGORY
+  MISSING_TRANSLATION
+  DUPLICATE_CONTENT
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ── 10. SYSTÈME, SÉCURITÉ & PARAMÈTRES ──
+enum SocialPlatform {
+  FACEBOOK
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  WHATSAPP
+  LINKEDIN
+  PINTEREST
+  X
+  OTHER
+}
+
+enum LegalDocumentType {
+  TERMS_OF_SERVICE
+  PRIVACY_POLICY
+  COOKIE_POLICY
+  SELLER_TERMS
+  REFUND_POLICY
+  SHIPPING_POLICY
+  LEGAL_NOTICE
+  OTHER
+}
+
+enum DocumentProvider {
+  GOOGLE_DOCS
+  GOOGLE_DRIVE
+  EXTERNAL_URL
+  CMS
+  OTHER
+}
+
+enum DocumentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SettingsDomain {
+  SITE_IDENTITY
+  THEME
+  SOCIAL_LINKS
+  SEO
+  MAINTENANCE
+  LEGAL_DOCUMENTS
+  SHIPPING
+  PAYMENT_METHODS
+  SELLER_VERIFICATION
+  AUCTIONS
+  NOTIFICATIONS
+}
+
+enum SettingsAuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum MediaArchiveStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  NOT_CONFIGURED
+}
+
+enum JobStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}

@@ -1,0 +1,199 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE : BOUTIQUES & VENDEURS ARTISANAUX
+// Règle : Un table = un seul rôle, données limitées, relations propres
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. BOUTIQUE (Identité centrale & état opérationnel) ──
+model Boutique {
+  id                   String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId              String      @unique @db.Uuid
+  owner                User        @relation("BoutiqueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name                 String      @unique @db.VarChar(120)
+  slug                 String      @unique @db.VarChar(120)
+  description          String?     @db.Text
+  logoUrl              String?     @db.VarChar(500)
+  coverUrl             String?     @db.VarChar(500)
+
+  storeCategoryId      String?     @db.Uuid
+  storeCategory        Category?   @relation("BoutiqueStoreCategory", fields: [storeCategoryId], references: [id], onDelete: SetNull)
+
+  // Caches de performance lecture (Maintenus par jobs et triggers)
+  ratingCache          Float       @default(0)
+  reviewCountCache     Int         @default(0)
+  subscriberCountCache Int         @default(0)
+  productCountCache    Int         @default(0)
+  salesCountCache      Int         @default(0)
+  viewCountCache       Int         @default(0)
+  favoriteCountCache   Int         @default(0)
+  scoreTotal           Float       @default(0)
+  seoScoreCache        Float       @default(0)
+  contentScoreCache    Float       @default(0)
+
+  tier                 SellerTier  @default(BRONZE)
+  isActive             Boolean     @default(true)
+  isFeatured           Boolean     @default(false)
+  isSuspended          Boolean     @default(false)
+  suspendedReason      String?     @db.VarChar(255)
+  publishedAt          DateTime?
+
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  deletedAt            DateTime?
+
+  // Sous-tables spécialisées (Séparation stricte pour éliminer le bloat)
+  profile              BoutiqueProfile?
+  contact              BoutiqueContact?
+  location             BoutiqueLocation?
+  legal                BoutiqueLegal?
+  policy               BoutiquePolicy?
+
+  // Relations marketplace
+  managers             ManagedBoutique[]
+  subscriptions        Subscription[]
+  products             Product[]
+  feedbacks            Feedback[]
+  localizations        BoutiqueLocalization[]
+  posts                BoutiquePost[]
+  seoAudits            SeoAudit[]
+  dailyStats           BoutiqueDailyStat[]
+  scoreSnapshots       SellerScoreSnapshot[]
+  stats                SellerStats[]
+  leaderboardEntries   SellerLeaderboardEntry[]
+  premiumAccesses      SellerPremiumAccess[]
+  rewards              SellerReward[]
+  achievements         SellerAchievementAward[]
+  promotions           SellerPromotion[]
+
+  @@index([storeCategoryId])
+  @@index([tier])
+  @@index([isActive, deletedAt])
+  @@index([isFeatured])
+  @@index([scoreTotal(sort: Desc)])
+  @@index([ratingCache(sort: Desc)])
+  @@index([subscriberCountCache(sort: Desc)])
+  @@map("boutiques")
+}
+
+// ── 2. PROFIL ÉDITORIAL & HISTOIRE ARTISANALE ──
+model BoutiqueProfile {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId      String   @unique @db.Uuid
+  boutique        Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  tagline         String?  @db.VarChar(160)
+  longDescription String?  @db.Text
+  story           String?  @db.Text
+  values          String?  @db.Text
+  bio             String?  @db.Text
+  galleryUrls     String[] @default([])
+
+  updatedAt       DateTime @updatedAt
+
+  @@map("boutique_profiles")
+}
+
+// ── 3. COORDONNÉES ET RÉSEAUX SOCIAUX ──
+model BoutiqueContact {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId     String   @unique @db.Uuid
+  boutique       Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  contactEmail   String?  @db.VarChar(120)
+  contactPhone   String?  @db.VarChar(30)
+  websiteUrl     String?  @db.VarChar(255)
+  whatsappNumber String?  @db.VarChar(30)
+  facebookUrl    String?  @db.VarChar(255)
+  instagramUrl   String?  @db.VarChar(255)
+  tiktokUrl      String?  @db.VarChar(255)
+  linkedinUrl    String?  @db.VarChar(255)
+
+  updatedAt      DateTime @updatedAt
+
+  @@map("boutique_contacts")
+}
+
+// ── 4. LOCALISATION GÉOGRAPHIQUE ──
+model BoutiqueLocation {
+  id         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String              @unique @db.Uuid
+  boutique   Boutique            @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  province   ProvinceMadagascar?
+  region     RegionMadagascar?
+  city       String?             @db.VarChar(100)
+  address    String?             @db.VarChar(255)
+  latitude   Float?
+  longitude  Float?
+
+  updatedAt  DateTime            @updatedAt
+
+  @@index([province, region])
+  @@map("boutique_locations")
+}
+
+// ── 5. INFORMATIONS JURIDIQUES ET FISCALES ──
+model BoutiqueLegal {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId              String    @unique @db.Uuid
+  boutique                Boutique  @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  legalName               String?   @db.VarChar(160)
+  legalRegistrationNumber String?   @db.VarChar(60)
+  taxId                   String?   @db.VarChar(60)
+  isVerified              Boolean   @default(false)
+  verifiedAt              DateTime?
+  verifiedBy              String?   @db.Uuid
+  trustLevel              Int       @default(0)
+
+  updatedAt               DateTime  @updatedAt
+
+  @@map("boutique_legals")
+}
+
+// ── 6. POLITIQUES COMMERCIALES ET LOGISTIQUES ──
+model BoutiquePolicy {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId         String   @unique @db.Uuid
+  boutique           Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  returnPolicy       String?  @db.Text
+  shippingPolicy     String?  @db.Text
+  warrantyPolicy     String?  @db.Text
+  processingTimeDays Int?     @default(1)
+
+  updatedAt          DateTime @updatedAt
+
+  @@map("boutique_policies")
+}
+
+// ── 7. COLLABORATEURS ET GESTIONNAIRES ──
+model ManagedBoutique {
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  role       String?  @db.VarChar(50)
+  createdAt  DateTime @default(now())
+
+  @@id([userId, boutiqueId])
+  @@index([boutiqueId])
+  @@map("managed_boutiques")
+}
+
+// ── 8. ABONNEMENTS CLIENTS ──
+model Subscription {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boutiqueId String    @db.Uuid
+  boutique   Boutique  @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime  @default(now())
+  deletedAt  DateTime?
+
+  @@unique([userId, boutiqueId])
+  @@index([boutiqueId])
+  @@index([userId])
+  @@map("subscriptions")
+}

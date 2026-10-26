@@ -1,0 +1,57 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE : AVIS, ÉVALUATIONS & FEEDBACKS CLIENTS
+// Règle : Un table = un seul rôle, validation stricte
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Feedback {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String            @db.Uuid
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            FeedbackType
+
+  // Contexte PRODUIT
+  productId       String?           @db.Uuid
+  product         Product?          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderId         String?           @db.Uuid
+  order           Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderItemId     String?           @db.Uuid
+  orderItem       OrderItem?        @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  // Contexte BOUTIQUE
+  boutiqueId      String?           @db.Uuid
+  boutique        Boutique?         @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  // Contexte SERVICE GLOBALE
+  period          String?           @db.VarChar(20)
+
+  // Contenu de l'évaluation
+  rating          Int
+  title           String?           @db.VarChar(120)
+  comment         String            @db.Text
+  criteria        Json?
+  category        FeedbackCategory?
+
+  // Modération & Réponses officielles
+  isApproved      Boolean           @default(false)
+  approvedBy      String?           @db.Uuid
+  approvedAt      DateTime?
+  rejectedBy      String?           @db.Uuid
+  rejectedAt      DateTime?
+  rejectionReason String?           @db.VarChar(255)
+  teamResponse    String?           @db.Text
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+
+  @@unique([userId, productId])
+  @@unique([userId, boutiqueId])
+  @@unique([userId, period])
+  @@index([productId, isApproved])
+  @@index([boutiqueId, isApproved])
+  @@index([userId, type])
+  @@index([type, isApproved, createdAt])
+  @@index([orderId])
+  @@index([deletedAt])
+  @@map("feedbacks")
+}

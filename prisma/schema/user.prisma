@@ -1,0 +1,269 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE : UTILISATEURS, AUTHENTIFICATION & SÉCURITÉ
+// Règle : Un table = un seul rôle, validation KYC et intégrité mineurs
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. UTILISATEUR & COMPTE CŒUR ──
+model User {
+  id                         String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullName                   String                     @db.VarChar(120)
+  email                      String                     @unique @db.VarChar(120)
+  phone                      String?                    @unique @db.VarChar(30)
+  avatarUrl                  String?                    @db.VarChar(500)
+  age                        Int?
+  gender                     Gender?
+  isPrimaryAdmin             Boolean                    @default(false)
+
+  passwordHash               String?                    @db.VarChar(255)
+  passwordChangedAt          DateTime?
+  primaryIdentifier          AuthIdentifier             @default(EMAIL)
+  primaryProvider            AuthProvider               @default(LOCAL)
+
+  emailVerified              Boolean                    @default(false)
+  phoneVerified              Boolean                    @default(false)
+  isVerified                 Boolean                    @default(false)
+
+  // Identité officielle (CIN / Passeport)
+  cinNumber                  String?                    @unique @db.VarChar(30)
+  cinVerifiedAt              DateTime?
+  identityDocumentType       IdentityDocumentType?
+  identityDocumentNumber     String?                    @unique @db.VarChar(60)
+  identityDocumentUrl        String?                    @db.Text
+  identityVerifiedAt         DateTime?
+  identityVerificationStatus IdentityVerificationStatus @default(NOT_SUBMITTED)
+  identityRejectionReason    String?                    @db.VarChar(255)
+
+  // Tutelle légale des mineurs (Champs directs pour rétro-compatibilité stricte)
+  isMinor                    Boolean                    @default(false)
+  guardianFullName           String?                    @db.VarChar(120)
+  guardianCinNumber          String?                    @db.VarChar(30)
+  guardianPhone              String?                    @db.VarChar(30)
+  guardianEmail              String?                    @db.VarChar(120)
+  guardianRelation           GuardianRelation?
+  guardianCinDocumentUrl     String?                    @db.Text
+  guardianCinVerifiedAt      DateTime?
+  guardianConsentGivenAt     DateTime?
+  guardianConsentIp          String?                    @db.VarChar(45)
+
+  role                       Role                       @default(CUSTOMER)
+  isActive                   Boolean                    @default(true)
+  lastLoginAt                DateTime?
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
+  deletedAt                  DateTime?
+
+  // Sous-table spécialisée de tutelle
+  guardian                   UserGuardian?
+
+  // Sessions, jetons et demandes administratives
+  oauthAccounts              OAuthAccount[]
+  refreshTokens              RefreshToken[]
+  passwordResets             PasswordResetToken[]
+  verificationRequests       VerificationRequest[]
+  identityVerifications      IdentityVerification[]
+  deletionRequests           AccountDeletionRequest[]
+  profileChangeRequests      ProfileChangeRequest[]
+
+  // Relations marketplace
+  boutique                   Boutique?                  @relation("BoutiqueOwner")
+  managedBoutiques           ManagedBoutique[]
+  subscriptions              Subscription[]
+  addresses                  Address[]
+  orders                     Order[]
+  cartItems                  CartItem[]
+  favorites                  FavoriteItem[]
+  feedbacks                  Feedback[]
+  notifications              Notification[]
+  messagesSent               UserMessage[]              @relation("MessageSender")
+  messagesReceived           UserMessage[]              @relation("MessageRecipient")
+  auditLogs                  AuditLog[]                 @relation("AuditActor")
+  mediaAssets                MediaAsset[]
+  productDeletionRequests    ProductDeletionRequest[]   @relation("SellerProductDeletionRequests")
+
+  // Enchères & Logistique
+  bids                       ProductBid[]
+  auctionProductsWon         Product[]                  @relation("AuctionWinner")
+  auctionMessages            AuctionMessage[]
+  auctionWatchers            AuctionWatcher[]
+  sellerContracts            SellerContract[]
+  settlements                SellerSettlement[]
+  transfers                  TransferLedger[]
+  deliveries                 DeliveryTracking[]         @relation("DeliveryCourier")
+
+  @@index([role])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@index([identityVerificationStatus])
+  @@index([guardianCinNumber])
+  @@map("users")
+}
+
+// ── 2. TUTELLE ET CONSENTEMENT DES MINEURS ──
+model UserGuardian {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String            @unique @db.Uuid
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isMinor            Boolean           @default(false)
+  fullName           String?           @db.VarChar(120)
+  cinNumber          String?           @db.VarChar(30)
+  phone              String?           @db.VarChar(30)
+  email              String?           @db.VarChar(120)
+  relation           GuardianRelation?
+  cinDocumentUrl     String?           @db.Text
+  cinVerifiedAt      DateTime?
+  consentGivenAt     DateTime?
+  consentIp          String?           @db.VarChar(45)
+
+  updatedAt          DateTime          @updatedAt
+
+  @@index([cinNumber])
+  @@map("user_guardians")
+}
+
+// ── 3. HISTORIQUE DES SOUMISSIONS KYC ──
+model IdentityVerification {
+  id                      String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                  String                     @db.Uuid
+  user                    User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status                  IdentityVerificationStatus @default(PENDING)
+
+  documentType            IdentityDocumentType?
+  documentNumber          String?                    @db.VarChar(60)
+  documentUrl             String?                    @db.Text
+  documentUrlBack         String?                    @db.Text
+  selfieUrl               String?                    @db.Text
+  cinNumber               String?                    @db.VarChar(30)
+
+  isGuardianVerification  Boolean                    @default(false)
+  guardianFullName        String?                    @db.VarChar(120)
+  guardianCinNumber       String?                    @db.VarChar(30)
+  guardianRelation        GuardianRelation?
+  guardianCinDocumentUrl  String?                    @db.Text
+  guardianPhone           String?                    @db.VarChar(30)
+  guardianConsentProofUrl String?                    @db.Text
+
+  submittedAt             DateTime                   @default(now())
+  reviewedAt              DateTime?
+  reviewedBy              String?                    @db.Uuid
+  rejectionReason         String?                    @db.VarChar(255)
+
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([guardianCinNumber])
+  @@map("identity_verifications")
+}
+
+// ── 4. SESSIONS OAUTH ET SÉCURITÉ JWT ──
+model OAuthAccount {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String       @db.Uuid
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       AuthProvider
+  providerUserId String       @db.VarChar(120)
+  providerEmail  String?      @db.VarChar(120)
+  providerName   String?      @db.VarChar(120)
+  avatarUrl      String?      @db.VarChar(500)
+  accessToken    String?      @db.Text
+  refreshToken   String?      @db.Text
+  tokenExpiresAt DateTime?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String         @db.Uuid
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String         @unique @db.VarChar(128)
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?        @db.Uuid
+  replacedBy   RefreshToken?  @relation("TokenRotation", fields: [replacedById], references: [id])
+  replaces     RefreshToken[] @relation("TokenRotation")
+  createdByIp  String?        @db.VarChar(45)
+  userAgent    String?        @db.VarChar(255)
+  createdAt    DateTime       @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique @db.VarChar(128)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdByIp String?   @db.VarChar(45)
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model VerificationRequest {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String             @db.Uuid
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        VerificationStatus @default(PENDING)
+  codeHash      String?            @db.VarChar(128)
+  expiresAt     DateTime?
+  approvedAt    DateTime?
+  approvedBy    String?            @db.VarChar(100)
+  usedAt        DateTime?
+  reason        String?            @db.VarChar(160)
+  attempts      Int                @default(0)
+  maxAttempts   Int                @default(5)
+  lastAttemptAt DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("verification_requests")
+}
+
+// ── 5. DEMANDES RGPD ET MODÉRATION COMPTE ──
+model AccountDeletionRequest {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String                @db.Uuid
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason      String?               @db.VarChar(255)
+  status      DeletionRequestStatus @default(PENDING)
+  adminNote   String?               @db.VarChar(255)
+  createdAt   DateTime              @default(now())
+  processedAt DateTime?
+
+  @@index([status])
+  @@index([userId])
+  @@map("account_deletion_requests")
+}
+
+model ProfileChangeRequest {
+  id                String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String                     @db.Uuid
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestedFullName String?                    @db.VarChar(120)
+  requestedEmail    String?                    @db.VarChar(120)
+  requestedPhone    String?                    @db.VarChar(30)
+  status            ProfileChangeRequestStatus @default(PENDING)
+  adminNote         String?                    @db.VarChar(255)
+  reviewedBy        String?                    @db.VarChar(100)
+  createdAt         DateTime                   @default(now())
+  reviewedAt        DateTime?
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("profile_change_requests")
+}

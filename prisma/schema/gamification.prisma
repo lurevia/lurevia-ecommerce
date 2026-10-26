@@ -1,0 +1,364 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE : MESURES, SCORES, CLASSEMENTS & GAMIFICATION
+// Règle : Un table = un seul rôle, append-only pour les statistiques
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. STATISTIQUES JOURNALIÈRES PRODUIT (Faits agrégés) ──
+model ProductDailyStat {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId    String   @db.Uuid
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  boutiqueId   String   @db.Uuid
+  date         DateTime @db.Date
+
+  impressions  Int      @default(0)
+  clicks       Int      @default(0)
+  views        Int      @default(0)
+  uniqueViews  Int      @default(0)
+  organicViews Int      @default(0)
+  addToCart    Int      @default(0)
+  favorites    Int      @default(0)
+  orders       Int      @default(0)
+  unitsSold    Int      @default(0)
+  revenue      BigInt   @default(0)
+  avgPosition  Float?
+
+  @@unique([productId, date])
+  @@index([boutiqueId, date])
+  @@index([date])
+  @@map("product_daily_stats")
+}
+
+// ── 2. STATISTIQUES JOURNALIÈRES BOUTIQUE ──
+model BoutiqueDailyStat {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId         String   @db.Uuid
+  boutique           Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  date               DateTime @db.Date
+
+  views              Int      @default(0)
+  uniqueViews        Int      @default(0)
+  organicViews       Int      @default(0)
+  newSubscribers     Int      @default(0)
+  lostSubscribers    Int      @default(0)
+  orders             Int      @default(0)
+  revenue            BigInt   @default(0)
+  messagesReceived   Int      @default(0)
+  messagesAnswered   Int      @default(0)
+  avgResponseMinutes Int?
+
+  @@unique([boutiqueId, date])
+  @@index([date])
+  @@map("boutique_daily_stats")
+}
+
+// ── 3. TERMES DE RECHERCHE CLIENTS ──
+model SearchTermDailyStat {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  term       String        @db.VarChar(120)
+  locale     ContentLocale @default(FR)
+  date       DateTime      @db.Date
+  searches   Int           @default(0)
+  zeroResult Int           @default(0)
+  clicks     Int           @default(0)
+
+  @@unique([term, locale, date])
+  @@index([date, searches(sort: Desc)])
+  @@map("search_term_daily_stats")
+}
+
+// ── 4. STATISTIQUES VENDEUR PAR PÉRIODE ──
+model SellerStats {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId         String            @db.Uuid
+  boutique           Boutique          @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  period             LeaderboardPeriod
+  periodKey          String            @db.VarChar(50)
+  startsAt           DateTime
+  endsAt             DateTime
+
+  totalRevenue       Int               @default(0)
+  totalOrders        Int               @default(0)
+  completedOrders    Int               @default(0)
+  cancelledOrders    Int               @default(0)
+  returnedOrders     Int               @default(0)
+  disputedOrders     Int               @default(0)
+  avgOrderValue      Float             @default(0)
+
+  avgRating          Float             @default(0)
+  totalReviews       Int               @default(0)
+  fiveStarReviews    Int               @default(0)
+
+  avgResponseMinutes Int?              @default(0)
+  onTimeDeliveryRate Float             @default(0)
+  cancellationRate   Float             @default(0)
+  returnRate         Float             @default(0)
+  disputeRate        Float             @default(0)
+
+  newSubscribers     Int               @default(0)
+  lostSubscribers    Int               @default(0)
+  newProducts        Int               @default(0)
+  totalViews         Int               @default(0)
+
+  scoreTotal         Float             @default(0)
+  rank               Int?
+  tier               SellerTier        @default(BRONZE)
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([boutiqueId, period, periodKey])
+  @@index([period, periodKey, scoreTotal(sort: Desc)])
+  @@index([period, periodKey, rank])
+  @@index([boutiqueId, period])
+  @@map("seller_stats")
+}
+
+// ── 5. JEUX DE RÈGLES DE SCORING (Versionnés) ──
+model ScoringRuleSet {
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version          Int                   @unique
+  name             String                @db.VarChar(120)
+
+  weightSeo        Float                 @default(0.25)
+  weightContent    Float                 @default(0.20)
+  weightTrust      Float                 @default(0.20)
+  weightEngagement Float                 @default(0.15)
+  weightQuality    Float                 @default(0.15)
+  weightRecency    Float                 @default(0.05)
+
+  params           Json?
+  isActive         Boolean               @default(false)
+  activeFrom       DateTime?
+  createdBy        String?               @db.Uuid
+  createdAt        DateTime              @default(now())
+
+  audits           SeoAudit[]
+  snapshots        SellerScoreSnapshot[]
+
+  @@index([isActive])
+  @@map("scoring_rule_sets")
+}
+
+// ── 6. INSTANTANÉS DE SCORES VENDEUR ──
+model SellerScoreSnapshot {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId      String            @db.Uuid
+  boutique        Boutique          @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  period          LeaderboardPeriod
+  periodKey       String            @db.VarChar(50)
+  ruleSetId       String            @db.Uuid
+  ruleSet         ScoringRuleSet    @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+
+  scoreSeo        Float             @default(0)
+  scoreContent    Float             @default(0)
+  scoreTrust      Float             @default(0)
+  scoreEngagement Float             @default(0)
+  scoreQuality    Float             @default(0)
+  scoreRecency    Float             @default(0)
+  scoreTotal      Float             @default(0)
+  rank            Int?
+  breakdown       Json?
+
+  computedAt      DateTime          @default(now())
+
+  @@unique([boutiqueId, period, periodKey, ruleSetId])
+  @@index([period, periodKey, scoreTotal(sort: Desc)])
+  @@index([boutiqueId, period])
+  @@map("seller_score_snapshots")
+}
+
+// ── 7. PALMARÈS & CLASSEMENTS VENDEURS ──
+model SellerLeaderboard {
+  id          String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  period      LeaderboardPeriod
+  periodKey   String                   @db.VarChar(50)
+  scope       LeaderboardScope         @default(GLOBAL)
+  scopeKey    String                   @default("ALL") @db.VarChar(50)
+  metric      ScoreComponent           @default(TOTAL)
+
+  startsAt    DateTime
+  endsAt      DateTime
+  publishedAt DateTime?
+  isFinalized Boolean                  @default(false)
+
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  entries     SellerLeaderboardEntry[]
+
+  @@unique([period, periodKey, scope, scopeKey, metric])
+  @@index([period, periodKey, scope])
+  @@map("seller_leaderboards")
+}
+
+model SellerLeaderboardEntry {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leaderboardId String            @db.Uuid
+  leaderboard   SellerLeaderboard @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
+  boutiqueId    String            @db.Uuid
+  boutique      Boutique          @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  rank          Int
+  scoreTotal    Float
+  tier          SellerTier        @default(BRONZE)
+
+  totalRevenue  Int               @default(0)
+  totalOrders   Int               @default(0)
+  avgRating     Float             @default(0)
+  totalReviews  Int               @default(0)
+  isWinner      Boolean           @default(false)
+
+  reward        SellerReward?
+
+  createdAt     DateTime          @default(now())
+
+  @@unique([leaderboardId, boutiqueId])
+  @@index([leaderboardId, rank])
+  @@index([boutiqueId])
+  @@map("seller_leaderboard_entries")
+}
+
+// ── 8. FONCTIONNALITÉS PREMIUM ──
+model PremiumFeature {
+  id           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         PremiumFeatureCode    @unique
+  name         String                @db.VarChar(120)
+  description  String                @db.Text
+  iconName     String?               @db.VarChar(50)
+  durationDays Int                   @default(7)
+  isActive     Boolean               @default(true)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  accesses     SellerPremiumAccess[]
+  rewards      SellerReward[]
+
+  @@map("premium_features")
+}
+
+model SellerPremiumAccess {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String         @db.Uuid
+  boutique   Boutique       @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  featureId  String         @db.Uuid
+  feature    PremiumFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  source     String?        @db.VarChar(60)
+  reason     String?        @db.VarChar(255)
+  grantedAt  DateTime       @default(now())
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  isActive   Boolean        @default(true)
+
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([boutiqueId, isActive])
+  @@index([featureId, isActive])
+  @@index([expiresAt])
+  @@map("seller_premium_access")
+}
+
+// ── 9. RÉCOMPENSES VENDEURS ──
+model SellerReward {
+  id                 String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId         String                  @db.Uuid
+  boutique           Boutique                @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  type               RewardType
+  status             RewardStatus            @default(PENDING)
+  title              String                  @db.VarChar(140)
+  description        String?                 @db.Text
+  value              Int?
+  currency           String?                 @default("MGA") @db.VarChar(10)
+
+  featureId          String?                 @db.Uuid
+  feature            PremiumFeature?         @relation(fields: [featureId], references: [id], onDelete: SetNull)
+
+  leaderboardEntryId String?                 @unique @db.Uuid
+  leaderboardEntry   SellerLeaderboardEntry? @relation(fields: [leaderboardEntryId], references: [id], onDelete: SetNull)
+
+  achievementAwardId String?                 @unique @db.Uuid
+  achievementAward   SellerAchievementAward? @relation(fields: [achievementAwardId], references: [id], onDelete: SetNull)
+
+  grantedAt          DateTime?
+  expiresAt          DateTime?
+  usedAt             DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?                 @db.VarChar(255)
+
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([boutiqueId, status])
+  @@index([type, status])
+  @@index([expiresAt])
+  @@map("seller_rewards")
+}
+
+// ── 10. SUCCÈS & BADGES D'EXCELLENCE (Achievements) ──
+model Achievement {
+  id          String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        AchievementCode          @unique
+  name        String                   @db.VarChar(120)
+  description String                   @db.Text
+  iconName    String?                  @db.VarChar(50)
+  rarity      AchievementRarity        @default(COMMON)
+  points      Int                      @default(10)
+  isActive    Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+
+  awards      SellerAchievementAward[]
+
+  @@map("achievements")
+}
+
+model SellerAchievementAward {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId    String        @db.Uuid
+  boutique      Boutique      @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  achievementId String        @db.Uuid
+  achievement   Achievement   @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  earnedAt      DateTime      @default(now())
+  periodKey     String        @default("LIFETIME") @db.VarChar(50)
+  metadata      Json?
+
+  reward        SellerReward?
+
+  createdAt     DateTime      @default(now())
+
+  @@unique([boutiqueId, achievementId, periodKey])
+  @@index([boutiqueId])
+  @@index([achievementId])
+  @@map("seller_achievement_awards")
+}
+
+// ── 11. BONS DE RÉDUCTION & PROMOTIONS CRÉÉS PAR LES BOUTIQUES ──
+model SellerPromotion {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId      String   @db.Uuid
+  boutique        Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  code            String   @unique @db.VarChar(50)
+  title           String   @db.VarChar(140)
+  description     String?  @db.Text
+  discountPercent Int?
+  discountAmount  Int?
+  maxUses         Int?
+  usedCount       Int      @default(0)
+  minOrderAmount  Int?
+
+  source          String?  @db.VarChar(60)
+  startsAt        DateTime
+  expiresAt       DateTime
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([boutiqueId, isActive])
+  @@map("seller_promotions")
+}

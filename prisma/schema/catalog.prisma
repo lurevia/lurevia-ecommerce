@@ -1,0 +1,278 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE : CATALOGUE PRODUITS & INVENTAIRE
+// Règle : Un table = un seul rôle, données limitées, rétro-compatibilité
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. CATÉGORIES (Hiérarchie et navigation) ──
+model Category {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String            @db.VarChar(100)
+  slug            String            @unique @db.VarChar(120)
+  description     String            @db.Text
+  imageUrl        String            @db.VarChar(500)
+  bannerUrl       String            @db.VarChar(500)
+  iconName        String            @default("ShoppingBag") @db.VarChar(50)
+  position        Int               @default(0)
+  isActive        Boolean           @default(true)
+
+  // Hiérarchie arborescente
+  parentId        String?           @db.Uuid
+  parent          Category?         @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Category[]        @relation("CategoryTree")
+  depth           Int               @default(0)
+  path            String            @default("") @db.VarChar(255)
+
+  metaTitle       String?           @db.VarChar(70)
+  metaDescription String?           @db.VarChar(160)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  products        ProductCategory[]
+  boutiques       Boutique[]        @relation("BoutiqueStoreCategory")
+
+  @@index([parentId])
+  @@index([isActive, position])
+  @@map("categories")
+}
+
+// ── 2. PRODUIT (Article de catalogue & inventaire) ──
+model Product {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId          String             @db.Uuid
+  boutique            Boutique           @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+
+  slug                String             @unique @db.VarChar(140)
+  sku                 String             @unique @db.VarChar(50)
+  title               String             @db.VarChar(200)
+  description         String?            @db.Text
+  longDescription     String?            @db.Text
+
+  pricingMode         ProductPricingMode @default(FIXED)
+  price               Int?
+  originalPrice       Int?
+  minPrice            Int?
+  maxPrice            Int?
+
+  // Champs enchères directs (pour performance et rétro-compatibilité)
+  auctionStartPrice   Int?
+  auctionReservePrice Int?
+  auctionCurrentPrice Int?
+  auctionStartAt      DateTime?
+  auctionEndAt        DateTime?
+  auctionStatus       AuctionStatus?
+  auctionWinnerId     String?            @db.Uuid
+  auctionWinner       User?              @relation("AuctionWinner", fields: [auctionWinnerId], references: [id], onDelete: SetNull)
+  auctionFinalPrice   Int?
+  auctionBidCount     Int                @default(0)
+  auctionWatcherCount Int                @default(0)
+
+  stock               Int                @default(0)
+  lowStockThreshold   Int                @default(5)
+  isActive            Boolean            @default(true)
+  isNew               Boolean            @default(false)
+
+  ratingCache         Float              @default(0)
+  reviewCountCache    Int                @default(0)
+  seoScoreCache       Float              @default(0)
+  contentScoreCache   Float              @default(0)
+
+  publishedAt         DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+
+  // Relations catalogue & variantes
+  images              ProductImage[]
+  colors              ProductColor[]
+  sizes               ProductSize[]
+  categories          ProductCategory[]
+  attributes          ProductAttribute[]
+  faqs                ProductFaq[]
+  tags                ProductTag[]
+  localizations       ProductLocalization[]
+  dailyStats          ProductDailyStat[]
+
+  // Commerce & Modération
+  cartItems           CartItem[]
+  favorites           FavoriteItem[]
+  orderItems          OrderItem[]
+  feedbacks           Feedback[]
+  deletionRequests    ProductDeletionRequest[]
+
+  // Module Enchères (Session détaillée)
+  auction             Auction?
+  bids                ProductBid[]
+  auctionMessages     AuctionMessage[]
+  auctionWatchers     AuctionWatcher[]
+
+  @@index([boutiqueId, isActive, deletedAt])
+  @@index([pricingMode, auctionStatus])
+  @@index([price])
+  @@index([stock])
+  @@index([createdAt])
+  @@map("products")
+}
+
+// ── 3. IMAGES DU PRODUIT ──
+model ProductImage {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String   @db.Uuid
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String   @db.VarChar(500)
+  position  Int      @default(0)
+
+  altText   String?  @db.VarChar(200)
+  width     Int?
+  height    Int?
+  blurHash  String?  @db.VarChar(64)
+  isPrimary Boolean  @default(false)
+
+  @@index([productId, position])
+  @@map("product_images")
+}
+
+// ── 4. VARIANTES : COULEURS ──
+model ProductColor {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String     @db.Uuid
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String     @db.VarChar(50)
+  hex       String     @db.VarChar(10)
+
+  cartItems CartItem[]
+
+  @@index([productId])
+  @@map("product_colors")
+}
+
+// ── 5. VARIANTES : TAILLES ──
+model ProductSize {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String     @db.Uuid
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  value     String     @db.VarChar(50)
+
+  cartItems CartItem[]
+
+  @@unique([productId, value])
+  @@map("product_sizes")
+}
+
+// ── 6. PIVOT PRODUIT <-> CATÉGORIES ──
+model ProductCategory {
+  productId  String   @db.Uuid
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  categoryId String   @db.Uuid
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+  @@map("product_categories")
+}
+
+// ── 7. ATTRIBUTS STRUCTURÉS (Matière, dimensions, provenance) ──
+model ProductAttribute {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key       String  @db.VarChar(60)
+  value     String  @db.VarChar(200)
+  unit      String? @db.VarChar(20)
+  position  Int     @default(0)
+
+  @@unique([productId, key])
+  @@index([key, value])
+  @@map("product_attributes")
+}
+
+// ── 8. QUESTIONS FRÉQUENTES SUR LE PRODUIT ──
+model ProductFaq {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String        @db.Uuid
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locale    ContentLocale @default(FR)
+  question  String        @db.VarChar(255)
+  answer    String        @db.Text
+  position  Int           @default(0)
+
+  @@index([productId, locale])
+  @@map("product_faqs")
+}
+
+// ── 9. TAGS ET MOTS-CLÉS ──
+model Tag {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String       @db.VarChar(60)
+  slug      String       @unique @db.VarChar(70)
+  createdAt DateTime     @default(now())
+  products  ProductTag[]
+
+  @@map("tags")
+}
+
+model ProductTag {
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tagId     String  @db.Uuid
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@index([tagId])
+  @@map("product_tags")
+}
+
+// ── 10. PANIER CLIENT ──
+model CartItem {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String        @db.Uuid
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String        @db.Uuid
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  colorId   String?       @db.Uuid
+  color     ProductColor? @relation(fields: [colorId], references: [id], onDelete: SetNull)
+  sizeId    String?       @db.Uuid
+  size      ProductSize?  @relation(fields: [sizeId], references: [id], onDelete: SetNull)
+
+  quantity  Int           @default(1)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([userId, productId, colorId, sizeId])
+  @@index([userId])
+  @@map("cart_items")
+}
+
+// ── 11. FAVORIS CLIENT ──
+model FavoriteItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String   @db.Uuid
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("favorite_items")
+}
+
+// ── 12. DEMANDE DE SUPPRESSION DE PRODUIT ──
+model ProductDeletionRequest {
+  id         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId  String                       @db.Uuid
+  product    Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sellerId   String                       @db.Uuid
+  seller     User                         @relation("SellerProductDeletionRequests", fields: [sellerId], references: [id], onDelete: Cascade)
+  reason     String                       @db.VarChar(255)
+  status     ProductDeletionRequestStatus @default(PENDING)
+  adminNote  String?                      @db.VarChar(255)
+  reviewedBy String?                      @db.Uuid
+  createdAt  DateTime                     @default(now())
+  reviewedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([sellerId, status])
+  @@index([productId, status])
+  @@map("product_deletion_requests")
+}

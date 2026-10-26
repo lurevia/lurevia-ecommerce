@@ -1,0 +1,98 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE : ENCHÈRES ARTISANALES EN TEMPS RÉEL
+// Règle : Découplé du produit classique, un table = un seul rôle
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. SESSION D'ENCHÈRE (Cycle de vie & règles de l'enchère) ──
+model Auction {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId    String        @unique @db.Uuid
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  startPrice   Int
+  reservePrice Int?
+  currentPrice Int
+  finalPrice   Int?
+
+  startAt      DateTime
+  endAt        DateTime
+  status       AuctionStatus @default(SCHEDULED)
+
+  bidCount     Int           @default(0)
+  watcherCount Int           @default(0)
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([status, endAt])
+  @@index([startAt])
+  @@map("auctions")
+}
+
+// ── 2. OFFRES / ENCHÈRES SOUMISES ──
+model ProductBid {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId     String    @db.Uuid
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId        String    @db.Uuid
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  proposedPrice Int
+  comment       String?   @db.VarChar(255)
+  status        BidStatus @default(PENDING)
+
+  isAutoBid     Boolean   @default(false)
+  autoBidMax    Int?
+  isWinningBid  Boolean   @default(false)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([productId, proposedPrice(sort: Desc)])
+  @@index([userId])
+  @@index([productId, status])
+  @@index([productId, isWinningBid])
+  @@map("product_bids")
+}
+
+// ── 3. CHAT EN DIRECT PENDANT L'ENCHÈRE ──
+model AuctionMessage {
+  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String             @db.Uuid
+  product   Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String?            @db.Uuid
+  user      User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  type      AuctionMessageType @default(CHAT)
+  content   String             @db.Text
+  metadata  Json?
+
+  isDeleted Boolean            @default(false)
+  deletedBy String?            @db.Uuid
+  deletedAt DateTime?
+
+  createdAt DateTime           @default(now())
+
+  @@index([productId, createdAt])
+  @@index([productId, type])
+  @@index([userId])
+  @@map("auction_messages")
+}
+
+// ── 4. SPECTATEURS / OBSERVATEURS EN TEMPS RÉEL ──
+model AuctionWatcher {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId  String   @db.Uuid
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt   DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  isActive   Boolean  @default(true)
+
+  @@unique([productId, userId])
+  @@index([productId, isActive])
+  @@index([lastSeenAt])
+  @@map("auction_watchers")
+}

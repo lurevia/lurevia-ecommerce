@@ -1,0 +1,157 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE : CONTENU MULTILINGUE, BLOG & RÉFÉRENCEMENT (SEO)
+// Règle : Un table = un seul rôle, optimisation sémantique et redirections
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. LOCALISATION & SEO PRODUIT (Contenu par langue) ──
+model ProductLocalization {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId        String           @db.Uuid
+  product          Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locale           ContentLocale
+
+  title            String           @db.VarChar(200)
+  shortDescription String?          @db.VarChar(300)
+  description      String?          @db.Text
+  longDescription  String?          @db.Text
+
+  metaTitle        String?          @db.VarChar(70)
+  metaDescription  String?          @db.VarChar(160)
+  focusKeyword     String?          @db.VarChar(80)
+  keywords         String[]         @default([])
+  canonicalUrl     String?          @db.VarChar(255)
+  ogImageUrl       String?          @db.VarChar(500)
+  noIndex          Boolean          @default(false)
+
+  wordCount        Int              @default(0)
+  readabilityScore Float?
+  contentHash      String?          @db.VarChar(64)
+
+  moderationStatus ModerationStatus @default(APPROVED)
+  moderatedBy      String?          @db.Uuid
+  moderatedAt      DateTime?
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([productId, locale])
+  @@index([locale, moderationStatus])
+  @@index([contentHash])
+  @@map("product_localizations")
+}
+
+// ── 2. LOCALISATION & SEO BOUTIQUE (Contenu par langue) ──
+model BoutiqueLocalization {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId      String           @db.Uuid
+  boutique        Boutique         @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  locale          ContentLocale
+
+  tagline         String?          @db.VarChar(160)
+  description     String?          @db.Text
+  longDescription String?          @db.Text
+  story           String?          @db.Text
+  values          String?          @db.Text
+
+  metaTitle       String?          @db.VarChar(70)
+  metaDescription String?          @db.VarChar(160)
+  focusKeyword    String?          @db.VarChar(80)
+  keywords        String[]         @default([])
+  canonicalUrl    String?          @db.VarChar(255)
+  ogImageUrl      String?          @db.VarChar(500)
+  noIndex         Boolean          @default(false)
+
+  wordCount       Int              @default(0)
+  moderationStatus ModerationStatus @default(APPROVED)
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([boutiqueId, locale])
+  @@map("boutique_localizations")
+}
+
+// ── 3. ARTICLES ÉDITORIAUX / BLOG DES BOUTIQUES ──
+model BoutiquePost {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId       String           @db.Uuid
+  boutique         Boutique         @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  locale           ContentLocale    @default(FR)
+
+  slug             String           @db.VarChar(160)
+  title            String           @db.VarChar(200)
+  excerpt          String?          @db.VarChar(300)
+  content          String           @db.Text
+  coverUrl         String?          @db.VarChar(500)
+
+  metaTitle        String?          @db.VarChar(70)
+  metaDescription  String?          @db.VarChar(160)
+  focusKeyword     String?          @db.VarChar(80)
+
+  status           PostStatus       @default(DRAFT)
+  moderationStatus ModerationStatus @default(PENDING)
+  publishedAt      DateTime?
+  wordCount        Int              @default(0)
+  viewCountCache   Int              @default(0)
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([boutiqueId, slug])
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("boutique_posts")
+}
+
+// ── 4. REDIRECTIONS 301 AUTOMATIQUES DE SLUGS ──
+model SlugRedirect {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType SeoEntityType
+  entityId   String        @db.Uuid
+  oldSlug    String        @db.VarChar(160)
+  createdAt  DateTime      @default(now())
+
+  @@unique([entityType, oldSlug])
+  @@index([entityType, entityId])
+  @@map("slug_redirects")
+}
+
+// ── 5. AUDITS ET CONTRÔLES QUALITÉ SEO ──
+model SeoAudit {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId   String          @db.Uuid
+  boutique     Boutique        @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  entityType   SeoEntityType
+  entityId     String          @db.Uuid
+  locale       ContentLocale   @default(FR)
+
+  seoScore     Float
+  contentScore Float
+  issueCount   Int             @default(0)
+
+  ruleSetId    String?         @db.Uuid
+  ruleSet      ScoringRuleSet? @relation(fields: [ruleSetId], references: [id], onDelete: SetNull)
+  isLatest     Boolean         @default(true)
+  computedAt   DateTime        @default(now())
+
+  issues       SeoIssue[]
+
+  @@index([entityType, entityId, isLatest])
+  @@index([boutiqueId, entityType, isLatest])
+  @@index([computedAt])
+  @@map("seo_audits")
+}
+
+model SeoIssue {
+  id       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  auditId  String           @db.Uuid
+  audit    SeoAudit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  code     SeoIssueCode
+  severity SeoIssueSeverity
+  field    String?          @db.VarChar(60)
+  message  String?          @db.VarChar(255)
+
+  @@index([auditId])
+  @@index([code, severity])
+  @@map("seo_issues")
+}
