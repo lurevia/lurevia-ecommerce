@@ -4,6 +4,7 @@ import { adminService, type AdminService } from "../services/admin.service";
 import { adminVerificationService, type AdminVerificationService } from "../services/admin-verifications.service";
 import { adminIdentityService, type AdminIdentityService } from "../services/admin-identity.service";
 import { adminFoundationService, type AdminFoundationService } from "../services/admin-foundation.service";
+import { productsService } from "../../products/services/products.service";
 import { sendSuccess, sendCreated, sendNoContent } from "../../../utils/apiResponse";
 
 export class AdminController {
@@ -202,6 +203,18 @@ export class AdminController {
     sendMessage = asyncHandler(async (req: Request, res: Response) => {
         const result = await this.adminFoundationService.sendMessage(req.user!.id, req.body);
         sendCreated(res, result);
+    });
+
+    listProducts = asyncHandler(async (req: Request, res: Response) => {
+        const page = req.query.page ? Number(req.query.page) : 1;
+        const limit = req.query.limit ? Number(req.query.limit) : 20;
+        const result = await productsService.listMine(req.user!.id, page, limit);
+        sendSuccess(res, result);
+    });
+
+    removeProduct = asyncHandler(async (req: Request, res: Response) => {
+        await productsService.remove(req.params.id, req.user!.id, req.user!.role);
+        sendNoContent(res);
     });
 }
 

@@ -44,4 +44,5 @@ export const PUBLIC_FIELDS = [
   "metaDescription",
   "maintenanceMode",
   "maintenanceMessage",
+  "advancedMaintenance",
 ] as const;

@@ -103,6 +103,7 @@ export const updateSettingsSchema = z.object({
     // ─── Maintenance ───
     maintenanceMode: z.boolean().optional(),
     maintenanceMessage: z.string().max(500).optional(),
+    advancedMaintenance: z.boolean().optional(),
 });
 
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;

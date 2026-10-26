@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from "../../../middlewares/auth.middleware";
 import { validate } from "../../../middlewares/validate.middleware";
 import {
   createSitePageSchema,
+  fetchDocSchema,
   sitePageIdSchema,
   updateSitePageSchema,
 } from "../dto";
@@ -25,6 +26,20 @@ router.post(
   requireRole("ADMIN"),
   validate({ body: createSitePageSchema }),
   sitePagesController.create
+);
+router.post(
+  "/admin/fetch-doc",
+  requireAuth,
+  requireRole("ADMIN"),
+  validate({ body: fetchDocSchema }),
+  sitePagesController.fetchDoc
+);
+router.post(
+  "/admin/:id/sync-doc",
+  requireAuth,
+  requireRole("ADMIN"),
+  validate({ params: sitePageIdSchema }),
+  sitePagesController.syncDoc
 );
 router.patch(
   "/admin/:id",

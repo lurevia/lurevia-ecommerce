@@ -13,6 +13,23 @@ export class ProductsRepository {
         return boutique?.storeCategoryId ?? null;
     }
 
+    async sellerStoreCategoryIds(ownerId: string): Promise<string[]> {
+        const boutique = await prisma.boutique.findUnique({
+            where: { ownerId },
+            select: {
+                storeCategoryId: true,
+                categories: { select: { categoryId: true } },
+            },
+        });
+        if (!boutique) return [];
+        const ids = new Set<string>();
+        if (boutique.storeCategoryId) ids.add(boutique.storeCategoryId);
+        for (const bc of boutique.categories) {
+            ids.add(bc.categoryId);
+        }
+        return Array.from(ids);
+    }
+
     async findManyByOwner(ownerId: string, skip: number, take: number) {
         const where: Prisma.ProductWhereInput = {
             boutique: { ownerId },
@@ -98,6 +115,7 @@ export class ProductsRepository {
                 title: true,
                 price: true,
                 images: { take: 1, orderBy: { position: "asc" } },
+                categories: { select: { categoryId: true } },
             },
         });
     }

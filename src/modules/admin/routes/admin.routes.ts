@@ -88,6 +88,12 @@ router.post(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PRODUITS DE L'ADMIN (Restreint exclusivement à sa propre boutique)
+// ═══════════════════════════════════════════════════════════════════════════
+router.get("/products", adminController.listProducts);
+router.delete("/products/:id", validate({ params: idParamsSchema }), adminController.removeProduct);
+
+// ═══════════════════════════════════════════════════════════════════════════
 // COMMANDES
 // ═══════════════════════════════════════════════════════════════════════════
 router.get(

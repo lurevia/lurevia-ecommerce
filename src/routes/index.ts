@@ -51,6 +51,8 @@ import { settingsRouter } from "../modules/settings";
 import { exportRouter } from "../modules/export";
 import sitePagesRouter from "../modules/site-pages/routes/site-pages.routes";
 
+import { maintenanceMiddleware } from "../middlewares/maintenance.middleware";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Router principal
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,6 +61,9 @@ const router = Router();
 
 // Attache l'utilisateur (si connecté) à toutes les requêtes
 router.use(attachUserIfPresent);
+
+// Gestion de la maintenance (avec déconnexion obligatoire des non-admins en mode avancé)
+router.use(maintenanceMiddleware);
 
 // ─── Santé ───
 router.get("/health", (_req, res) => {

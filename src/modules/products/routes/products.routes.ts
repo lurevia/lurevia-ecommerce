@@ -19,6 +19,18 @@ router.get(
 );
 
 router.get(
+    "/recommendations/personalized",
+    requireAuth,
+    productsController.personalized
+);
+
+router.get(
+    "/recommendations/my-categories",
+    requireAuth,
+    productsController.myCategoryAffinities
+);
+
+router.get(
     "/slug/:slug",
     validate({ params: productSlugParamsSchema }),
     productsController.getBySlug

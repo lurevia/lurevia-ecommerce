@@ -17,42 +17,92 @@ export class SellerService {
         private readonly repository: SellerRepository
     ) { }
 
-    async apply(userId: string, input: { type: "PERCENTAGE" | "MONTHLY_FIXED"; value: number; storeName: string; storeDescription: string; storeCategoryId: string; storeLogoUrl?: string; storeCoverUrl?: string; }) {
+    async apply(userId: string, input: {
+        type?: "PERCENTAGE" | "MONTHLY_FIXED";
+        value?: number;
+        storeName: string;
+        storeDescription: string;
+        storeCategoryId?: string;
+        storeCategoryIds?: string[];
+        storeLogoUrl?: string;
+        storeCoverUrl?: string;
+        metaTitle?: string;
+        metaDescription?: string;
+        metaKeywords?: string[];
+        ogImageUrl?: string;
+    }) {
         return prisma.$transaction(async (tx) => {
-            const category = await tx.category.findUnique({ where: { id: input.storeCategoryId }, select: { id: true } });
-            if (!category) throw new NotFoundError("Catégorie de boutique");
-            const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true, role: true, isVerified: true } });
-            if (!user) throw new NotFoundError("Utilisateur");
-            if (!user.isVerified) throw new ForbiddenError("Votre compte doit être vérifié avant de devenir vendeur.");
-            if (user.role === "SELLER") throw new ConflictError("Vous êtes déjà vendeur.");
-            if (user.role !== "CUSTOMER") throw new ForbiddenError("Ce compte ne peut pas devenir vendeur.");
-
-            const updatedUser = await tx.user.update({
+            const user = await tx.user.findUnique({
                 where: { id: userId },
-                data: {
-                    role: "SELLER",
-                },
+                select: { id: true, role: true, isVerified: true },
             });
-            const slugCandidate = input.storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-            await tx.boutique.upsert({
+            if (!user) throw new NotFoundError("Utilisateur");
+
+            const existingBoutique = await tx.boutique.findUnique({
                 where: { ownerId: userId },
-                create: {
+                select: { id: true },
+            });
+            if (existingBoutique) {
+                throw new ConflictError("Vous possédez déjà une boutique.");
+            }
+
+            // Résolution des catégories autorisées (1 à 3 catégories max)
+            const rawCategoryIds = input.storeCategoryIds && input.storeCategoryIds.length > 0
+                ? input.storeCategoryIds
+                : (input.storeCategoryId ? [input.storeCategoryId] : []);
+
+            if (rawCategoryIds.length === 0) {
+                throw new ConflictError("Veuillez choisir au moins une catégorie pour la boutique.");
+            }
+            if (rawCategoryIds.length > 3) {
+                throw new ConflictError("Une boutique ne peut appartenir qu'à 3 catégories maximum.");
+            }
+
+            const uniqueCategoryIds = Array.from(new Set(rawCategoryIds));
+            const existingCategories = await tx.category.findMany({
+                where: { id: { in: uniqueCategoryIds } },
+                select: { id: true },
+            });
+            if (existingCategories.length !== uniqueCategoryIds.length) {
+                throw new NotFoundError("Une ou plusieurs catégories sélectionnées sont introuvables.");
+            }
+
+            // Tout utilisateur authentifié peut créer sa boutique
+            let updatedUser = user;
+            if (user.role !== "SELLER" && user.role !== "ADMIN") {
+                updatedUser = await tx.user.update({
+                    where: { id: userId },
+                    data: { role: "SELLER" },
+                    select: { id: true, role: true, isVerified: true },
+                });
+            }
+
+            const slugCandidate = input.storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+            const primaryCategoryId = uniqueCategoryIds[0];
+
+            const boutique = await tx.boutique.create({
+                data: {
                     ownerId: userId,
                     name: input.storeName,
                     slug: slugCandidate || `boutique-${userId.slice(0, 8)}`,
                     description: input.storeDescription,
                     logoUrl: input.storeLogoUrl,
                     coverUrl: input.storeCoverUrl,
-                    storeCategoryId: category.id,
+                    storeCategoryId: primaryCategoryId,
+                    // SEO spécifique à la boutique
+                    metaTitle: input.metaTitle || `${input.storeName} - Boutique en ligne`,
+                    metaDescription: input.metaDescription || input.storeDescription.slice(0, 160),
+                    metaKeywords: input.metaKeywords ?? [],
+                    ogImageUrl: input.ogImageUrl || input.storeCoverUrl || input.storeLogoUrl,
+                    categories: {
+                        create: uniqueCategoryIds.map((categoryId) => ({ categoryId })),
+                    },
                 },
-                update: {
-                    name: input.storeName,
-                    description: input.storeDescription,
-                    logoUrl: input.storeLogoUrl,
-                    coverUrl: input.storeCoverUrl,
-                    storeCategoryId: category.id,
+                include: {
+                    categories: { include: { category: true } },
                 },
             });
+
             const latestContract = await tx.sellerContract.findFirst({
                 where: { sellerId: userId },
                 orderBy: { version: "desc" },
@@ -62,11 +112,11 @@ export class SellerService {
                 data: {
                     sellerId: userId,
                     version: (latestContract?.version ?? 0) + 1,
-                    type: input.type,
-                    value: input.value,
+                    type: input.type ?? "PERCENTAGE",
+                    value: input.value ?? 10,
                 },
             });
-            return { user: updatedUser, contract };
+            return { user: updatedUser, boutique, contract };
         });
     }
 
@@ -93,6 +143,20 @@ export class SellerService {
     async getPublicProfile(id: string) {
         const seller = await this.repository.publicProfile(id);
         if (!seller) throw new NotFoundError("Vendeur");
+        const boutique = await prisma.boutique.findUnique({
+            where: { id: seller.id },
+            select: {
+                metaTitle: true,
+                metaDescription: true,
+                metaKeywords: true,
+                ogImageUrl: true,
+                categories: {
+                    select: {
+                        category: { select: { id: true, name: true, slug: true } },
+                    },
+                },
+            },
+        });
         return {
             id: seller.id,
             storeName: seller.name,
@@ -101,6 +165,13 @@ export class SellerService {
             coverUrl: seller.coverUrl,
             storeCategoryId: seller.storeCategoryId,
             storeCategory: seller.storeCategory,
+            categories: boutique?.categories?.map((c) => c.category) ?? (seller.storeCategory ? [seller.storeCategory] : []),
+            seo: {
+                metaTitle: boutique?.metaTitle ?? `${seller.name} - Boutique en ligne`,
+                metaDescription: boutique?.metaDescription ?? seller.description,
+                metaKeywords: boutique?.metaKeywords ?? [],
+                ogImageUrl: boutique?.ogImageUrl ?? seller.coverUrl ?? seller.logoUrl,
+            },
             products: productsMapper.toOutputList(seller.products),
         };
     }
@@ -108,16 +179,47 @@ export class SellerService {
     async updateProfile(userId: string, input: UpdateSellerProfileInput) {
         const boutique = await prisma.boutique.findUnique({
             where: { ownerId: userId },
-            select: { id: true, storeCategoryId: true, _count: { select: { products: true } } },
+            select: {
+                id: true,
+                storeCategoryId: true,
+                categories: { select: { categoryId: true } },
+                _count: { select: { products: true } },
+            },
         });
         if (!boutique) throw new NotFoundError("Boutique non trouvée.");
-        if (input.storeCategoryId && input.storeCategoryId !== boutique.storeCategoryId) {
-            if (boutique._count.products > 0) {
-                throw new ConflictError("La catégorie de boutique ne peut plus changer après la création de produits.");
+
+        const categoryUpdates: string[] | null = input.storeCategoryIds && input.storeCategoryIds.length > 0
+            ? input.storeCategoryIds
+            : (input.storeCategoryId ? [input.storeCategoryId] : null);
+
+        if (categoryUpdates) {
+            if (categoryUpdates.length > 3) {
+                throw new ConflictError("Une boutique ne peut appartenir qu'à 3 catégories maximum.");
             }
-            const category = await prisma.category.findUnique({ where: { id: input.storeCategoryId }, select: { id: true } });
-            if (!category) throw new NotFoundError("Catégorie de boutique");
+            const uniqueIds = Array.from(new Set(categoryUpdates));
+            const existingCategories = await prisma.category.findMany({
+                where: { id: { in: uniqueIds } },
+                select: { id: true },
+            });
+            if (existingCategories.length !== uniqueIds.length) {
+                throw new NotFoundError("Une ou plusieurs catégories sélectionnées sont introuvables.");
+            }
+
+            await prisma.$transaction([
+                prisma.boutiqueCategory.deleteMany({ where: { boutiqueId: boutique.id } }),
+                prisma.boutiqueCategory.createMany({
+                    data: uniqueIds.map((categoryId) => ({
+                        boutiqueId: boutique.id,
+                        categoryId,
+                    })),
+                }),
+                prisma.boutique.update({
+                    where: { id: boutique.id },
+                    data: { storeCategoryId: uniqueIds[0] },
+                }),
+            ]);
         }
+
         const updated = await prisma.boutique.update({
             where: { ownerId: userId },
             data: {
@@ -125,7 +227,10 @@ export class SellerService {
                 ...(input.storeDescription !== undefined ? { description: input.storeDescription } : {}),
                 ...(input.storeLogoUrl !== undefined ? { logoUrl: input.storeLogoUrl } : {}),
                 ...(input.storeCoverUrl !== undefined ? { coverUrl: input.storeCoverUrl } : {}),
-                ...(input.storeCategoryId ? { storeCategoryId: input.storeCategoryId } : {}),
+                ...(input.metaTitle !== undefined ? { metaTitle: input.metaTitle } : {}),
+                ...(input.metaDescription !== undefined ? { metaDescription: input.metaDescription } : {}),
+                ...(input.metaKeywords !== undefined ? { metaKeywords: input.metaKeywords } : {}),
+                ...(input.ogImageUrl !== undefined ? { ogImageUrl: input.ogImageUrl } : {}),
             },
             select: {
                 id: true,
@@ -134,10 +239,20 @@ export class SellerService {
                 description: true,
                 logoUrl: true,
                 coverUrl: true,
+                metaTitle: true,
+                metaDescription: true,
+                metaKeywords: true,
+                ogImageUrl: true,
                 storeCategory: { select: { id: true, name: true, slug: true } },
+                categories: {
+                    select: {
+                        category: { select: { id: true, name: true, slug: true } },
+                    },
+                },
                 _count: { select: { products: true } },
             },
         });
+
         return {
             id: updated.id,
             storeName: updated.name,
@@ -146,6 +261,13 @@ export class SellerService {
             coverUrl: updated.coverUrl,
             storeCategoryId: updated.storeCategoryId,
             storeCategory: updated.storeCategory,
+            categories: updated.categories.map((c) => c.category),
+            seo: {
+                metaTitle: updated.metaTitle,
+                metaDescription: updated.metaDescription,
+                metaKeywords: updated.metaKeywords,
+                ogImageUrl: updated.ogImageUrl,
+            },
             productCount: updated._count.products,
         };
     }
@@ -160,7 +282,16 @@ export class SellerService {
                 description: true,
                 logoUrl: true,
                 coverUrl: true,
+                metaTitle: true,
+                metaDescription: true,
+                metaKeywords: true,
+                ogImageUrl: true,
                 storeCategory: { select: { id: true, name: true, slug: true } },
+                categories: {
+                    select: {
+                        category: { select: { id: true, name: true, slug: true } },
+                    },
+                },
                 _count: { select: { products: true } },
             },
         });
@@ -173,6 +304,13 @@ export class SellerService {
             coverUrl: boutique.coverUrl,
             storeCategoryId: boutique.storeCategoryId,
             storeCategory: boutique.storeCategory,
+            categories: boutique.categories.map((c) => c.category),
+            seo: {
+                metaTitle: boutique.metaTitle ?? `${boutique.name} - Boutique en ligne`,
+                metaDescription: boutique.metaDescription ?? boutique.description,
+                metaKeywords: boutique.metaKeywords ?? [],
+                ogImageUrl: boutique.ogImageUrl ?? boutique.coverUrl ?? boutique.logoUrl,
+            },
             productCount: boutique._count.products,
         };
     }

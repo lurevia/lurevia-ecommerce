@@ -48,7 +48,14 @@ model Boutique {
   legal                BoutiqueLegal?
   policy               BoutiquePolicy?
 
+  // SEO propre à chaque boutique
+  metaTitle            String?     @db.VarChar(120)
+  metaDescription      String?     @db.VarChar(255)
+  metaKeywords         String[]    @default([])
+  ogImageUrl           String?     @db.VarChar(500)
+
   // Relations marketplace
+  categories           BoutiqueCategory[]
   managers             ManagedBoutique[]
   subscriptions        Subscription[]
   products             Product[]
@@ -197,3 +204,19 @@ model Subscription {
   @@index([userId])
   @@map("subscriptions")
 }
+
+// ── 9. CATÉGORIES DE LA BOUTIQUE (Max 3 catégories) ──
+model BoutiqueCategory {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boutiqueId String   @db.Uuid
+  boutique   Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  categoryId String   @db.Uuid
+  category   Category @relation("CategoryBoutiques", fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([boutiqueId, categoryId])
+  @@index([categoryId])
+  @@map("boutique_categories")
+}
+

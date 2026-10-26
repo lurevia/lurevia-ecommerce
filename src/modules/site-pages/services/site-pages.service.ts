@@ -1,6 +1,7 @@
 import { prisma } from "../../../lib/prisma";
-import { NotFoundError } from "../../../errors/client.errors";
+import { NotFoundError, BadRequestError } from "../../../errors/client.errors";
 import { settingsService } from "../../settings/services/settings.service";
+import { googleDocsService } from "./google-docs.service";
 import type {
   CreateSitePageInput,
   UpdateSitePageInput,
@@ -96,10 +97,34 @@ export class SitePagesService {
     });
   }
 
+  async fetchGoogleDoc(url: string) {
+    return googleDocsService.fetchDocContent(url);
+  }
+
   async create(data: CreateSitePageInput, updatedBy: string) {
+    let contentToSave = data.content ?? "";
+    let docFetchedAt: Date | undefined;
+
+    if (data.docUrl) {
+      try {
+        const fetched = await googleDocsService.fetchDocContent(data.docUrl);
+        if (fetched?.content) {
+          contentToSave = fetched.content;
+          docFetchedAt = new Date();
+        }
+      } catch {
+        // Si la récupération automatique échoue, on conserve le contenu manuel fourni
+      }
+    }
+
     return prisma.$transaction(async (tx) => {
       const page = await tx.sitePage.create({
-        data: { ...data, updatedBy },
+        data: {
+          ...data,
+          content: contentToSave,
+          docFetchedAt,
+          updatedBy,
+        },
       });
       await tx.auditLog.create({
         data: {
@@ -107,7 +132,7 @@ export class SitePagesService {
           action: "SITE_PAGE_CREATED",
           entityType: "SitePage",
           entityId: page.id,
-          metadata: { slug: page.slug },
+          metadata: { slug: page.slug, hasDocUrl: Boolean(data.docUrl) },
         },
       });
       return page;
@@ -118,10 +143,31 @@ export class SitePagesService {
     const existing = await prisma.sitePage.findUnique({ where: { id } });
     if (!existing) throw new NotFoundError("Page");
 
+    let contentToSave = data.content;
+    let docFetchedAt: Date | undefined;
+
+    // Si une nouvelle docUrl est fournie ou modifiée
+    if (data.docUrl && data.docUrl !== existing.docUrl) {
+      try {
+        const fetched = await googleDocsService.fetchDocContent(data.docUrl);
+        if (fetched?.content) {
+          contentToSave = fetched.content;
+          docFetchedAt = new Date();
+        }
+      } catch {
+        // En cas d'erreur de récupération, conserver le contenu envoyé ou existant
+      }
+    }
+
     return prisma.$transaction(async (tx) => {
       const page = await tx.sitePage.update({
         where: { id },
-        data: { ...data, updatedBy },
+        data: {
+          ...data,
+          ...(contentToSave !== undefined ? { content: contentToSave } : {}),
+          ...(docFetchedAt ? { docFetchedAt } : {}),
+          updatedBy,
+        },
       });
       await tx.auditLog.create({
         data: {
@@ -134,6 +180,34 @@ export class SitePagesService {
       });
       return page;
     });
+  }
+
+  async syncDoc(id: string, updatedBy: string) {
+    const existing = await prisma.sitePage.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundError("Page");
+    if (!existing.docUrl) throw new BadRequestError("Aucune URL Google Docs configurée pour cette page.");
+
+    const fetched = await googleDocsService.fetchDocContent(existing.docUrl);
+    const updated = await prisma.sitePage.update({
+      where: { id },
+      data: {
+        content: fetched.content,
+        docFetchedAt: new Date(),
+        updatedBy,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: updatedBy,
+        action: "SITE_PAGE_DOC_SYNCED",
+        entityType: "SitePage",
+        entityId: id,
+        metadata: { docUrl: existing.docUrl },
+      },
+    });
+
+    return updated;
   }
 
   async remove(id: string, updatedBy: string) {

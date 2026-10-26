@@ -33,6 +33,16 @@ export class SitePagesController {
     sendSuccess(res, page);
   });
 
+  syncDoc = asyncHandler(async (req: Request, res: Response) => {
+    const page = await sitePagesService.syncDoc(req.params.id, req.user!.id);
+    sendSuccess(res, page);
+  });
+
+  fetchDoc = asyncHandler(async (req: Request, res: Response) => {
+    const result = await sitePagesService.fetchGoogleDoc(req.body.url);
+    sendSuccess(res, result);
+  });
+
   remove = asyncHandler(async (req: Request, res: Response) => {
     sendSuccess(
       res,

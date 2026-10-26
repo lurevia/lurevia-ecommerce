@@ -14,8 +14,31 @@ describe("applySellerSchema", () => {
     expect(applySellerSchema.safeParse(validApplication).success).toBe(true);
   });
 
-  it("requires a selected store category", () => {
-    const { storeCategoryId: _storeCategoryId, ...application } = validApplication;
-    expect(applySellerSchema.safeParse(application).success).toBe(false);
+  it("accepts up to 3 store categories and boutique SEO", () => {
+    const withThreeCategories = {
+      ...validApplication,
+      storeCategoryIds: [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003",
+      ],
+      metaTitle: "Atelier Demo - Artisanat Malgache",
+      metaDescription: "Boutique artisanale en ligne",
+      metaKeywords: ["artisanat", "madagascar"],
+    };
+    expect(applySellerSchema.safeParse(withThreeCategories).success).toBe(true);
+  });
+
+  it("rejects more than 3 store categories", () => {
+    const withFourCategories = {
+      ...validApplication,
+      storeCategoryIds: [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003",
+        "00000000-0000-4000-8000-000000000004",
+      ],
+    };
+    expect(applySellerSchema.safeParse(withFourCategories).success).toBe(false);
   });
 });

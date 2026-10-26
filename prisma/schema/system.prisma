@@ -134,17 +134,19 @@ model JobRun {
 
 // ── 8. PAGES STATIQUES CMS DU SITE ──
 model SitePage {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug          String   @unique @db.VarChar(80)
-  title         String   @db.VarChar(200)
-  summary       String   @default("") @db.Text
-  content       String   @default("") @db.Text
-  published     Boolean  @default(false)
-  showInFooter  Boolean  @default(false)
-  footerSection String?  @db.VarChar(20)
-  updatedBy     String?  @db.Uuid
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug          String    @unique @db.VarChar(80)
+  title         String    @db.VarChar(200)
+  summary       String    @default("") @db.Text
+  content       String    @default("") @db.Text
+  docUrl        String?   @db.VarChar(500)
+  docFetchedAt  DateTime?
+  published     Boolean   @default(false)
+  showInFooter  Boolean   @default(false)
+  footerSection String?   @db.VarChar(20)
+  updatedBy     String?   @db.Uuid
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([published, showInFooter])
   @@map("site_pages")

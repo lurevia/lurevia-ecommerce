@@ -11,9 +11,27 @@ export class ProductsController {
 
     list = asyncHandler(async (req: Request, res: Response) => {
         const result = await this.service.list(
-            req.query as unknown as ListProductsQuery
+            req.query as unknown as ListProductsQuery,
+            req.user?.id
         );
         sendSuccess(res, result);
+    });
+
+    searchSuggestions = asyncHandler(async (req: Request, res: Response) => {
+        const { q, limit } = req.query as unknown as SearchSuggestionsQuery;
+        const suggestions = await this.service.searchSuggestions(q, limit, req.user?.id);
+        sendSuccess(res, { suggestions });
+    });
+
+    personalized = asyncHandler(async (req: Request, res: Response) => {
+        const limit = req.query.limit ? Number(req.query.limit) : 8;
+        const products = await this.service.getPersonalizedRecommendations(req.user!.id, limit);
+        sendSuccess(res, { products });
+    });
+
+    myCategoryAffinities = asyncHandler(async (req: Request, res: Response) => {
+        const affinities = await this.service.getUserCategoryStats(req.user!.id);
+        sendSuccess(res, { affinities });
     });
 
     getById = asyncHandler(async (req: Request, res: Response) => {
@@ -30,12 +48,6 @@ export class ProductsController {
         const limit = req.query.limit ? Number(req.query.limit) : 4;
         const products = await this.service.getRelated(req.params.id, limit);
         sendSuccess(res, { products });
-    });
-
-    searchSuggestions = asyncHandler(async (req: Request, res: Response) => {
-        const { q, limit } = req.query as unknown as SearchSuggestionsQuery;
-        const suggestions = await this.service.searchSuggestions(q, limit);
-        sendSuccess(res, { suggestions });
     });
 
     listMine = asyncHandler(async (req: Request, res: Response) => {

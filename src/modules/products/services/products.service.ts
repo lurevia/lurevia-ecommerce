@@ -7,14 +7,43 @@ import { productsMapper } from "../mapper/products.mapper";
 import { prisma } from "../../../lib/prisma";
 import slugify from "slugify";
 
+import { productRecommendationService } from "./product-recommendation.service";
+
 export class ProductsService {
     constructor(
         private readonly repository: ProductsRepository
     ) { }
 
-    async list(query: ListProductsQuery) {
+    async list(query: ListProductsQuery, userId?: string) {
         const { items, totalItems } = await this.repository.findMany(query);
-        return buildPaginatedResult(productsMapper.toOutputList(items), totalItems, query);
+        let outputItems = productsMapper.toOutputList(items);
+
+        // Système de valorisation des catégories d'après les achats de chaque utilisateur
+        if (userId) {
+            const preferredCategoryIds = await productRecommendationService.getUserPreferredCategoryIds(userId);
+            if (preferredCategoryIds.length > 0) {
+                outputItems = outputItems.map((prod) => {
+                    const hasPreferredCategory = (prod as any).categories?.some((cat: any) =>
+                        preferredCategoryIds.includes(cat.id ?? cat.categoryId)
+                    );
+                    return {
+                        ...prod,
+                        isPreferredCategory: Boolean(hasPreferredCategory),
+                    };
+                });
+
+                // Si pas de tri personnalisé spécifique, booster en tête les produits de la catégorie valorisée
+                if (!query.sortBy || query.sortBy === "newest" || query.sortBy === "popular") {
+                    outputItems.sort((a: any, b: any) => {
+                        const aScore = a.isPreferredCategory ? 1 : 0;
+                        const bScore = b.isPreferredCategory ? 1 : 0;
+                        return bScore - aScore;
+                    });
+                }
+            }
+        }
+
+        return buildPaginatedResult(outputItems, totalItems, query);
     }
 
     async getById(id: string) {
@@ -40,19 +69,46 @@ export class ProductsService {
         return productsMapper.toOutputList(related);
     }
 
-    async searchSuggestions(q: string, limit: number) {
-        const results = await this.repository.searchSuggestions(q, limit);
-        return results.map((p) => ({
+    async searchSuggestions(q: string, limit: number, userId?: string) {
+        const results = await this.repository.searchSuggestions(q, limit * 2);
+        let suggestions = results.map((p) => ({
             id: p.id,
             slug: p.slug,
             title: p.title,
             price: p.price,
             imageUrl: p.images[0]?.url ?? null,
+            categoryIds: p.categories?.map((c) => c.categoryId) ?? [],
+        }));
+
+        if (userId) {
+            const preferredCategoryIds = await productRecommendationService.getUserPreferredCategoryIds(userId);
+            if (preferredCategoryIds.length > 0) {
+                suggestions = suggestions.sort((a, b) => {
+                    const aPref = a.categoryIds.some((cid) => preferredCategoryIds.includes(cid)) ? 1 : 0;
+                    const bPref = b.categoryIds.some((cid) => preferredCategoryIds.includes(cid)) ? 1 : 0;
+                    return bPref - aPref;
+                });
+            }
+        }
+
+        return suggestions.slice(0, limit).map(({ id, slug, title, price, imageUrl }) => ({
+            id,
+            slug,
+            title,
+            price,
+            imageUrl,
         }));
     }
 
+    async getPersonalizedRecommendations(userId: string, limit = 8) {
+        return productRecommendationService.getPersonalizedRecommendations(userId, limit);
+    }
+
+    async getUserCategoryStats(userId: string) {
+        return productRecommendationService.getUserCategoryStats(userId);
+    }
+
     async create(input: CreateProductInput, ownerId: string, userRole = "SELLER") {
-        const categoryIds = await this.enforceSellerCategory(input.categoryIds, ownerId, userRole);
         const existingSku = await this.repository.findBySku(input.sku);
         if (existingSku) throw new ConflictError("Ce SKU est déjà utilisé.");
 
@@ -60,7 +116,7 @@ export class ProductsService {
 
         let boutique = await prisma.boutique.findUnique({
             where: { ownerId },
-            select: { id: true },
+            select: { id: true, storeCategoryId: true },
         });
         if (!boutique) {
             const seller = await prisma.user.findUnique({
@@ -68,15 +124,22 @@ export class ProductsService {
                 select: { fullName: true },
             });
             const boutiqueName = seller?.fullName ? `Boutique de ${seller.fullName}` : `Boutique ${ownerId.slice(0, 8)}`;
+            const primaryCatId = input.categoryIds[0];
             boutique = await prisma.boutique.create({
                 data: {
                     ownerId,
                     name: boutiqueName,
                     slug: await generateUniqueProductSlug(boutiqueName),
+                    storeCategoryId: primaryCatId,
+                    categories: {
+                        create: input.categoryIds.slice(0, 3).map((categoryId) => ({ categoryId })),
+                    },
                 },
-                select: { id: true },
+                select: { id: true, storeCategoryId: true },
             });
         }
+
+        const categoryIds = await this.enforceSellerCategory(input.categoryIds, ownerId, userRole);
 
         const tagConnectors = input.tags?.length
             ? await Promise.all(
@@ -130,6 +193,11 @@ export class ProductsService {
                 create: categoryIds.map((categoryId) => ({ categoryId })),
             },
         });
+
+        // Notifier les acheteurs réguliers de cette catégorie
+        productRecommendationService
+            .notifyInterestedUsers(product.id, categoryIds, product.title, product.slug)
+            .catch(() => {});
 
         return productsMapper.toOutput(product);
     }
@@ -227,11 +295,20 @@ export class ProductsService {
         );
     }
 
-    private async assertOwnership(productId: string, userId: string, userRole: string) {
+    private async assertOwnership(productId: string, userId: string, _userRole?: string) {
         const product = await this.repository.findById(productId);
         if (!product) throw new NotFoundError("Produit");
-        if (userRole !== "ADMIN" && product.boutique?.ownerId !== userId) {
-            throw new ForbiddenError("Ce produit ne vous appartient pas.");
+
+        // RÈGLE MÉTIER : Un administrateur ou vendeur ne peut modifier ou supprimer QUE les produits
+        // de sa propre boutique (ou boutique managée). Il ne peut pas supprimer ceux des autres boutiques.
+        const isOwner = product.boutique?.ownerId === userId;
+        if (!isOwner) {
+            const isManager = await prisma.managedBoutique.findUnique({
+                where: { userId_boutiqueId: { userId, boutiqueId: product.boutiqueId } },
+            });
+            if (!isManager) {
+                throw new ForbiddenError("Vous ne pouvez modifier ou supprimer que les produits de votre propre boutique.");
+            }
         }
         return product;
     }
@@ -239,17 +316,18 @@ export class ProductsService {
     private async enforceSellerCategory(
         categoryIds: string[],
         ownerId: string,
-        userRole: string
+        _userRole?: string
     ) {
-        if (userRole !== "SELLER") return categoryIds;
-        const storeCategoryId = await this.repository.sellerStoreCategoryId(ownerId);
-        if (!storeCategoryId) {
-            throw new ConflictError("Choisissez d’abord la catégorie de votre boutique.");
+        const allowedCategoryIds = await this.repository.sellerStoreCategoryIds(ownerId);
+        if (allowedCategoryIds.length === 0) {
+            throw new ConflictError("Choisissez d'abord les catégories de votre boutique (1 à 3 catégories).");
         }
-        if (categoryIds.some((categoryId) => categoryId !== storeCategoryId)) {
-            throw new ForbiddenError("Tous les produits doivent utiliser la catégorie de votre boutique.");
+        // Vérifier que tous les categoryIds du produit font partie des catégories autorisées de la boutique
+        const unauthorized = categoryIds.filter((cid) => !allowedCategoryIds.includes(cid));
+        if (unauthorized.length > 0) {
+            throw new ForbiddenError("Une boutique ne peut vendre que des produits appartenant à ses 3 catégories autorisées.");
         }
-        return [storeCategoryId];
+        return categoryIds;
     }
 }
 

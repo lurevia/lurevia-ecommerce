@@ -20,6 +20,7 @@ export const createSitePageSchema = z.object({
   title: z.string().trim().min(1).max(200),
   summary: z.string().max(5000).default(""),
   content: z.string().max(50000).default(""),
+  docUrl: z.string().url().max(500).nullish(),
   published: z.boolean().default(false),
   showInFooter: z.boolean().default(false),
   footerSection: footerSectionSchema.optional(),
@@ -31,5 +32,11 @@ export const updateSitePageSchema = createSitePageSchema
 
 export const sitePageIdSchema = z.object({ id: z.string().uuid() });
 
+export const fetchDocSchema = z.object({
+  url: z.string().url("Veuillez fournir une URL Google Docs valide"),
+});
+
 export type CreateSitePageInput = z.infer<typeof createSitePageSchema>;
 export type UpdateSitePageInput = z.infer<typeof updateSitePageSchema>;
+export type FetchDocInput = z.infer<typeof fetchDocSchema>;
+

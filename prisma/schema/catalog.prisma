@@ -28,8 +28,9 @@ model Category {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  products        ProductCategory[]
-  boutiques       Boutique[]        @relation("BoutiqueStoreCategory")
+  products           ProductCategory[]
+  boutiques          Boutique[]          @relation("BoutiqueStoreCategory")
+  boutiqueCategories BoutiqueCategory[]  @relation("CategoryBoutiques")
 
   @@index([parentId])
   @@index([isActive, position])

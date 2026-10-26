@@ -61,6 +61,7 @@ model PlatformSettings {
 
   maintenanceMode          Boolean  @default(false)
   maintenanceMessage       String?  @db.VarChar(255)
+  advancedMaintenance      Boolean  @default(false)
 
   updatedAt                DateTime @updatedAt
   updatedBy                String?  @db.Uuid
