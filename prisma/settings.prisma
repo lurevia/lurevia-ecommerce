@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SiteIdentitySettings {
+  id                 String   @id @default("singleton")
+  siteName           String   @default("Lurevia")
+  tagline            String?
+  description        String?
+  contactEmail       String?
+  contactPhone       String?
+  companyName        String?
+  companyAddress     String?
+  companyRegistration String?
+  defaultLocale      String   @default("fr")
+  defaultCurrency    String   @default("MGA")
+  timezone           String   @default("Indian/Antananarivo")
+
+  updatedAt          DateTime @updatedAt
+  updatedBy          String?
+
+  @@map("site_identity_settings")
+}
+
+model ThemeSettings {
+  id               String   @id @default("singleton")
+  logoUrl          String?
+  faviconUrl       String?
+  primaryColor     String   @default("#000000")
+  secondaryColor   String   @default("#FFFFFF")
+  accentColor      String?
+  backgroundColor  String?
+  textColor        String?
+  fontFamily       String?
+  darkModeEnabled  Boolean  @default(false)
+
+  updatedAt        DateTime @updatedAt
+  updatedBy        String?
+
+  @@map("theme_settings")
+}
+
+// ============================================
+// 3. RÉSEAUX SOCIAUX
+// Responsabilité : liens vers les profils sociaux
+// Une ligne par réseau / profil
+// ============================================
+
+model SocialLink {
+  id          String         @id @default(cuid())
+  platform    SocialPlatform
+  label       String?
+  url         String
+  isActive    Boolean        @default(true)
+  position    Int            @default(0)
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  updatedBy   String?
+
+  @@unique([platform, label])
+  @@index([isActive, position])
+  @@map("social_links")
+}
+
+// ============================================
+// 4. SEO
+// Responsabilité : référencement global du site
+// ============================================
+
+model SeoSettings {
+  id                 String   @id @default("singleton")
+  defaultTitle       String?
+  titleTemplate     String?
+  defaultDescription String?
+  defaultKeywords   String[]  @default([])
+  defaultOgImageUrl String?
+  canonicalBaseUrl  String?
+  robotsIndex       Boolean   @default(true)
+  robotsFollow      Boolean   @default(true)
+
+  updatedAt         DateTime  @updatedAt
+  updatedBy         String?
+
+  @@map("seo_settings")
+}
+
+// ============================================
+// 5. MAINTENANCE
+// Responsabilité : disponibilité de la plateforme
+// ============================================
+
+model MaintenanceSettings {
+  id                 String   @id @default("singleton")
+  isEnabled          Boolean  @default(false)
+  message            String?
+  expectedEndAt      DateTime?
+  allowAdminAccess   Boolean  @default(true)
+
+  updatedAt          DateTime @updatedAt
+  updatedBy          String?
+
+  @@map("maintenance_settings")
+}
+
+// ============================================
+// 6. DOCUMENTS JURIDIQUES
+// Responsabilité : références vers les documents
+// Le contenu long reste dans le service documentaire
+// ============================================
+
+model LegalDocument {
+  id                 String            @id @default(cuid())
+  type               LegalDocumentType
+  provider           DocumentProvider
+  status             DocumentStatus    @default(DRAFT)
+  locale             String            @default("fr")
+  title              String
+  description        String?
+
+  documentUrl        String
+  externalDocumentId String?
+
+  version            Int               @default(1)
+  isCurrent          Boolean           @default(false)
+  publishedAt        DateTime?
+  archivedAt         DateTime?
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  createdBy          String?
+  updatedBy          String?
+
+  @@index([type, locale, status])
+  @@index([type, locale, isCurrent])
+  @@unique([type, locale, version])
+  @@map("legal_documents")
+}
+
+// ============================================
+// 7. LIVRAISON
+// Responsabilité : paramètres généraux de livraison
+// ============================================
+
+model ShippingSettings {
+  id                       String   @id @default("singleton")
+  shippingEnabled          Boolean  @default(true)
+  freeShippingEnabled      Boolean  @default(false)
+  freeShippingMinAmount    Decimal? @db.Decimal(12, 2)
+  defaultShippingFee       Decimal  @default(0) @db.Decimal(12, 2)
+  estimatedMinDays         Int?
+  estimatedMaxDays         Int?
+  allowShippingCalculation Boolean  @default(true)
+
+  updatedAt                DateTime @updatedAt
+  updatedBy                String?
+
+  @@map("shipping_settings")
+}
+
+// ============================================
+// 8. MOYENS DE PAIEMENT
+// Responsabilité : disponibilité des méthodes de paiement
+// Aucun secret ni clé API dans cette table
+// ============================================
+
+model PaymentMethodSettings {
+  id                 String   @id @default("singleton")
+  cashOnDelivery     Boolean  @default(true)
+  mobileMoney        Boolean  @default(false)
+  bankTransfer       Boolean  @default(false)
+  cardPayment        Boolean  @default(false)
+  codMaxAmount       Decimal? @db.Decimal(12, 2)
+
+  updatedAt          DateTime @updatedAt
+  updatedBy          String?
+
+  @@map("payment_method_settings")
+}
+
+// ============================================
+// 9. VÉRIFICATION DES VENDEURS
+// Responsabilité : règles de vérification d'identité
+// Ne stocke pas les pièces d'identité elles-mêmes
+// ============================================
+
+model SellerVerificationSettings {
+  id                       String   @id @default("singleton")
+  verificationRequired     Boolean  @default(true)
+  cinVerificationRequired  Boolean  @default(true)
+  manualReviewRequired     Boolean  @default(true)
+  allowUnverifiedSelling   Boolean  @default(false)
+  requireVerifiedForPayout Boolean  @default(true)
+
+  updatedAt                DateTime @updatedAt
+  updatedBy                String?
+
+  @@map("seller_verification_settings")
+}
+
+// ============================================
+// 10. ENCHÈRES
+// Responsabilité : règles globales des enchères
+// ============================================
+
+model AuctionSettings {
+  id                     String   @id @default("singleton")
+  auctionsEnabled        Boolean  @default(false)
+  minimumDurationHours   Int      @default(24)
+  maximumDurationDays    Int      @default(14)
+  minimumIncrement       Decimal  @default(1000) @db.Decimal(12, 2)
+  requireVerifiedSeller  Boolean  @default(true)
+  requireVerifiedBuyer   Boolean  @default(false)
+
+  updatedAt              DateTime @updatedAt
+  updatedBy              String?
+
+  @@map("auction_settings")
+}
+
+// ============================================
+// 11. NOTIFICATIONS
+// Responsabilité : activation des canaux de notification
+// ============================================
+
+model NotificationSettings {
+  id                  String   @id @default("singleton")
+  emailEnabled        Boolean  @default(true)
+  smsEnabled          Boolean  @default(false)
+  pushEnabled         Boolean  @default(false)
+  orderNotifications  Boolean  @default(true)
+  paymentNotifications Boolean @default(true)
+  shippingNotifications Boolean @default(true)
+  sellerNotifications Boolean  @default(true)
+  adminNotifications  Boolean  @default(true)
+
+  updatedAt           DateTime @updatedAt
+  updatedBy           String?
+
+  @@map("notification_settings")
+}
+
+// ============================================
+// 12. JOURNAL D'AUDIT DES PARAMÈTRES
+// Responsabilité : traçabilité des changements
+// ============================================
+
+model SettingsAuditLog {
+  id            String              @id @default(cuid())
+  actorId       String?
+  domain        SettingsDomain
+  settingId     String?
+  action        SettingsAuditAction
+  changes       Json?
+  requestId     String?
+  ipAddress     String?
+  userAgent     String?
+
+  createdAt     DateTime            @default(now())
+
+  @@index([domain, createdAt])
+  @@index([actorId, createdAt])
+  @@index([settingId])
+  @@map("settings_audit_logs")
+}
